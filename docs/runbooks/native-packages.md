@@ -1,0 +1,56 @@
+# Native Package Contract
+
+Skawld Maintenance remains a server product. Linux OCI images are the preferred
+production distribution. Native archives support development, integration
+testing, demonstrations, and explicitly qualified installations on Windows and
+macOS.
+
+## Build
+
+From any platform with Go installed:
+
+```text
+go run ./tools/package -version <version> [-commit <sha>] [-built-at <RFC3339>] [-clean]
+```
+
+The packaging tool uses `CGO_ENABLED=0`, `-trimpath`, and `-buildvcs=false`.
+Build metadata is embedded in the binaries and exposed by API liveness.
+
+Artifacts:
+
+```text
+dist/packages/<version>/
+├── SHA256SUMS
+├── skawld-maintenance_<version>_windows_amd64.zip
+├── skawld-maintenance_<version>_windows_arm64.zip
+├── skawld-maintenance_<version>_darwin_amd64.tar.gz
+├── skawld-maintenance_<version>_darwin_arm64.tar.gz
+├── skawld-maintenance_<version>_linux_amd64.tar.gz
+└── skawld-maintenance_<version>_linux_arm64.tar.gz
+```
+
+Each archive contains:
+
+```text
+api[.exe]
+worker[.exe]
+migrate[.exe]
+README.txt
+.env.example
+contracts/openapi.yaml
+```
+
+## Release boundary
+
+Current archives are unsigned engineering artifacts:
+
+- macOS binaries are not code-signed or notarized;
+- Windows executables are not Authenticode-signed;
+- no MSI, PKG, launchd unit, or Windows service wrapper is included;
+- dependency services are not bundled into native installers;
+- no auto-update mechanism exists.
+
+Before external enterprise distribution, define signing identities, protected
+CI signing, notarization, SBOM/provenance, support matrix, upgrade/rollback, and
+service-management behavior. Do not weaken workstation security controls to run
+an unverified artifact.

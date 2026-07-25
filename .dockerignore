@@ -1,0 +1,10 @@
+.git
+.env
+.idea
+.vscode
+bin
+coverage
+dist
+web/node_modules
+mobile/.dart_tool
+mobile/build

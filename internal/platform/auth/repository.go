@@ -1,0 +1,202 @@
+package auth
+
+import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"sort"
+	"time"
+
+	"github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/clock"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/id"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Repository struct {
+	Pool  *pgxpool.Pool
+	IDs   id.Generator
+	Clock clock.Clock
+}
+
+type Flow struct {
+	Nonce        string
+	PKCEVerifier string
+	ReturnTo     string
+	ExpiresAt    time.Time
+}
+
+type IdentityClaims struct {
+	Subject     string
+	DisplayName string
+	Email       string
+}
+
+func (r Repository) SaveFlow(
+	ctx context.Context,
+	state string,
+	flow Flow,
+) error {
+	hash := sha256.Sum256([]byte(state))
+	_, err := r.Pool.Exec(ctx, `
+		INSERT INTO auth_flows (
+			state_hash, nonce, pkce_verifier, return_to, expires_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6)
+	`, hash[:], flow.Nonce, flow.PKCEVerifier, flow.ReturnTo, flow.ExpiresAt.UTC(), r.Clock.Now())
+	if err != nil {
+		return fmt.Errorf("save OIDC flow: %w", err)
+	}
+	return nil
+}
+
+func (r Repository) ConsumeFlow(ctx context.Context, state string) (Flow, error) {
+	hash := sha256.Sum256([]byte(state))
+	var flow Flow
+	err := r.Pool.QueryRow(ctx, `
+		DELETE FROM auth_flows
+		WHERE state_hash = $1
+		RETURNING nonce, pkce_verifier, return_to, expires_at
+	`, hash[:]).Scan(&flow.Nonce, &flow.PKCEVerifier, &flow.ReturnTo, &flow.ExpiresAt)
+	if err != nil {
+		return Flow{}, fmt.Errorf("consume OIDC flow: %w", err)
+	}
+	if !r.Clock.Now().Before(flow.ExpiresAt) {
+		return Flow{}, fmt.Errorf("OIDC flow expired")
+	}
+	return flow, nil
+}
+
+func (r Repository) ResolvePrincipal(
+	ctx context.Context,
+	claims IdentityClaims,
+	bootstrapSubjects map[string]struct{},
+) (domain.Principal, error) {
+	if claims.Subject == "" {
+		return domain.Principal{}, fmt.Errorf("OIDC subject is required")
+	}
+	now := r.Clock.Now()
+	principalID := r.IDs.New()
+	err := r.Pool.QueryRow(ctx, `
+		INSERT INTO principals (
+			id, external_subject, display_name, email, created_at, updated_at
+		) VALUES ($1::uuid, $2, $3, nullif($4, ''), $5, $5)
+		ON CONFLICT (external_subject) DO UPDATE
+		SET display_name = EXCLUDED.display_name,
+		    email = EXCLUDED.email,
+		    updated_at = EXCLUDED.updated_at
+		RETURNING id::text
+	`, principalID, claims.Subject, claims.DisplayName, claims.Email, now).Scan(&principalID)
+	if err != nil {
+		return domain.Principal{}, fmt.Errorf("resolve principal: %w", err)
+	}
+
+	principal := domain.Principal{
+		ID:              principalID,
+		ExternalSubject: claims.Subject,
+		DisplayName:     claims.DisplayName,
+		Permissions:     make(map[domain.Permission]struct{}),
+	}
+	rows, err := r.Pool.Query(ctx, `
+		SELECT organization_id::text, coalesce(site_id::text, ''), role
+		FROM memberships
+		WHERE principal_id = $1::uuid
+		ORDER BY created_at
+	`, principalID)
+	if err != nil {
+		return domain.Principal{}, fmt.Errorf("load principal memberships: %w", err)
+	}
+	defer rows.Close()
+	siteSet := make(map[string]struct{})
+	for rows.Next() {
+		var organizationID, siteID, role string
+		if err := rows.Scan(&organizationID, &siteID, &role); err != nil {
+			return domain.Principal{}, fmt.Errorf("scan principal membership: %w", err)
+		}
+		if principal.OrganizationID == "" {
+			principal.OrganizationID = organizationID
+		}
+		if siteID != "" {
+			siteSet[siteID] = struct{}{}
+		}
+		addRolePermissions(principal.Permissions, role)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Principal{}, fmt.Errorf("iterate principal memberships: %w", err)
+	}
+	for siteID := range siteSet {
+		principal.SiteIDs = append(principal.SiteIDs, siteID)
+	}
+	sort.Strings(principal.SiteIDs)
+	if _, ok := bootstrapSubjects[claims.Subject]; ok {
+		principal.Permissions[domain.PermissionOrganizationCreate] = struct{}{}
+	}
+	return principal, nil
+}
+
+func (r Repository) CreateSession(
+	ctx context.Context,
+	token string,
+	principalID string,
+	expiresAt time.Time,
+) error {
+	hash := sha256.Sum256([]byte(token))
+	now := r.Clock.Now()
+	_, err := r.Pool.Exec(ctx, `
+		INSERT INTO web_sessions (
+			token_hash, principal_id, expires_at, created_at, last_seen_at
+		) VALUES ($1, $2::uuid, $3, $4, $4)
+	`, hash[:], principalID, expiresAt.UTC(), now)
+	if err != nil {
+		return fmt.Errorf("create web session: %w", err)
+	}
+	return nil
+}
+
+func (r Repository) PrincipalForSession(
+	ctx context.Context,
+	token string,
+	bootstrapSubjects map[string]struct{},
+) (domain.Principal, error) {
+	hash := sha256.Sum256([]byte(token))
+	var claims IdentityClaims
+	err := r.Pool.QueryRow(ctx, `
+		SELECT p.external_subject, p.display_name, coalesce(p.email, '')
+		FROM web_sessions s
+		JOIN principals p ON p.id = s.principal_id
+		WHERE s.token_hash = $1
+		  AND s.revoked_at IS NULL
+		  AND s.expires_at > $2
+		  AND p.status = 'ACTIVE'
+	`, hash[:], r.Clock.Now()).Scan(&claims.Subject, &claims.DisplayName, &claims.Email)
+	if err != nil {
+		return domain.Principal{}, fmt.Errorf("load web session: %w", err)
+	}
+	return r.ResolvePrincipal(ctx, claims, bootstrapSubjects)
+}
+
+func (r Repository) RevokeSession(ctx context.Context, token string) error {
+	hash := sha256.Sum256([]byte(token))
+	_, err := r.Pool.Exec(ctx, `
+		UPDATE web_sessions SET revoked_at = $2
+		WHERE token_hash = $1 AND revoked_at IS NULL
+	`, hash[:], r.Clock.Now())
+	if err != nil {
+		return fmt.Errorf("revoke web session: %w", err)
+	}
+	return nil
+}
+
+func addRolePermissions(target map[domain.Permission]struct{}, role string) {
+	switch role {
+	case "Administrator":
+		target[domain.PermissionOrganizationCreate] = struct{}{}
+		target[domain.PermissionWorkflowReview] = struct{}{}
+		target[domain.PermissionWorkflowPublish] = struct{}{}
+		target[domain.PermissionReportApprove] = struct{}{}
+	case "Maintenance Supervisor":
+		target[domain.PermissionWorkflowReview] = struct{}{}
+		target[domain.PermissionReportApprove] = struct{}{}
+	case "Senior Technician":
+		target[domain.PermissionWorkflowReview] = struct{}{}
+	}
+}

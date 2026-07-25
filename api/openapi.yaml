@@ -1,0 +1,298 @@
+openapi: 3.1.0
+info:
+  title: Skawld Maintenance API
+  version: 0.1.0-phase0
+  description: >
+    Phase 0 REST contract. AI output is untrusted and this API exposes no
+    industrial control action.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Identity
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      responses:
+        "200":
+          description: Process is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liveness"
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Required database dependency is ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          $ref: "#/components/responses/Problem"
+  /auth/login:
+    get:
+      tags: [Authentication]
+      operationId: beginWebLogin
+      parameters:
+        - in: query
+          name: return_to
+          schema:
+            type: string
+            default: /
+      responses:
+        "302":
+          description: Redirect to the configured OIDC provider.
+  /auth/callback:
+    get:
+      tags: [Authentication]
+      operationId: finishWebLogin
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: true
+          schema:
+            type: string
+      responses:
+        "303":
+          description: Session created; redirect to the validated local path.
+        "401":
+          $ref: "#/components/responses/Problem"
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logoutWebSession
+      responses:
+        "204":
+          description: Session revoked and cookie cleared.
+  /api/v1/me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentPrincipal
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current application principal and effective permissions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Principal"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /api/v1/organizations:
+    post:
+      tags: [Identity]
+      operationId: createOrganization
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+      responses:
+        "201":
+          description: Organization created atomically with membership and audit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "200":
+          description: Original result replayed for an identical idempotent request.
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: "true"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /api/v1/sites/{siteID}:
+    get:
+      tags: [Identity]
+      operationId: getAuthorizedSite
+      description: >
+        Returns a site only when the principal's organization/site membership
+        permits it. Unauthorized resources are not disclosed.
+      security:
+        - sessionCookie: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: siteID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Authorized site projection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Site"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: skawld_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OIDC access token for native/mobile Authorization Code + PKCE.
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+  responses:
+    Problem:
+      description: RFC 9457-style problem response.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Build:
+      type: object
+      required: [version, commit, built_at]
+      properties:
+        version:
+          type: string
+        commit:
+          type: string
+        built_at:
+          type: string
+    Liveness:
+      type: object
+      required: [status, build]
+      properties:
+        status:
+          type: string
+          const: live
+        build:
+          $ref: "#/components/schemas/Build"
+    Readiness:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ready
+    Principal:
+      type: object
+      required: [id, external_subject, display_name, site_ids, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        external_subject:
+          type: string
+        display_name:
+          type: string
+        organization_id:
+          type: string
+          format: uuid
+        site_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        permissions:
+          type: array
+          items:
+            type: string
+    Organization:
+      type: object
+      required: [id, name, source_of_truth, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        source_of_truth:
+          type: string
+          enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+    Site:
+      type: object
+      required: [id, organization_id, code, name, timezone, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        timezone:
+          type: string
+        status:
+          type: string
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
