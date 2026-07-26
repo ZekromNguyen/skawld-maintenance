@@ -14,7 +14,7 @@ The pinned PostgreSQL/pgvector and Keycloak container images publish both
 
 ## Prerequisites
 
-- Go `1.25.7` or a compatible newer patch release.
+- Go `1.25.12` or a compatible newer patch release.
 - Docker Desktop with Docker Compose, or a compatible alternative such as
   Colima.
 - Git and a POSIX shell.

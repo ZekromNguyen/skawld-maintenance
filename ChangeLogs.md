@@ -4,6 +4,16 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-07-26 — Go standard-library security update
+
+- Upgraded the minimum, CI, and container build toolchain from Go `1.25.7` to
+  Go `1.25.12`.
+- Cleared reachable standard-library findings reported by `govulncheck`,
+  including `crypto/tls`, `crypto/x509`, `net/http`, `net/textproto`,
+  `net/url`, `net`, and `os`.
+- Verified the full race-enabled PostgreSQL/S3 suite and `govulncheck` with the
+  exact `go1.25.12` toolchain.
+
 ### 2026-07-26 — Phase 5 pilot engineering baseline implemented
 
 #### Added

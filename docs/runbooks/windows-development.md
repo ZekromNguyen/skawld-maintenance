@@ -14,7 +14,7 @@ provided for compatible Go and Windows environments.
 ## Prerequisites
 
 - Windows 11 or a supported Windows 10 release.
-- Go `1.25.7` or a compatible newer patch release.
+- Go `1.25.12` or a compatible newer patch release.
 - Git for Windows.
 - Docker Desktop configured for Linux containers and Docker Compose.
 - PowerShell 7 is recommended; Windows PowerShell 5.1 is sufficient for the

@@ -1,6 +1,6 @@
 module github.com/ZekromNguyen/skawld-maintenance
 
-go 1.25.7
+go 1.25.12
 
 require (
 	github.com/ZekromNguyen/skawld-sdk-go v0.2.0

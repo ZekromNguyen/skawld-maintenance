@@ -7,7 +7,7 @@ All credentials below are development-only.
 
 ## Prerequisites
 
-- Go `1.25.7` or a compatible newer patch release.
+- Go `1.25.12` or a compatible newer patch release.
 - Podman with `podman compose`, or Docker with `docker compose`.
 - `curl`, `make`, and Poppler's `pdftotext` for a native Phase 2 worker.
 
