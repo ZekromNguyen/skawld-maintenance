@@ -261,9 +261,7 @@ class SyncEngine {
         status: const Value('RETRY'),
         attemptCount: Value(attempts),
         lastAttemptAt: Value(DateTime.now().toUtc()),
-        nextAttemptAt: Value(
-          DateTime.now().toUtc().add(delay),
-        ),
+        nextAttemptAt: Value(DateTime.now().toUtc().add(delay)),
         lastError: Value(reason),
       ),
     );
