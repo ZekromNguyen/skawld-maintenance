@@ -1,0 +1,33 @@
+name: skawld_maintenance_mobile
+description: Offline-first technician client for Skawld Maintenance.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  connectivity_plus: ^7.3.1
+  crypto: ^3.0.7
+  dio: ^5.11.0
+  drift: ^2.34.2
+  drift_flutter: ^0.3.1
+  file_selector: ^1.1.0
+  flutter_secure_storage: ^10.3.1
+  openid_client: ^0.4.10+1
+  path_provider: ^2.1.6
+  sqlite3: ^3.5.0
+  uuid: ^4.6.0
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  build_runner: ^2.15.1
+  drift_dev: ^2.34.5
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

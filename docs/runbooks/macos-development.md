@@ -18,6 +18,8 @@ The pinned PostgreSQL/pgvector and Keycloak container images publish both
 - Docker Desktop with Docker Compose, or a compatible alternative such as
   Colima.
 - Git and a POSIX shell.
+- Flutter stable, Xcode command-line tools, and CocoaPods when required are
+  additionally needed for the technician/workstation desktop application.
 
 With Homebrew:
 
@@ -63,6 +65,9 @@ The macOS archives are not currently signed or notarized. They are suitable for
 developer builds and controlled testing, not general end-user distribution.
 Code signing and notarization become a release requirement before distributing
 native binaries to enterprise users.
+
+For the Flutter `.app`, DMG, and ZIP rather than the Go backend archives,
+follow [Windows and macOS desktop application packages](./desktop-app-packages.md).
 
 ## Shutdown
 

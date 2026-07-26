@@ -1,0 +1,5 @@
+{
+  "api_url": "https://maintenance.example.internal",
+  "oidc_issuer": "https://identity.example.internal/realms/skawld",
+  "oidc_client_id": "skawld-mobile"
+}
