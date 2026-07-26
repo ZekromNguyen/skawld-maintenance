@@ -1,20 +1,50 @@
 openapi: 3.1.0
 info:
   title: Skawld Maintenance API
-  version: 0.1.0-phase0
+  version: 0.6.0-phase5
   description: >
-    Phase 0 REST contract. AI output is untrusted and this API exposes no
-    industrial control action.
+    Phase 5 pilot-ready evidence-first maintenance intelligence contract.
+    Learned candidates require exact evidence, human review, deterministic
+    evaluation, approval authority, and explicit publication. AI quality
+    labels are append-oriented. This API exposes no industrial control action
+    or permit authority.
 servers:
   - url: http://localhost:8080
     description: Local development
 tags:
   - name: Health
+    description: Process and dependency health.
   - name: Authentication
+    description: OIDC web session lifecycle.
   - name: Identity
+    description: Principal, organization, and site scope.
+  - name: Assets
+    description: Source-aware asset knowledge and approved criticality.
+  - name: Incidents
+    description: Lightweight native or external incident context.
+  - name: Executions
+    description: Deterministic maintenance execution and evidence.
+  - name: Attachments
+    description: Secure media manifest and verification lifecycle.
+  - name: Knowledge
+    description: Controlled document revisions, applicability, ingestion, and retrieval.
+  - name: Copilot
+    description: Typed evidence-backed advisory recommendations; no generic chat.
+  - name: Reports
+    description: Human-reviewable maintenance report drafts and approval.
+  - name: Handovers
+    description: Normal-work shift handover drafts and human acceptance.
+  - name: Demonstrations
+    description: Semantic work capture, provenance, redaction, and expert review.
+  - name: Workflows
+    description: Evidence-linked candidate compilation, review, applicability, evaluation, publication, and retirement.
+  - name: Evaluation
+    description: Human-reviewed AI quality and safety metrics.
 paths:
   /health/live:
     get:
+      summary: Get process liveness
+      security: []
       tags: [Health]
       operationId: getLiveness
       responses:
@@ -26,6 +56,8 @@ paths:
                 $ref: "#/components/schemas/Liveness"
   /health/ready:
     get:
+      summary: Get dependency readiness
+      security: []
       tags: [Health]
       operationId: getReadiness
       responses:
@@ -39,6 +71,8 @@ paths:
           $ref: "#/components/responses/Problem"
   /auth/login:
     get:
+      summary: Begin web OIDC login
+      security: []
       tags: [Authentication]
       operationId: beginWebLogin
       parameters:
@@ -52,6 +86,8 @@ paths:
           description: Redirect to the configured OIDC provider.
   /auth/callback:
     get:
+      summary: Complete web OIDC login
+      security: []
       tags: [Authentication]
       operationId: finishWebLogin
       parameters:
@@ -72,6 +108,8 @@ paths:
           $ref: "#/components/responses/Problem"
   /auth/logout:
     post:
+      summary: Revoke web session
+      security: []
       tags: [Authentication]
       operationId: logoutWebSession
       responses:
@@ -79,6 +117,7 @@ paths:
           description: Session revoked and cookie cleared.
   /api/v1/me:
     get:
+      summary: Get current principal
       tags: [Identity]
       operationId: getCurrentPrincipal
       security:
@@ -95,6 +134,7 @@ paths:
           $ref: "#/components/responses/Problem"
   /api/v1/organizations:
     post:
+      summary: Create an organization
       tags: [Identity]
       operationId: createOrganization
       security:
@@ -142,6 +182,7 @@ paths:
           $ref: "#/components/responses/Problem"
   /api/v1/sites/{siteID}:
     get:
+      summary: Get an authorized site
       tags: [Identity]
       operationId: getAuthorizedSite
       description: >
@@ -170,6 +211,1260 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /api/v1/assets:
+    get:
+      summary: List authorized assets
+      tags: [Assets]
+      operationId: listAssets
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: q, schema: {type: string}}
+      responses:
+        "200":
+          description: Assets in the principal's authorized scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Asset"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Create an asset
+      tags: [Assets]
+      operationId: createAsset
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CreateAsset"}
+      responses:
+        "201":
+          description: Asset created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Asset"}
+        "200": {$ref: "#/components/responses/IdempotentReplay"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/assets/{assetID}:
+    get:
+      summary: Get asset detail
+      tags: [Assets]
+      operationId: getAsset
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/AssetID"}]
+      responses:
+        "200":
+          description: Authorized asset detail.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Asset"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/assets/{assetID}/criticality-approvals:
+    post:
+      summary: Approve asset criticality
+      tags: [Assets]
+      operationId: approveAssetCriticality
+      description: Requires both RBAC permission and a matching ApprovalAuthority.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/AssetID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CriticalityCommand"}
+      responses:
+        "201": {description: Human-approved criticality recorded.}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents:
+    get:
+      summary: List authorized incidents
+      tags: [Incidents]
+      operationId: listIncidents
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: asset_id, schema: {type: string, format: uuid}}
+        - {in: query, name: state, schema: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED]}}
+      responses:
+        "200":
+          description: Incidents in the authorized scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Incident"}}
+    post:
+      summary: Create an incident
+      tags: [Incidents]
+      operationId: createIncident
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CreateIncident"}
+      responses:
+        "201":
+          description: Incident created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Incident"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents/{incidentID}:
+    get:
+      summary: Get incident detail
+      tags: [Incidents]
+      operationId: getIncident
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IncidentID"}]
+      responses:
+        "200":
+          description: Authorized incident detail.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Incident"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents/{incidentID}/resolution:
+    post:
+      summary: Resolve an incident
+      tags: [Incidents]
+      operationId: resolveIncident
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IncidentID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, resolution_summary]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+                resolution_summary: {type: string, minLength: 1}
+      responses:
+        "200": {description: Incident resolved by an authorized actor.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents/{incidentID}/executions:
+    post:
+      summary: Create a pump inspection execution
+      tags: [Executions]
+      operationId: createPumpInspectionExecution
+      description: Creates the Phase 1 deterministic pump inspection; not a CMMS work order.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IncidentID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [purpose]
+              properties:
+                assigned_to: {type: string, format: uuid}
+                purpose: {type: string, minLength: 1}
+      responses:
+        "201":
+          description: Execution created.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Execution"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions:
+    get:
+      summary: List assigned or authorized executions
+      tags: [Executions]
+      operationId: listExecutions
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: state, schema: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}}
+        - {in: query, name: assigned_to, schema: {type: string, description: "Use me for the current mobile principal."}}
+      responses:
+        "200":
+          description: Executions visible to the principal; field roles are constrained to their own assignments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Execution"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}:
+    get:
+      summary: Get execution detail
+      tags: [Executions]
+      operationId: getExecution
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/ExecutionID"}]
+      responses:
+        "200":
+          description: Execution with steps and field evidence.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Execution"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}/start:
+    post:
+      summary: Start an execution
+      tags: [Executions]
+      operationId: startExecution
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Execution started.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}/steps/{stepID}/complete:
+    post:
+      summary: Complete an execution step
+      tags: [Executions]
+      operationId: completeExecutionStep
+      description: Returns 409 and a blocked step when a required external prerequisite is absent.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {in: path, name: stepID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_execution_version, expected_step_version]
+              properties:
+                expected_execution_version: {type: integer, format: int64, minimum: 1}
+                expected_step_version: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200": {description: Step completed.}
+        "409":
+          description: Version conflict or safety prerequisite blocked the step.
+  /api/v1/executions/{executionID}/prerequisite-verifications:
+    post:
+      summary: Record external prerequisite evidence
+      tags: [Executions]
+      operationId: recordExternalPrerequisiteVerification
+      description: Records evidence from an external PTW/LOTO authority; Skawld is not that authority.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PrerequisiteVerificationCommand"}
+      responses:
+        "201": {description: External verification evidence recorded.}
+        "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}/measurements:
+    post:
+      summary: Record a maintenance measurement
+      tags: [Executions]
+      operationId: recordMeasurement
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MeasurementCommand"}
+      responses:
+        "201":
+          description: Exact, deterministically converted maintenance measurement recorded.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Measurement"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}/observations:
+    post:
+      summary: Record an observation
+      tags: [Executions]
+      operationId: recordObservation
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "201": {description: "Human, voice, vision-candidate, or external observation recorded."}
+  /api/v1/executions/{executionID}/actions:
+    post:
+      summary: Record a maintenance action
+      tags: [Executions]
+      operationId: recordMaintenanceAction
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "201": {description: Non-control maintenance action evidence recorded.}
+  /api/v1/executions/{executionID}/decisions:
+    post:
+      summary: Record a technician decision
+      tags: [Executions]
+      operationId: recordExecutionDecision
+      description: Captures a semantic decision, rationale, alternatives, and context rather than UI coordinates.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [client_event_id, decision, rationale, decided_at]
+              properties:
+                client_event_id: {type: string, format: uuid}
+                device_id: {type: string}
+                created_at_device: {type: string, format: date-time}
+                step_id: {type: string, format: uuid}
+                component_id: {type: string, format: uuid}
+                decision: {type: string, minLength: 1}
+                rationale: {type: string, minLength: 1}
+                alternatives: {type: array, items: {type: string}}
+                decided_at: {type: string, format: date-time}
+      responses:
+        "201": {description: Semantic technician decision recorded.}
+        "400": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/executions/{executionID}/complete:
+    post:
+      summary: Complete an execution
+      tags: [Executions]
+      operationId: completeExecution
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "200": {description: Fully completed execution closed with an outcome summary.}
+  /api/v1/attachments:
+    post:
+      summary: Create an attachment manifest
+      tags: [Attachments]
+      operationId: createAttachmentManifest
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AttachmentManifestCommand"}
+      responses:
+        "201":
+          description: Pending manifest and constrained signed upload request.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Attachment"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/attachments/{attachmentID}/complete:
+    post:
+      summary: Verify a completed attachment upload
+      tags: [Attachments]
+      operationId: completeAttachmentUpload
+      description: Streams and verifies object size, SHA-256, and magic-byte MIME before availability.
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: attachmentID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "200":
+          description: Attachment verified and available.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Attachment"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/attachments/{attachmentID}/transcriptions:
+    post:
+      summary: Queue transcription through the configured provider
+      description: >
+        The transcript is always an unverified candidate until a human verifies
+        or rejects it. Returns 503 when no deployment speech provider is configured.
+      tags: [Attachments]
+      operationId: requestAttachmentTranscription
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: attachmentID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "202": {description: Transcription job queued transactionally.}
+        "503": {$ref: "#/components/responses/Problem"}
+  /api/v1/transcriptions/{transcriptionID}:
+    get:
+      summary: Get transcription candidate and verification state
+      tags: [Attachments]
+      operationId: getTranscription
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: transcriptionID, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Versioned candidate with provider and source provenance.}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/transcriptions/{transcriptionID}/verify:
+    post:
+      summary: Human-verify, correct, or reject a transcript candidate
+      tags: [Attachments]
+      operationId: verifyTranscription
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: transcriptionID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, transcript, accept]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+                transcript: {type: string, maxLength: 50000}
+                accept: {type: boolean}
+      responses:
+        "200": {description: Candidate verified/corrected or rejected by a human.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/documents:
+    get:
+      summary: List authorized controlled documents
+      tags: [Knowledge]
+      operationId: listDocuments
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Documents and revision lifecycle in authorized scope.
+    post:
+      summary: Create controlled document metadata
+      tags: [Knowledge]
+      operationId: createDocument
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site_id, document_type, title, authority]
+              properties:
+                site_id: {type: string, format: uuid}
+                document_type:
+                  type: string
+                  enum: [OEM_MANUAL, SOP, WORK_INSTRUCTION, DATASHEET, INSPECTION_PROCEDURE, SAFETY_PROCEDURE, TECHNICAL_BULLETIN]
+                title: {type: string, minLength: 1}
+                authority:
+                  type: string
+                  enum: [OEM, CORPORATE, SITE_APPROVED, REGULATORY, EXPERT_REFERENCE]
+                source_reference: {type: string}
+      responses:
+        "201": {description: Document metadata created.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/documents/{documentID}:
+    get:
+      summary: Get document and revision validity
+      tags: [Knowledge]
+      operationId: getDocument
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: documentID, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Controlled document with revision history.}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/documents/{documentID}/revisions:
+    post:
+      summary: Create a document revision and applicability
+      tags: [Knowledge]
+      operationId: createDocumentRevision
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: documentID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [revision, language, applicability]
+              properties:
+                revision: {type: string, minLength: 1}
+                effective_at: {type: string, format: date-time}
+                expires_at: {type: string, format: date-time}
+                language: {type: string}
+                applicability:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      site_id: {type: string, format: uuid}
+                      asset_id: {type: string, format: uuid}
+                      asset_class: {type: string}
+                      manufacturer: {type: string}
+                      model: {type: string}
+                      process_service: {type: string}
+      responses:
+        "201": {description: Draft revision created.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/document-revisions/{revisionID}/ingestion:
+    post:
+      summary: Atomically queue document extraction and embedding
+      tags: [Knowledge]
+      operationId: requestDocumentIngestion
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: revisionID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [attachment_id]
+              properties:
+                attachment_id: {type: string, format: uuid}
+      responses:
+        "202": {description: PostgreSQL-backed ingestion job committed with revision state.}
+        "422": {$ref: "#/components/responses/Problem"}
+  /api/v1/document-revisions/{revisionID}/approve:
+    post:
+      summary: Approve a ready revision using approval authority
+      tags: [Knowledge]
+      operationId: approveDocumentRevision
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: revisionID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Revision approved and prior approved revision superseded.}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/document-revisions/{revisionID}/retire:
+    post:
+      summary: Retire a document revision
+      tags: [Knowledge]
+      operationId: retireDocumentRevision
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: revisionID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, reason]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+                reason: {type: string, minLength: 1}
+      responses:
+        "200": {description: Revision retired and immediately ineligible.}
+  /api/v1/search:
+    post:
+      summary: Search an authorization-first eligible evidence set
+      description: >
+        Tenant, authorized site, approval, validity, supersession, and asset
+        applicability are applied in SQL before FTS/vector ranking and RRF.
+      tags: [Knowledge]
+      operationId: searchEvidence
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site_id, query]
+              properties:
+                site_id: {type: string, format: uuid}
+                asset_id: {type: string, format: uuid}
+                query: {type: string, minLength: 1, maxLength: 500}
+                limit: {type: integer, minimum: 1, maximum: 20}
+                language: {type: string}
+                process_service: {type: string}
+      responses:
+        "200": {description: "Ranked evidence with inspectable lexical, vector, and RRF scores."}
+  /api/v1/incidents/{incidentID}/recommendations:
+    post:
+      summary: Generate an evidence-backed advisory recommendation
+      tags: [Copilot]
+      operationId: generateIncidentRecommendation
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IncidentID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                question: {type: string, maxLength: 500}
+                execution_id: {type: string, format: uuid}
+      responses:
+        "201": {description: Advisory recommendation or INSUFFICIENT_EVIDENCE with provenance.}
+        "422": {description: "Model JSON, evidence, or risk envelope was rejected."}
+  /api/v1/recommendations/{recommendationID}:
+    get:
+      summary: Get a recommendation and immutable evidence snapshot
+      tags: [Copilot]
+      operationId: getRecommendation
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: recommendationID, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: "Recommendation, unknowns, evidence, and model provenance."}
+  /api/v1/recommendations/{recommendationID}/feedback:
+    post:
+      summary: Record human review or correction
+      tags: [Copilot]
+      operationId: reviewRecommendation
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: recommendationID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [outcome]
+              properties:
+                outcome:
+                  type: string
+                  enum:
+                    [ACCEPTED, REJECTED, CORRECTED, UNSAFE,
+                     UNSUPPORTED, INCORRECT_NEXT_STEP]
+                correction: {type: string}
+                reason: {type: string}
+                material_claims: {type: integer, minimum: 0}
+                supported_claims: {type: integer, minimum: 0}
+                retrieved_evidence: {type: integer, minimum: 0}
+                relevant_evidence: {type: integer, minimum: 0}
+      responses:
+        "204": {description: Append-oriented feedback recorded for later evaluation.}
+  /api/v1/executions/{executionID}/reports/draft:
+    post:
+      summary: Prepare a structured maintenance report draft
+      tags: [Reports]
+      operationId: draftMaintenanceReport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/ExecutionID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "201": {description: Human-reviewable draft with exact evidence and model provenance.}
+  /api/v1/reports/{reportID}:
+    get:
+      summary: Get report draft or approved revision
+      tags: [Reports]
+      operationId: getMaintenanceReport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: reportID, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Structured report and edit/approval state.}
+  /api/v1/reports/{reportID}/edit:
+    post:
+      summary: Edit a draft without introducing unknown evidence
+      tags: [Reports]
+      operationId: editMaintenanceReport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: reportID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, structured_content]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+                structured_content: {$ref: "#/components/schemas/ReportContent"}
+      responses:
+        "200": {description: Human edit preserved in append-oriented edit history.}
+  /api/v1/reports/{reportID}/submit:
+    post:
+      summary: Submit report for approval
+      tags: [Reports]
+      operationId: submitMaintenanceReport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: reportID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Draft submitted.}
+  /api/v1/reports/{reportID}/approve:
+    post:
+      summary: Approve submitted report using approval authority
+      tags: [Reports]
+      operationId: approveMaintenanceReport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: reportID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Report approved by an authorized human.}
+  /api/v1/handovers/prepare-draft:
+    post:
+      summary: Prepare shift handover from current authorized records
+      tags: [Handovers]
+      operationId: prepareShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site_id, shift_start, shift_end]
+              properties:
+                site_id: {type: string, format: uuid}
+                shift_start: {type: string, format: date-time}
+                shift_end: {type: string, format: date-time}
+      responses:
+        "201": {description: Draft with normal-work evidence and model provenance.}
+  /api/v1/handovers/{handoverID}:
+    get:
+      summary: Get a shift handover
+      tags: [Handovers]
+      operationId: getShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: handoverID, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Handover draft or accepted record.}
+  /api/v1/handovers/{handoverID}/edit:
+    post:
+      summary: Human-edit a draft handover
+      tags: [Handovers]
+      operationId: editShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: handoverID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, structured_content]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+                structured_content: {$ref: "#/components/schemas/HandoverContent"}
+      responses:
+        "200": {description: Handover edited with audit history.}
+  /api/v1/handovers/{handoverID}/submit:
+    post:
+      summary: Submit a handover
+      tags: [Handovers]
+      operationId: submitShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: handoverID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Handover submitted.}
+  /api/v1/handovers/{handoverID}/accept:
+    post:
+      summary: Accept a submitted handover using approval authority
+      tags: [Handovers]
+      operationId: acceptShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: handoverID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Handover accepted by an authorized human.}
+  /api/v1/handovers/{handoverID}/acknowledge:
+    post:
+      summary: Incoming supervisor acknowledges accepted handover
+      tags: [Handovers]
+      operationId: acknowledgeShiftHandover
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: path, name: handoverID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
+      responses:
+        "200": {description: Accepted handover acknowledged.}
+  /api/v1/demonstrations:
+    get:
+      summary: List semantic demonstrations
+      tags: [Demonstrations]
+      operationId: listDemonstrations
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Demonstrations in the authorized organization/site scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Demonstration"}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Start semantic demonstration capture
+      tags: [Demonstrations]
+      operationId: startDemonstration
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subject_kind, subject_id]
+              properties:
+                subject_kind: {type: string, enum: [EXECUTION, HANDOVER]}
+                subject_id: {type: string, format: uuid}
+      responses:
+        "201":
+          description: SDK Observation v1 recording started.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Demonstration"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/demonstrations/{demonstrationID}:
+    get:
+      summary: Get demonstration timeline and capture health
+      tags: [Demonstrations]
+      operationId: getDemonstration
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/DemonstrationID"}
+      responses:
+        "200":
+          description: Authorized, redaction-aware semantic timeline.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Demonstration"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/demonstrations/{demonstrationID}/complete:
+    post:
+      summary: Complete semantic demonstration
+      description: >
+        Flushes durable capture deliveries before SDK trace validation. Pending
+        or failed deliveries return conflict and never alter maintenance state.
+      tags: [Demonstrations]
+      operationId: completeDemonstration
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/DemonstrationID"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [outcome]
+              properties:
+                outcome: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        "200":
+          description: Complete SDK trace.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Demonstration"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/demonstrations/{demonstrationID}/evidence-views:
+    post:
+      summary: Record an authorized evidence view
+      tags: [Demonstrations]
+      operationId: recordDemonstrationEvidenceView
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/DemonstrationID"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [evidence_id]
+              properties:
+                evidence_id: {type: string, minLength: 1, maxLength: 256}
+                intent: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Semantic evidence-view event appended.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DemonstrationEvent"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/demonstrations/{demonstrationID}/reviews:
+    post:
+      summary: Review a completed demonstration
+      description: Requires review permission and matching ApprovalAuthority.
+      tags: [Demonstrations]
+      operationId: reviewDemonstration
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/DemonstrationID"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason]
+              properties:
+                decision:
+                  type: string
+                  enum: [APPROVED, REJECTED, REDACTION_REQUIRED]
+                reason: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        "201": {description: Append-oriented review recorded.}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/demonstrations/{demonstrationID}/events/{eventID}/redactions:
+    post:
+      summary: Add a review redaction overlay
+      tags: [Demonstrations]
+      operationId: redactDemonstrationEvent
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/DemonstrationID"}
+        - {in: path, name: eventID, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [json_path, action, reason]
+              properties:
+                json_path: {type: string, minLength: 3, maxLength: 512}
+                action: {type: string, enum: [MASK, DROP]}
+                reason: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        "201": {description: Redaction overlay and audit event recorded.}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflow-candidates:
+    post:
+      summary: Compile a review-only workflow candidate
+      description: >
+        Uses at least two completed and approved semantic demonstrations.
+        Compiler validation rejects fabricated event references, unknown tools,
+        incomplete safety metadata, and unclassified semantic actions. This
+        operation never publishes a workflow.
+      tags: [Workflows]
+      operationId: compileWorkflowCandidate
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, demonstration_ids]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                description: {type: string, maxLength: 2000}
+                demonstration_ids:
+                  type: array
+                  minItems: 2
+                  maxItems: 20
+                  uniqueItems: true
+                  items: {type: string, format: uuid}
+      responses:
+        "201":
+          description: Review-only candidate compiled.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows:
+    get:
+      summary: List authorized workflow versions
+      tags: [Workflows]
+      operationId: listWorkflowVersions
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      responses:
+        "200":
+          description: Workflow versions in authorized site scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/WorkflowVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/applicable:
+    get:
+      summary: List current published workflows applicable to one asset
+      description: >
+        Tenant, site, lifecycle, effective/review dates, and typed applicability
+        are eligibility predicates in SQL before a workflow is returned.
+      tags: [Workflows]
+      operationId: listApplicableWorkflows
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - in: query
+          name: asset_id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Current applicable published workflow versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/WorkflowVersion"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/{workflowID}/versions/{version}:
+    get:
+      summary: Get an exact workflow version and governance evidence
+      tags: [Workflows]
+      operationId: getWorkflowVersion
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/WorkflowID"}
+        - {$ref: "#/components/parameters/WorkflowVersion"}
+      responses:
+        "200":
+          description: Exact immutable candidate or published version.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/{workflowID}/versions/{version}/reviews:
+    post:
+      summary: Review an exact workflow candidate digest
+      description: >
+        Workflow review permission and a current scoped ApprovalAuthority are
+        both required. Approval records applicability, prerequisites,
+        competencies, effective date, and review date.
+      tags: [Workflows]
+      operationId: reviewWorkflowCandidate
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/WorkflowID"}
+        - {$ref: "#/components/parameters/WorkflowVersion"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason, applicability]
+              properties:
+                decision:
+                  type: string
+                  enum: [APPROVED, REJECTED, REVIEW_REQUIRED]
+                reason: {type: string, minLength: 1, maxLength: 2000}
+                applicability:
+                  type: array
+                  items: {$ref: "#/components/schemas/WorkflowApplicability"}
+                prerequisites:
+                  type: array
+                  maxItems: 20
+                  items: {type: string, minLength: 1, maxLength: 200}
+                required_competencies:
+                  type: array
+                  maxItems: 20
+                  items: {type: string, minLength: 1, maxLength: 200}
+                effective_at: {type: string, format: date-time}
+                review_at: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Append-only candidate review recorded.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/{workflowID}/versions/{version}/publish:
+    post:
+      summary: Evaluate and publish an approved workflow candidate
+      description: >
+        Publication requires workflow-publish permission, a separate current
+        ApprovalAuthority, an approved exact digest, unchanged tool contracts,
+        and passing deterministic task-success and unsafe-action gates.
+      tags: [Workflows]
+      operationId: publishWorkflowVersion
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/WorkflowID"}
+        - {$ref: "#/components/parameters/WorkflowVersion"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        "200":
+          description: Immutable effective-dated workflow version published.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/{workflowID}/versions/{version}/applicability:
+    post:
+      summary: Approve a separate applicability expansion
+      tags: [Workflows]
+      operationId: expandWorkflowApplicability
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/WorkflowID"}
+        - {$ref: "#/components/parameters/WorkflowVersion"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, applicability]
+              properties:
+                reason: {type: string, minLength: 1, maxLength: 2000}
+                applicability:
+                  $ref: "#/components/schemas/WorkflowApplicability"
+      responses:
+        "201":
+          description: Separately authorized applicability scope appended.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/workflows/{workflowID}/versions/{version}/retire:
+    post:
+      summary: Retire a published workflow version
+      tags: [Workflows]
+      operationId: retireWorkflowVersion
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/WorkflowID"}
+        - {$ref: "#/components/parameters/WorkflowVersion"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        "200":
+          description: Workflow version retired and excluded from applicability.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkflowVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/evaluations/summary:
+    get:
+      summary: Get tenant- and site-scoped pilot quality metrics
+      tags: [Evaluation]
+      operationId: getEvaluationSummary
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      responses:
+        "200":
+          description: Aggregated latest human labels and workflow evaluation gates.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/EvaluationSummary"}
+        "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     sessionCookie:
@@ -190,6 +1485,47 @@ components:
         type: string
         minLength: 8
         maxLength: 200
+    AssetID:
+      in: path
+      name: assetID
+      required: true
+      schema: {type: string, format: uuid}
+    IncidentID:
+      in: path
+      name: incidentID
+      required: true
+      schema: {type: string, format: uuid}
+    ExecutionID:
+      in: path
+      name: executionID
+      required: true
+      schema: {type: string, format: uuid}
+    DemonstrationID:
+      in: path
+      name: demonstrationID
+      required: true
+      schema: {type: string, format: uuid}
+    WorkflowID:
+      in: path
+      name: workflowID
+      required: true
+      schema: {type: string, format: uuid}
+    WorkflowVersion:
+      in: path
+      name: version
+      required: true
+      schema: {type: integer, minimum: 1}
+  requestBodies:
+    ExpectedVersion:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expected_version]
+            properties:
+              expected_version: {type: integer, format: int64, minimum: 1}
   responses:
     Problem:
       description: RFC 9457-style problem response.
@@ -197,7 +1533,38 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    IdempotentReplay:
+      description: Original successful response replayed for the same command.
+      headers:
+        Idempotent-Replayed:
+          schema: {type: string, const: "true"}
   schemas:
+    ReportContent:
+      type: object
+      additionalProperties: false
+      required: [summary, measurements, observations, actions, outcome, evidence_ids, unknowns, requires_human_review]
+      properties:
+        summary: {type: string, minLength: 1, maxLength: 5000}
+        measurements: {type: array, maxItems: 100, items: {type: string}}
+        observations: {type: array, maxItems: 100, items: {type: string}}
+        actions: {type: array, maxItems: 100, items: {type: string}}
+        outcome: {type: string}
+        evidence_ids: {type: array, items: {type: string}}
+        unknowns: {type: array, maxItems: 50, items: {type: string}}
+        requires_human_review: {type: boolean, const: true}
+    HandoverContent:
+      type: object
+      additionalProperties: false
+      required: [summary, open_incidents, active_executions, safety_concerns, follow_up, evidence_ids, unknowns, requires_human_review]
+      properties:
+        summary: {type: string, minLength: 1, maxLength: 5000}
+        open_incidents: {type: array, maxItems: 100, items: {type: string}}
+        active_executions: {type: array, maxItems: 100, items: {type: string}}
+        safety_concerns: {type: array, maxItems: 100, items: {type: string}}
+        follow_up: {type: array, maxItems: 100, items: {type: string}}
+        evidence_ids: {type: array, items: {type: string}}
+        unknowns: {type: array, maxItems: 100, items: {type: string}}
+        requires_human_review: {type: boolean, const: true}
     Build:
       type: object
       required: [version, commit, built_at]
@@ -281,6 +1648,463 @@ components:
           type: string
         status:
           type: string
+    CreateAsset:
+      type: object
+      additionalProperties: false
+      required: [site_id, tag, name, class, source_of_truth]
+      properties:
+        site_id: {type: string, format: uuid}
+        parent_asset_id: {type: string, format: uuid}
+        tag: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        class: {type: string, minLength: 1}
+        manufacturer: {type: string}
+        model: {type: string}
+        source_of_truth:
+          type: string
+          enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        external_reference:
+          type: object
+          required: [system, id]
+          properties:
+            system: {type: string}
+            id: {type: string}
+            version: {type: string}
+        components:
+          type: array
+          items:
+            type: object
+            required: [code, name, type]
+            properties:
+              code: {type: string}
+              name: {type: string}
+              type: {type: string}
+    Asset:
+      type: object
+      required: [id, organization_id, site_id, tag, name, class, status, source_of_truth, version, components]
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        parent_asset_id: {type: string, format: uuid}
+        tag: {type: string}
+        name: {type: string}
+        class: {type: string}
+        manufacturer: {type: string}
+        model: {type: string}
+        status: {type: string, enum: [ACTIVE, INACTIVE, RETIRED]}
+        source_of_truth:
+          type: string
+          enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        version: {type: integer, format: int64}
+        components: {type: array, items: {type: object}}
+        criticality: {$ref: "#/components/schemas/Criticality"}
+    Criticality:
+      type: object
+      properties:
+        rating: {type: string, enum: [A, B, C]}
+        safety_impact: {type: integer, minimum: 0, maximum: 5}
+        production_impact: {type: integer, minimum: 0, maximum: 5}
+        environmental_impact: {type: integer, minimum: 0, maximum: 5}
+        financial_impact: {type: integer, minimum: 0, maximum: 5}
+        redundancy: {type: string}
+        rationale: {type: string}
+        approved_by: {type: string, format: uuid}
+        approved_at: {type: string, format: date-time}
+    CriticalityCommand:
+      type: object
+      additionalProperties: false
+      required: [rating, safety_impact, production_impact, environmental_impact, financial_impact, redundancy, rationale]
+      properties:
+        rating: {type: string, enum: [A, B, C]}
+        safety_impact: {type: integer, minimum: 0, maximum: 5}
+        production_impact: {type: integer, minimum: 0, maximum: 5}
+        environmental_impact: {type: integer, minimum: 0, maximum: 5}
+        financial_impact: {type: integer, minimum: 0, maximum: 5}
+        redundancy: {type: string}
+        rationale: {type: string, minLength: 1}
+    CreateIncident:
+      type: object
+      additionalProperties: false
+      required: [site_id, asset_id, summary, severity, source_of_truth, detected_at]
+      properties:
+        site_id: {type: string, format: uuid}
+        asset_id: {type: string, format: uuid}
+        summary: {type: string, minLength: 1}
+        severity: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
+        source_of_truth:
+          type: string
+          enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        external_system: {type: string}
+        external_id: {type: string}
+        external_version: {type: string}
+        occurred_at: {type: string, format: date-time}
+        detected_at: {type: string, format: date-time}
+    Incident:
+      type: object
+      required: [id, organization_id, site_id, asset_id, number, summary, severity, state, source_of_truth, detected_at, version]
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        asset_id: {type: string, format: uuid}
+        asset_tag: {type: string}
+        number: {type: string}
+        summary: {type: string}
+        severity: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
+        state: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED]}
+        source_of_truth:
+          type: string
+          enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        detected_at: {type: string, format: date-time}
+        version: {type: integer, format: int64}
+    Execution:
+      type: object
+      required: [id, organization_id, site_id, asset_id, purpose, state, version, steps, prerequisites, measurements, observations, actions, decisions]
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        incident_id: {type: string, format: uuid}
+        asset_id: {type: string, format: uuid}
+        asset_tag: {type: string}
+        purpose: {type: string}
+        state: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}
+        version: {type: integer, format: int64}
+        steps:
+          type: array
+          items: {$ref: "#/components/schemas/ExecutionStep"}
+        prerequisites: {type: array, items: {type: object}}
+        measurements:
+          type: array
+          items: {$ref: "#/components/schemas/Measurement"}
+        observations: {type: array, items: {type: object}}
+        actions: {type: array, items: {type: object}}
+        decisions: {type: array, items: {type: object}}
+    ExecutionStep:
+      type: object
+      required: [id, key, sequence, title, state, risk_level, version]
+      properties:
+        id: {type: string, format: uuid}
+        key: {type: string}
+        sequence: {type: integer}
+        title: {type: string}
+        state: {type: string, enum: [PENDING, COMPLETED, BLOCKED]}
+        risk_level:
+          type: string
+          enum: [INFORMATIONAL, ADVISORY, OPERATIONAL_LOW, SAFETY_SIGNIFICANT]
+        required_prerequisite: {type: string}
+        blocked_reason: {type: string}
+        version: {type: integer, format: int64}
+    PrerequisiteVerificationCommand:
+      type: object
+      additionalProperties: false
+      required: [type, status, external_reference, verified_at]
+      properties:
+        type:
+          type: string
+          enum: [WORK_PERMIT, ENERGY_ISOLATION, GAS_TEST, SUPERVISOR, COMPETENCY]
+        status: {type: string, enum: [VERIFIED, REJECTED, EXPIRED]}
+        external_reference: {type: string, minLength: 1}
+        verified_at: {type: string, format: date-time}
+        valid_until: {type: string, format: date-time}
+    MeasurementCommand:
+      type: object
+      additionalProperties: false
+      required: [client_event_id, measurement_type, value, unit, source, data_quality, verification_status, observed_at]
+      properties:
+        client_event_id: {type: string, format: uuid}
+        device_id: {type: string}
+        created_at_device: {type: string, format: date-time}
+        component_id: {type: string, format: uuid}
+        measurement_type:
+          type: string
+          enum: [VIBRATION_VELOCITY, TEMPERATURE]
+        value:
+          type: string
+          pattern: '^-?(0|[1-9][0-9]*)(\.[0-9]{1,6})?$'
+        unit: {type: string, enum: [MM_PER_S, IN_PER_S, DEG_C, DEG_F]}
+        source: {type: string, enum: [MANUAL, INSTRUMENT, EXTERNAL_SYSTEM]}
+        data_quality: {type: string, enum: [GOOD, QUESTIONABLE, BAD, UNKNOWN]}
+        verification_status: {type: string, enum: [UNVERIFIED, VERIFIED, REJECTED]}
+        observed_at: {type: string, format: date-time}
+    Measurement:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        measurement_type: {type: string}
+        value: {type: string}
+        unit: {type: string}
+        original_value: {type: string}
+        original_unit: {type: string}
+        source: {type: string}
+        data_quality: {type: string}
+        verification_status: {type: string}
+        observed_at: {type: string, format: date-time}
+        received_at_server: {type: string, format: date-time}
+    AttachmentManifestCommand:
+      type: object
+      additionalProperties: false
+      required: [site_id, entity_kind, entity_id, client_event_id, original_filename, declared_mime, size_bytes, checksum_sha256]
+      properties:
+        site_id: {type: string, format: uuid}
+        entity_kind: {type: string, enum: [EXECUTION, OBSERVATION, INCIDENT, DOCUMENT_REVISION]}
+        entity_id: {type: string, format: uuid}
+        client_event_id: {type: string, format: uuid}
+        original_filename: {type: string}
+        declared_mime:
+          type: string
+          enum: [image/jpeg, image/png, image/webp, audio/m4a, audio/mp4, audio/mpeg, audio/wav, application/pdf, text/plain]
+        size_bytes: {type: integer, minimum: 1, maximum: 52428800}
+        checksum_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    Attachment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        entity_kind: {type: string}
+        entity_id: {type: string, format: uuid}
+        original_filename: {type: string}
+        declared_mime: {type: string}
+        verified_mime: {type: string}
+        size_bytes: {type: integer}
+        checksum_sha256: {type: string}
+        state:
+          type: string
+          enum: [PENDING_UPLOAD, UPLOADED, QUARANTINED, AVAILABLE, REJECTED]
+        upload_url: {type: string, format: uri}
+        upload_headers:
+          type: object
+          additionalProperties: {type: string}
+        upload_expires_at: {type: string, format: date-time}
+    DemonstrationEvent:
+      type: object
+      required:
+        [id, ordinal, schema_version, timestamp, actor_id, roles, source,
+         trust, sensitivity, action, provenance]
+      properties:
+        id: {type: string, format: uuid}
+        ordinal: {type: integer, minimum: 1}
+        schema_version: {type: string}
+        timestamp: {type: string, format: date-time}
+        actor_id: {type: string, format: uuid}
+        roles: {type: array, items: {type: string}}
+        source: {type: string}
+        trust: {type: string}
+        sensitivity: {type: string}
+        application: {type: string}
+        action: {type: string}
+        intent: {type: string}
+        entity:
+          type: object
+          properties:
+            type: {type: string}
+            id: {type: string}
+        input: {type: object, additionalProperties: true}
+        output: {type: object, additionalProperties: true}
+        context: {type: object, additionalProperties: true}
+        decision: {type: object, additionalProperties: true}
+        result: {type: object, additionalProperties: true}
+        error: {type: string}
+        correction_of: {type: string, format: uuid}
+        approval_id: {type: string}
+        domain_event_id: {type: string, format: uuid}
+        provenance: {type: object, additionalProperties: true}
+        redactions:
+          type: array
+          items:
+            type: object
+            required: [id, event_id, json_path, action, reason]
+            properties:
+              id: {type: string, format: uuid}
+              event_id: {type: string, format: uuid}
+              json_path: {type: string}
+              action: {type: string, enum: [MASK, DROP]}
+              reason: {type: string}
+              requested_by: {type: string, format: uuid}
+              requested_at: {type: string, format: date-time}
+    Demonstration:
+      type: object
+      required:
+        [id, organization_id, site_id, subject_kind, subject_id, workflow_key,
+         schema_version, session_id, status, review_status, initial_context,
+         events, reviews, capture, started_at, created_by]
+      properties:
+        id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        site_id: {type: string, format: uuid}
+        subject_kind: {type: string, enum: [EXECUTION, HANDOVER]}
+        subject_id: {type: string, format: uuid}
+        workflow_key: {type: string}
+        schema_version: {type: string}
+        session_id: {type: string, format: uuid}
+        status: {type: string, enum: [recording, completed, rejected]}
+        review_status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, REDACTION_REQUIRED]
+        initial_context: {type: object, additionalProperties: true}
+        final_result: {type: object, additionalProperties: true}
+        events:
+          type: array
+          items: {$ref: "#/components/schemas/DemonstrationEvent"}
+        reviews:
+          type: array
+          items: {type: object, additionalProperties: true}
+        capture:
+          type: object
+          required: [pending, processing, failed, applied]
+          properties:
+            pending: {type: integer, minimum: 0}
+            processing: {type: integer, minimum: 0}
+            failed: {type: integer, minimum: 0}
+            applied: {type: integer, minimum: 0}
+            last_error: {type: string}
+            updated_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        created_by: {type: string, format: uuid}
+    WorkflowApplicability:
+      type: object
+      additionalProperties: false
+      required: [validation_status]
+      properties:
+        id: {type: string, format: uuid, readOnly: true}
+        site_id: {type: string, format: uuid}
+        asset_id: {type: string, format: uuid}
+        asset_class: {type: string}
+        manufacturer: {type: string}
+        model: {type: string}
+        process_service: {type: string}
+        operating_condition: {type: string}
+        validation_status:
+          type: string
+          enum:
+            [VALIDATED, LIKELY_APPLICABLE, NOT_VALIDATED, NOT_APPLICABLE]
+        approved_by: {type: string, format: uuid, readOnly: true}
+        approved_at: {type: string, format: date-time, readOnly: true}
+    WorkflowEvidence:
+      type: object
+      required: [demonstration_id, event_ids]
+      properties:
+        demonstration_id: {type: string, format: uuid}
+        event_ids:
+          type: array
+          minItems: 1
+          items: {type: string, format: uuid}
+    WorkflowStep:
+      type: object
+      required: [id, kind, evidence]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        kind: {type: string, enum: [tool, validation, approval]}
+        tool_name: {type: string}
+        arguments: {type: object, additionalProperties: true}
+        evidence:
+          type: array
+          items: {$ref: "#/components/schemas/WorkflowEvidence"}
+    WorkflowVersion:
+      type: object
+      required:
+        [workflow_id, workflow_key, name, version, status, site_id,
+         asset_class, candidate_digest, tool_catalog_digest,
+         source_demonstration_ids, steps, analysis, behavioral_changes,
+         learning, applicability, prerequisites, required_competencies,
+         reviews, evaluations, improvement_candidates, created_at]
+      properties:
+        workflow_id: {type: string, format: uuid}
+        workflow_key: {type: string}
+        name: {type: string}
+        description: {type: string}
+        version: {type: integer, minimum: 1}
+        status:
+          type: string
+          enum:
+            [CANDIDATE, APPROVED, REVIEW_REQUIRED, PUBLISHED, RETIRED, REJECTED]
+        site_id: {type: string, format: uuid}
+        asset_class: {type: string}
+        candidate_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        tool_catalog_digest: {type: string}
+        source_demonstration_ids:
+          type: array
+          minItems: 2
+          items: {type: string, format: uuid}
+        steps:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/WorkflowStep"}
+        analysis:
+          type: object
+          additionalProperties: true
+          description: Deterministic sequence variants, conflicts, parameters, and findings.
+        behavioral_changes:
+          type: object
+          additionalProperties: true
+          description: Behavior-focused diff from the latest stored version.
+        learning:
+          type: object
+          additionalProperties: true
+        applicability:
+          type: array
+          items: {$ref: "#/components/schemas/WorkflowApplicability"}
+        prerequisites:
+          type: array
+          items: {type: string}
+        required_competencies:
+          type: array
+          items: {type: string}
+        effective_at: {type: string, format: date-time}
+        review_at: {type: string, format: date-time}
+        reviews:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        evaluations:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        improvement_candidates:
+          type: array
+          description: Human corrections awaiting review; never automatic mutations.
+          items:
+            type: object
+            additionalProperties: true
+        created_at: {type: string, format: date-time}
+        published_at: {type: string, format: date-time}
+        published_by: {type: string, format: uuid}
+    EvaluationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [recommendations, reviewed, review_coverage,
+         recommendation_acceptance, human_override_rate,
+         unsafe_recommendation_rate, unsupported_recommendation_rate,
+         incorrect_next_step_rate, evidence_coverage, retrieval_precision,
+         llm_calls, average_latency_ms, tokens_in, tokens_out,
+         estimated_cost_micros,
+         workflow_evaluations, workflow_gate_pass_rate, generated_at]
+      properties:
+        recommendations: {type: integer, format: int64, minimum: 0}
+        reviewed: {type: integer, format: int64, minimum: 0}
+        review_coverage: {type: number, minimum: 0, maximum: 1}
+        recommendation_acceptance: {type: number, minimum: 0, maximum: 1}
+        human_override_rate: {type: number, minimum: 0, maximum: 1}
+        unsafe_recommendation_rate: {type: number, minimum: 0, maximum: 1}
+        unsupported_recommendation_rate: {type: number, minimum: 0, maximum: 1}
+        incorrect_next_step_rate: {type: number, minimum: 0, maximum: 1}
+        evidence_coverage: {type: number, minimum: 0, maximum: 1}
+        retrieval_precision: {type: number, minimum: 0, maximum: 1}
+        llm_calls: {type: integer, format: int64, minimum: 0}
+        average_latency_ms: {type: number, minimum: 0}
+        tokens_in: {type: integer, format: int64, minimum: 0}
+        tokens_out: {type: integer, format: int64, minimum: 0}
+        estimated_cost_micros: {type: integer, format: int64, minimum: 0}
+        workflow_evaluations: {type: integer, format: int64, minimum: 0}
+        workflow_gate_pass_rate: {type: number, minimum: 0, maximum: 1}
+        generated_at: {type: string, format: date-time}
     Problem:
       type: object
       required: [type, title, status]
