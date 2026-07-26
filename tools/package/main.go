@@ -41,21 +41,35 @@ var safeVersion = regexp.MustCompile(`\A[A-Za-z0-9][A-Za-z0-9._-]*\z`)
 
 func main() {
 	var (
-		version = flag.String("version", "dev", "artifact version")
-		commit  = flag.String("commit", "unknown", "source commit")
-		builtAt = flag.String("built-at", "", "RFC3339 build time")
-		output  = flag.String("output", "dist/packages", "artifact output root")
-		clean   = flag.Bool("clean", false, "replace an existing version directory")
+		version   = flag.String("version", "dev", "artifact version")
+		commit    = flag.String("commit", "unknown", "source commit")
+		builtAt   = flag.String("built-at", "", "RFC3339 build time")
+		output    = flag.String("output", "dist/packages", "artifact output root")
+		clean     = flag.Bool("clean", false, "replace an existing version directory")
+		platforms = flag.String(
+			"platforms",
+			"all",
+			"comma-separated target operating systems: windows,darwin,linux or all",
+		)
 	)
 	flag.Parse()
 
-	if err := run(*version, *commit, *builtAt, *output, *clean); err != nil {
+	selectedTargets, err := selectTargets(*platforms)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "package:", err)
+		os.Exit(1)
+	}
+	if err := run(*version, *commit, *builtAt, *output, *clean, selectedTargets); err != nil {
 		fmt.Fprintln(os.Stderr, "package:", err)
 		os.Exit(1)
 	}
 }
 
-func run(version, commit, builtAt, output string, clean bool) error {
+func run(
+	version, commit, builtAt, output string,
+	clean bool,
+	buildTargets []target,
+) error {
 	if !safeVersion.MatchString(version) {
 		return fmt.Errorf("version %q contains unsupported characters", version)
 	}
@@ -101,7 +115,7 @@ func run(version, commit, builtAt, output string, clean bool) error {
 	defer os.RemoveAll(temporaryRoot)
 
 	var archives []string
-	for _, buildTarget := range targets {
+	for _, buildTarget := range buildTargets {
 		archivePath, err := buildTargetArchive(
 			root,
 			temporaryRoot,
@@ -122,6 +136,38 @@ func run(version, commit, builtAt, output string, clean bool) error {
 	}
 	fmt.Printf("checksums %s\n", filepath.Join(releaseDir, "SHA256SUMS"))
 	return nil
+}
+
+func selectTargets(platforms string) ([]target, error) {
+	requested := strings.Split(strings.ToLower(strings.TrimSpace(platforms)), ",")
+	if len(requested) == 1 && requested[0] == "all" {
+		return append([]target(nil), targets...), nil
+	}
+
+	allowed := map[string]bool{
+		"windows": true,
+		"darwin":  true,
+		"linux":   true,
+	}
+	selectedPlatforms := make(map[string]bool, len(requested))
+	for _, platform := range requested {
+		platform = strings.TrimSpace(platform)
+		if platform == "" || !allowed[platform] {
+			return nil, fmt.Errorf(
+				"unsupported platform %q; use windows,darwin,linux or all",
+				platform,
+			)
+		}
+		selectedPlatforms[platform] = true
+	}
+
+	selected := make([]target, 0, len(targets))
+	for _, buildTarget := range targets {
+		if selectedPlatforms[buildTarget.goos] {
+			selected = append(selected, buildTarget)
+		}
+	}
+	return selected, nil
 }
 
 func repositoryRoot() (string, error) {
@@ -156,6 +202,9 @@ func buildTargetArchive(
 	if err := os.MkdirAll(filepath.Join(staging, "contracts"), 0o755); err != nil {
 		return "", fmt.Errorf("create staging directory: %w", err)
 	}
+	if err := os.MkdirAll(filepath.Join(staging, "evaldata"), 0o755); err != nil {
+		return "", fmt.Errorf("create evaluation fixture directory: %w", err)
+	}
 
 	extension := ""
 	if buildTarget.goos == "windows" {
@@ -168,7 +217,7 @@ func buildTargetArchive(
 		"-X", buildInfoPackage + ".commit=" + commit,
 		"-X", buildInfoPackage + ".builtAt=" + builtAt.Format(time.RFC3339),
 	}, " ")
-	for _, binary := range []string{"api", "worker", "migrate"} {
+	for _, binary := range []string{"api", "worker", "migrate", "eval"} {
 		outputPath := filepath.Join(staging, binary+extension)
 		command := exec.Command(
 			"go", "build",
@@ -214,6 +263,12 @@ func buildTargetArchive(
 	if err := copyFile(
 		filepath.Join(root, "api", "openapi.yaml"),
 		filepath.Join(staging, "contracts", "openapi.yaml"),
+	); err != nil {
+		return "", err
+	}
+	if err := copyFile(
+		filepath.Join(root, "test", "evaldata", "pilot-v1.json"),
+		filepath.Join(staging, "evaldata", "pilot-v1.json"),
 	); err != nil {
 		return "", err
 	}
