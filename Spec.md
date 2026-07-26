@@ -1,9 +1,14 @@
 # Skawld Maintenance Copilot — Architecture Specification
 
-Status: **Accepted; Phase 0 foundation implementation active as of 2026-07-26**  
+Implementation status: the accepted architecture and Phase 5 pilot engineering
+baseline are implemented as of 2026-07-26. The generic SDK is pinned at
+`v0.2.0`; named-customer qualification, deployment-specific production AI,
+agreed RPO/RTO, and signed/notarized native distribution remain explicit gates.
+
+Status: **Accepted; Phase 5 engineering baseline complete as of 2026-07-26**
 Date: 2026-07-26  
 Decision owner: Product/engineering owner  
-Implementation status: **Not started**  
+Implementation status: **Phases 0–5 engineering baseline implemented; customer pilot qualification open**
 Core principle: **Skawld should learn from normal industrial work while preserving safety, evidence, authority, and human control.**
 
 This document is the architectural decision record for the first vertical product built on `skawld-sdk-go`. It is intentionally a product architecture, not an enterprise wish list and not a claim of compliance with any industrial standard.
@@ -552,6 +557,8 @@ Compilation creates a `CANDIDATE`; reviewers add applicability, validity, effect
 - During co-development, a workspace-level `go.work` outside both repositories uses their local module paths. It is developer convenience and is not committed to either repository unless the parent workspace is itself managed.
 - CI and release builds ignore local replacements and resolve a tagged SDK dependency from `go.mod`.
 - While SDK is `v0.x`, maintenance pins an exact tag (not a branch or pseudo-version for releases), reads release notes, and runs its contract suite before upgrade.
+- The current verified tag is `v0.2.0`; product display roles are canonicalized
+  to SDK policy-safe identifiers only inside `internal/skawld`.
 - Breaking SDK changes use a new minor version during `v0` and include migration notes. Patch releases are expected to be compatible bug/security fixes.
 - Maintenance may temporarily use a local `go.work` during coordinated changes, but SDK and product commits remain independently reviewable.
 - A stable SDK should move to `v1` only after real maintenance use validates the public contracts.
@@ -1107,7 +1114,9 @@ skawld-maintenance/
 Rules:
 
 - Domain packages do not import HTTP, SQL, S3, Flutter/web, provider SDKs, or concrete clock/ID generators.
-- Domain and ordinary application packages do not import `skawld-sdk-go`; only `internal/skawld` may do so.
+- Domain and ordinary application packages do not import `skawld-sdk-go`;
+  only production code in `internal/skawld` may do so. The isolated
+  `test/contract/sdk` suite is the verification-only exception.
 - Application packages define use cases and transaction boundaries. Define interfaces only at a boundary that has or clearly needs substitution.
 - Adapters may import domain/application packages; never the reverse.
 - Modules may not query another module’s tables directly. In the monolith they call an application query/port; reporting read models may be an explicit exception.

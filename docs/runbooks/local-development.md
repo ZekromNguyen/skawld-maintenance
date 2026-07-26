@@ -9,7 +9,7 @@ All credentials below are development-only.
 
 - Go `1.25.7` or a compatible newer patch release.
 - Podman with `podman compose`, or Docker with `docker compose`.
-- `curl` and `make`.
+- `curl`, `make`, and Poppler's `pdftotext` for a native Phase 2 worker.
 
 ## Start
 
@@ -64,6 +64,9 @@ on-premise installations must select and qualify an S3 implementation.
 
 ## Database roles
 
+- PostgreSQL must have the `vector` extension installed by the image or a DBA
+  before migrations run. The Compose bootstrap performs this privileged step;
+  `skawld_owner` intentionally is not a superuser.
 - `skawld_owner` runs migrations.
 - `skawld_app` is used by both process roles at runtime.
 - API and worker use distinct connection pools and configured budgets.
@@ -73,9 +76,8 @@ on-premise installations must select and qualify an S3 implementation.
 
 ## SDK workspace
 
-Do not commit `go.work` or a `replace` directive. Once the SDK release gate in
-ADR 0002 is satisfied, a developer may create a workspace above both clean
-repositories:
+Do not commit `go.work` or a `replace` directive. The release build pins SDK
+`v0.2.0`; a developer may create a workspace above both clean repositories:
 
 ```bash
 cd ..

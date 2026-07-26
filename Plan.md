@@ -1,6 +1,6 @@
 # Skawld Maintenance Copilot — Implementation Plan
 
-Status: **Phase 0 foundation operational; SDK release gate remains open**  
+Status: **Phases 0–5 engineering baseline implemented; SDK v0.2.0 pinned; customer pilot qualification and native signing gates remain open**
 Architecture source: [Spec.md](./Spec.md)  
 Planning rule: Complete vertical behavior before adding infrastructure. Do not interpret a later phase as authorization to build it early.
 
@@ -62,13 +62,16 @@ Implemented and verified:
 - unit, architecture, race, concurrent-idempotency, transaction rollback,
   wrong-site, migration, and database-privilege checks.
 
-Open gate:
+SDK gate completed:
 
-- `skawld-sdk-go` has no clean compatible tag with the accepted module path and
-  required workflow/observation/learning/policy/audit contracts. Per ADR 0002,
-  this repository does not pin the dirty sibling tree and does not use
-  `replace`; Phase 0 is not marked complete until that upstream release and
-  contract suite are available.
+- `skawld-sdk-go v0.2.0` is pinned without `replace` and resolves through the
+  standard Go module path;
+- the anti-corruption layer maps trusted tenant/actor/roles and maintenance
+  risk without leaking SDK types into product domain/application packages;
+- SDK contract tests cover provider streaming, tool validation and
+  idempotency, deterministic workflow execution, approval pause/resume and
+  separation of duties, audit, semantic demonstrations, candidate
+  compilation, review, deterministic evaluation, and publication.
 
 ### Phase 1 — Core Maintenance
 
@@ -104,7 +107,49 @@ Deliver the deterministic maintenance backbone for the pump demo, including a na
 - No comprehensive work-order planning, inventory, permit, or telemetry subsystem exists.
 - External asset/work/permit/telemetry projections cannot silently become Skawld-owned records.
 
+**Implementation status — 2026-07-26**
+
+Implemented:
+
+- source-aware asset hierarchy/components and human-approved criticality;
+- incident lifecycle and transactional domain-event/audit outbox;
+- deterministic pump execution with optimistic versions, assigned-execution
+  projection, safety-significant step blocking, and separately privileged
+  external prerequisite verification;
+- exact decimal vibration/temperature measurement validation and rational unit
+  conversion, plus semantic observations, maintenance actions, and decisions;
+- S3 capability adapter, server-generated object keys, constrained signed
+  uploads, independent manifests, streaming SHA-256/size/magic-byte validation,
+  and rejection states;
+- Phase 1 REST/OpenAPI, React/Vite/Tailwind supervisor asset/incident/execution
+  workbench, and production web build;
+- Flutter/Drift source for assigned work, checklist, measurements, notes,
+  photo/audio metadata, atomic outbox writes, stable client/idempotency/device
+  identity, retry/conflict state, attachment store-and-forward, OIDC PKCE, and
+  connectivity-triggered push/pull;
+- Windows and macOS Flutter engineering-package jobs on native CI runners,
+  producing a portable Windows ZIP and macOS DMG/ZIP with SHA-256 files.
+
+Verified on the current Fedora host:
+
+- migrations `00001`–`00003`, runtime least privilege, all Go tests/vet/build;
+- PostgreSQL pump vertical integration including exact `8.1 mm/s`, offline
+  mutation metadata, and LOTO blocking;
+- required S3 operation subset against S3Mock 5;
+- TypeScript check, Vitest, Vite production build, and valid OpenAPI lint;
+- pinned Flutter `3.44.8`, resolved/locked dependencies, Drift generation,
+  clean Flutter analysis, and Flutter contract tests.
+
+Open verification gate:
+
+- Windows/macOS Flutter builds require their native runner toolchains. Native
+  build/package jobs are defined in CI but have not been executed in this
+  Fedora session. Do not call the desktop distribution pilot-ready until those
+  jobs, code signing, and macOS notarization pass.
+
 ### Phase 2 — Copilot
+
+**Implementation status: core Phase 2 completed on 2026-07-26.**
 
 **Goal**
 
@@ -137,7 +182,48 @@ Add evidence-backed document/history retrieval, safe recommendations, transcript
 - Report and handover drafts retain exact model/prompt/evidence provenance and human edits.
 - No generic chat endpoint or autonomous action path exists.
 
+Implemented and verified:
+
+- migrations `00004`–`00005` add controlled document, chunk/embedding,
+  retrieval, recommendation/feedback, report provenance/edit, handover,
+  transcription-candidate, and AI-call records;
+- document ingestion commits revision state and River job atomically, uses a
+  dedicated worker pool, bounded Poppler/text extraction, stable chunks,
+  versioned embeddings, and safe re-ingestion job identity;
+- a PostgreSQL integration test proves draft, expired, wrong-class, and
+  cross-site documents are excluded before ranking while current applicable
+  documents and same-site resolved incident history remain available;
+- closed structured-output decoders reject unknown fields, invented evidence
+  IDs, duplicated evidence IDs, and risks above advisory for recommendations;
+- report and handover PostgreSQL vertical tests preserve model/prompt/input/
+  output/evidence provenance and human edits/lifecycle transitions;
+- optional speech uses a configured HTTP provider adapter and asynchronous
+  River worker; no provider is assumed by default and every transcript remains
+  an unverified candidate until a human verifies or rejects it;
+- the complete schema migrates from an empty PostgreSQL database to version 5
+  using a non-superuser owner after the DBA/container installs `pgvector`;
+- backend engineering archives cross-build for Windows amd64/arm64 and macOS
+  amd64/arm64 with verified SHA-256 manifests;
+- reachable Go vulnerability scanning reports no findings and both API and
+  non-root Poppler-equipped worker OCI images build;
+- React supervisor surfaces cover controlled knowledge, evidence search,
+  recommendations, report drafts, and shift handover; Flutter desktop/field UI
+  exposes online-only advisory recommendations while preserving offline writes.
+
+Open Phase 2 deployment gates:
+
+- replace deterministic development structured/embedding providers with
+  selected deployment adapters and run secret-gated contract/evaluation tests;
+- provide an approved fictional document/history corpus and scoped approval
+  authorities for a polished customer demo;
+- execute native Windows/macOS Flutter package CI, code signing, and
+  notarization;
+- run Flutter analysis/tests for the Phase 2 desktop copilot panel; the current
+  Fedora shell does not have Flutter on `PATH`.
+
 ### Phase 3 — Demonstration Capture
+
+**Status: Implemented and verified on 2026-07-26.**
 
 **Goal**
 
@@ -166,7 +252,36 @@ Capture how senior technicians perform both incident and normal work as trustwor
 - Corrections link the exact recommendation/context to the human choice and later outcome.
 - Capture failure cannot fail the authoritative maintenance transaction; a durable retry is visible and audited.
 
+Implemented and verified:
+
+- migrations `00006`–`00008` add subject-aware domain events, the SDK
+  demonstration/event store, durable capture deliveries, append-oriented
+  reviews/redactions, one active recording per subject, and hardened runtime
+  privileges for immutable events/reviews;
+- `internal/skawld` contains the only SDK Observation store, recorder adapter,
+  semantic mapper, sanitizer, and retry processor; maintenance application
+  types expose no SDK types;
+- execution lifecycle, steps, prerequisites, measurements, observations,
+  actions, decisions, recommendations/corrections, outcomes, and shift
+  handovers emit versioned semantic source events;
+- River runs a two-second semantic-capture sweep on a dedicated queue with one
+  worker, bounded batches, idempotent event identity, stale-claim recovery,
+  exponential retry, and visible per-demonstration capture health;
+- REST endpoints and a dense supervisor timeline expose actor, source, trust,
+  sensitivity, provenance, domain-event identity, correction links, review,
+  redaction, and structured payload;
+- review and redaction require both RBAC and scoped `ApprovalAuthority`;
+  captured events and review records cannot be updated/deleted by the runtime
+  role;
+- PostgreSQL fixtures prove a coherent P-302 trace, a normal shift-handover
+  trace, exact human correction linkage, later outcome capture, and a failed
+  delivery that remains retryable without rolling back its domain event;
+- clean migration through version 8, Go vet/race/integration suite,
+  React/TypeScript/Vitest/Vite build, and valid OpenAPI Phase 3 contract pass.
+
 ### Phase 4 — Workflow Learning
+
+**Status: Implemented and verified on 2026-07-26. Phase 5 has not started.**
 
 **Goal**
 
@@ -195,6 +310,37 @@ Turn multiple reviewed demonstrations into a safe, evidence-linked, human-publis
 - Applicability expansion requires a separate human approval.
 - Published versions are immutable, effective-dated, supersedable, and reproducible.
 - A human correction creates an improvement candidate only.
+
+Implemented and verified:
+
+- migration `00009` adds workflow identities, immutable versions,
+  applicability, append-oriented reviews/evaluations, and improvement
+  candidates while preserving the exact SDK candidate payload and digest;
+- only completed, approved, gap-free demonstrations for the same site, asset
+  class, and workflow key can be compiled, with at least two distinct source
+  demonstrations required;
+- `internal/skawld` owns the maintenance extractor, read-only guidance tool
+  catalog, SDK stores, compiler, deterministic evaluation gates, publisher,
+  and query mapping; product domain/application packages expose no SDK types;
+- every common compiled step is backed by exact source event IDs, unsupported
+  or unclassified actions are rejected, variants/conflicts remain visible, and
+  human corrections create improvement candidates rather than executable
+  steps;
+- review and publication require RBAC and a separate scoped
+  `ApprovalAuthority`; initial review cannot expand site/asset-class scope,
+  while later applicability expansion is a separately authorized operation;
+- published and retired executable payloads are database-immutable, versions
+  carry effective/review dates and applicability, and retirement immediately
+  removes a workflow from applicable guidance;
+- REST/OpenAPI and the React supervisor workbench support compile, inspect,
+  approve/reject/review-required, evaluate/publish, expand applicability, query
+  applicable versions, and retire;
+- Phase 4 compilation is deliberately synchronous and bounded for the MVP.
+  Move it to the existing River worker only when measured latency or workload
+  justifies asynchronous execution;
+- migration upgrade through version 9, Go vet/race/integration suite,
+  React/TypeScript/Vitest/Vite build, valid OpenAPI contract, and
+  Windows/macOS backend packaging pass.
 
 ### Phase 5 — Pilot Readiness
 
@@ -226,6 +372,47 @@ Make the two demos deployable, supportable, measurable, and safe for a real main
 - Pilot reviewer can trace every recommendation/report/workflow step to evidence and AI/human provenance.
 - Unsafe recommendation test set fails closed; critical actions have no tool implementation.
 - Installation does not require Kubernetes, Redis, Kafka, Elasticsearch, or public AI access as an architectural assumption.
+
+**Implementation status — 2026-07-26**
+
+Implemented and verified as the engineering baseline:
+
+- migration 10 adds append-only reviewer quality labels and evidence/retrieval
+  counts; live tenant/site-scoped quality metrics and a frozen deterministic
+  evaluation suite fail closed on unsafe candidates;
+- the supervisor dashboard exposes review and AI quality/safety metrics without
+  creating a separate evaluation platform;
+- API/worker PostgreSQL pools have an explicit shared connection budget; River
+  jobs have per-kind concurrency, deadlines, bounded retry schedules,
+  idempotency, and permanent/transient failure classification;
+- mobile sync policy covers duplicates, deterministic reordering,
+  interruption/backoff, stale-version conflicts, and independent attachment
+  manifest/upload/completion retry behavior;
+- a pull-only EAM/CMMS connector contract and immutable NDJSON snapshot adapter
+  preserve tenant/site scope, provenance, source-of-truth, path confinement,
+  and cursor/digest consistency; no write-back or connector marketplace exists;
+- backup, checksum, empty-database restore, schema/count verification, tenant
+  audit export, retention, incident response, threat model, OIDC/S3 support
+  matrix, and single-server pilot runbooks exist;
+- non-root/read-only OCI roles, Compose pilot profile, CycloneDX dependency
+  SBOM, pinned GitHub Actions, dependency/image scan gates, tagged provenance,
+  and release/signing gates are defined;
+- local rehearsal restored schema version 10 and verified key-table counts;
+  the local contention check completed 1,600 operations with zero errors;
+- full Go race/PostgreSQL/S3 tests, vet/build, web lint/Vitest/Vite,
+  OpenAPI validation, all four OCI image builds, frozen safety gates, SBOM, and
+  Windows/macOS backend package checks pass.
+
+Still requires a named customer before the word “pilot-ready” may be used:
+
+- agreed topology, data classification, IdP/S3 selections, support contacts,
+  RPO/RTO, retention, safety review, and customer acceptance;
+- a restore drill measured against that agreed RPO/RTO and an object-storage
+  backup/restore drill for the selected implementation;
+- Windows Authenticode and macOS Developer ID/notarization, protected signing
+  identities, and clean-machine installation tests;
+- native Flutter analysis/build/package execution on Windows/macOS CI. Flutter
+  is not installed in this Fedora verification environment.
 
 ## First 20 Engineering Tasks
 
@@ -260,6 +447,9 @@ Record the accepted stack plus the `ApprovalAuthority`, `internal/skawld`, and `
 Document-link and Markdown lint check; manual decision checklist.
 
 ### Task 2 — Verify and pin the SDK integration contract
+
+**Implementation status: completed on 2026-07-26 against
+`skawld-sdk-go v0.2.0`.**
 
 **Goal**
 
