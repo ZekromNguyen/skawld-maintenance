@@ -1,0 +1,324 @@
+import type {
+  Asset,
+  Demonstration,
+  EvaluationSummary,
+  Execution,
+  KnowledgeDocument,
+  MaintenanceReport,
+  Incident,
+  ListResponse,
+  Measurement,
+  Principal,
+  Problem,
+  Recommendation,
+  ShiftHandover,
+  Step,
+  WorkflowApplicability,
+  WorkflowVersion
+} from "./types";
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(problem: Problem) {
+    super(problem.detail || problem.title);
+    this.status = problem.status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api/v1${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers
+    }
+  });
+  if (response.status === 401) {
+    window.location.assign("/auth/login");
+    throw new ApiError({ title: "Authentication required", status: 401 });
+  }
+  if (!response.ok) {
+    const problem = (await response.json()) as Problem;
+    throw new ApiError(problem);
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+function command<T>(path: string, value: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "POST",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify(value)
+  });
+}
+
+export const api = {
+  principal: () => request<Principal>("/me"),
+  assets: () => request<ListResponse<Asset>>("/assets"),
+  createAsset: (value: {
+    site_id: string;
+    tag: string;
+    name: string;
+    class: string;
+  }) =>
+    command<Asset>("/assets", {
+      ...value,
+      source_of_truth: "OWNED_BY_SKAWLD",
+      components: []
+    }),
+  incidents: () => request<ListResponse<Incident>>("/incidents"),
+  createIncident: (value: {
+    site_id: string;
+    asset_id: string;
+    summary: string;
+    severity: string;
+  }) =>
+    command<Incident>("/incidents", {
+      ...value,
+      source_of_truth: "OWNED_BY_SKAWLD",
+      detected_at: new Date().toISOString()
+    }),
+  execution: (id: string) => request<Execution>(`/executions/${id}`),
+  createExecution: (incidentID: string) =>
+    command<Execution>(`/incidents/${incidentID}/executions`, {
+      purpose: "High vibration pump inspection"
+    }),
+  startExecution: (execution: Execution) =>
+    command<Execution>(`/executions/${execution.id}/start`, {
+      expected_version: execution.version
+    }),
+  completeStep: (execution: Execution, step: Step) =>
+    command<Step>(`/executions/${execution.id}/steps/${step.id}/complete`, {
+      expected_execution_version: execution.version,
+      expected_step_version: step.version
+    }),
+  recordMeasurement: (
+    execution: Execution,
+    measurementType: string,
+    value: string,
+    unit: string
+  ) =>
+    command<Measurement>(`/executions/${execution.id}/measurements`, {
+      client_event_id: crypto.randomUUID(),
+      measurement_type: measurementType,
+      value,
+      unit,
+      source: "MANUAL",
+      data_quality: "GOOD",
+      verification_status: "UNVERIFIED",
+      observed_at: new Date().toISOString()
+    }),
+  documents: (siteID?: string) =>
+    request<ListResponse<KnowledgeDocument>>(
+      `/documents${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+    ),
+  createDocument: (siteID: string, title: string, documentType: string) =>
+    command<KnowledgeDocument>("/documents", {
+      site_id: siteID,
+      document_type: documentType,
+      title,
+      authority: "SITE_APPROVED"
+    }),
+  createDocumentRevision: (
+    documentID: string,
+    siteID: string,
+    assetClass: string
+  ) =>
+    command<KnowledgeDocument["revisions"][number]>(
+      `/documents/${documentID}/revisions`,
+      {
+        revision: "R1",
+        language: "en",
+        applicability: [{ site_id: siteID, asset_class: assetClass }]
+      }
+    ),
+  uploadDocumentRevision: async (
+    revisionID: string,
+    siteID: string,
+    file: File
+  ) => {
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const checksum = Array.from(new Uint8Array(digest))
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    const manifest = await command<{
+      id: string;
+      upload_url: string;
+      upload_headers?: Record<string, string>;
+    }>("/attachments", {
+      site_id: siteID,
+      entity_kind: "DOCUMENT_REVISION",
+      entity_id: revisionID,
+      client_event_id: crypto.randomUUID(),
+      original_filename: file.name,
+      declared_mime: file.type || "application/pdf",
+      size_bytes: file.size,
+      checksum_sha256: checksum
+    });
+    const upload = await fetch(manifest.upload_url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/pdf",
+        ...manifest.upload_headers
+      },
+      body: file
+    });
+    if (!upload.ok) throw new Error("Object upload failed");
+    await command(`/attachments/${manifest.id}/complete`, {});
+    return command(`/document-revisions/${revisionID}/ingestion`, {
+      attachment_id: manifest.id
+    });
+  },
+  searchKnowledge: (siteID: string, query: string, assetID?: string) =>
+    request<{ retrieval_run_id: string; items: import("./types").Evidence[] }>(
+      "/search",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          site_id: siteID,
+          asset_id: assetID || "",
+          query,
+          limit: 8
+        })
+      }
+    ),
+  recommendation: (incidentID: string, executionID?: string) =>
+    command<Recommendation>(`/incidents/${incidentID}/recommendations`, {
+      execution_id: executionID || "",
+      question: "What is the next safe non-intrusive inspection step?"
+    }),
+  reviewRecommendation: (
+    recommendationID: string,
+    value: {
+      outcome:
+        | "ACCEPTED"
+        | "REJECTED"
+        | "CORRECTED"
+        | "UNSAFE"
+        | "UNSUPPORTED"
+        | "INCORRECT_NEXT_STEP";
+      reason: string;
+      material_claims?: number;
+      supported_claims?: number;
+      retrieved_evidence?: number;
+      relevant_evidence?: number;
+    }
+  ) => command<void>(`/recommendations/${recommendationID}/feedback`, value),
+  evaluationSummary: () =>
+    request<EvaluationSummary>("/evaluations/summary"),
+  draftReport: (executionID: string) =>
+    command<MaintenanceReport>(`/executions/${executionID}/reports/draft`, {}),
+  prepareHandover: (siteID: string) => {
+    const end = new Date();
+    const start = new Date(end.getTime() - 12 * 60 * 60 * 1000);
+    return command<ShiftHandover>("/handovers/prepare-draft", {
+      site_id: siteID,
+      shift_start: start.toISOString(),
+      shift_end: end.toISOString()
+    });
+  },
+  demonstrations: (siteID?: string) =>
+    request<ListResponse<Demonstration>>(
+      `/demonstrations${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+    ),
+  demonstration: (id: string) =>
+    request<Demonstration>(`/demonstrations/${id}`),
+  startDemonstration: (
+    subjectKind: "EXECUTION" | "HANDOVER",
+    subjectID: string
+  ) =>
+    command<Demonstration>("/demonstrations", {
+      subject_kind: subjectKind,
+      subject_id: subjectID
+    }),
+  completeDemonstration: (id: string, outcome: string) =>
+    command<Demonstration>(`/demonstrations/${id}/complete`, { outcome }),
+  recordEvidenceView: (id: string, evidenceID: string, intent: string) =>
+    command(`/demonstrations/${id}/evidence-views`, {
+      evidence_id: evidenceID,
+      intent
+    }),
+  reviewDemonstration: (
+    id: string,
+    decision: "APPROVED" | "REJECTED" | "REDACTION_REQUIRED",
+    reason: string
+  ) =>
+    command(`/demonstrations/${id}/reviews`, { decision, reason }),
+  redactDemonstrationEvent: (
+    demonstrationID: string,
+    eventID: string,
+    jsonPath: string,
+    reason: string
+  ) =>
+    command(`/demonstrations/${demonstrationID}/events/${eventID}/redactions`, {
+      json_path: jsonPath,
+      action: "MASK",
+      reason
+    }),
+  workflows: () => request<ListResponse<WorkflowVersion>>("/workflows"),
+  workflow: (workflowID: string, version: number) =>
+    request<WorkflowVersion>(
+      `/workflows/${workflowID}/versions/${version}`
+    ),
+  compileWorkflow: (name: string, demonstrationIDs: string[]) =>
+    command<WorkflowVersion>("/workflow-candidates", {
+      name,
+      description: "Compiled from reviewed semantic demonstrations",
+      demonstration_ids: demonstrationIDs
+    }),
+  reviewWorkflow: (
+    value: WorkflowVersion,
+    decision: "APPROVED" | "REJECTED" | "REVIEW_REQUIRED",
+    reason: string,
+    applicability: WorkflowApplicability[]
+  ) => {
+    const effective = new Date();
+    const review = new Date(effective);
+    review.setUTCFullYear(review.getUTCFullYear() + 1);
+    return command<WorkflowVersion>(
+      `/workflows/${value.workflow_id}/versions/${value.version}/reviews`,
+      {
+        decision,
+        reason,
+        applicability: decision === "APPROVED" ? applicability : [],
+        prerequisites:
+          decision === "APPROVED"
+            ? ["ENERGY_ISOLATION_WHEN_INTRUSIVE"]
+            : [],
+        required_competencies:
+          decision === "APPROVED" ? [value.asset_class] : [],
+        effective_at:
+          decision === "APPROVED" ? effective.toISOString() : undefined,
+        review_at:
+          decision === "APPROVED" ? review.toISOString() : undefined
+      }
+    );
+  },
+  publishWorkflow: (value: WorkflowVersion, reason: string) =>
+    command<WorkflowVersion>(
+      `/workflows/${value.workflow_id}/versions/${value.version}/publish`,
+      { reason }
+    ),
+  expandWorkflowApplicability: (
+    value: WorkflowVersion,
+    applicability: WorkflowApplicability,
+    reason: string
+  ) =>
+    command<WorkflowVersion>(
+      `/workflows/${value.workflow_id}/versions/${value.version}/applicability`,
+      { reason, applicability }
+    ),
+  retireWorkflow: (value: WorkflowVersion, reason: string) =>
+    command<WorkflowVersion>(
+      `/workflows/${value.workflow_id}/versions/${value.version}/retire`,
+      { reason }
+    ),
+  applicableWorkflows: (assetID: string) =>
+    request<ListResponse<WorkflowVersion>>(
+      `/workflows/applicable?asset_id=${encodeURIComponent(assetID)}`
+    )
+};
