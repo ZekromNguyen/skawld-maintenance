@@ -18,12 +18,15 @@ const (
 )
 
 type Config struct {
-	Environment string
-	Role        Role
-	HTTP        HTTP
-	Database    Database
-	Auth        Auth
-	Jobs        Jobs
+	Environment   string
+	Role          Role
+	HTTP          HTTP
+	Database      Database
+	Auth          Auth
+	Jobs          Jobs
+	ObjectStore   ObjectStore
+	Documents     Documents
+	Transcription Transcription
 }
 
 type HTTP struct {
@@ -58,6 +61,27 @@ type Jobs struct {
 	TranscriptionConcurrency int
 }
 
+type ObjectStore struct {
+	Endpoint        string
+	Region          string
+	Bucket          string
+	AccessKeyID     string
+	SecretAccessKey string
+	UsePathStyle    bool
+}
+
+type Documents struct {
+	PDFToTextBinary string
+}
+
+type Transcription struct {
+	Endpoint     string
+	APIKey       string
+	Provider     string
+	Model        string
+	ModelVersion string
+}
+
 func Load(role Role) (Config, error) {
 	cfg := Config{
 		Environment: env("APP_ENV", "development"),
@@ -89,6 +113,24 @@ func Load(role Role) (Config, error) {
 			ReportConcurrency:        envInt("JOB_CONCURRENCY_REPORT", 10),
 			VisionConcurrency:        envInt("JOB_CONCURRENCY_VISION", 3),
 			TranscriptionConcurrency: envInt("JOB_CONCURRENCY_TRANSCRIPTION", 3),
+		},
+		ObjectStore: ObjectStore{
+			Endpoint:        env("S3_ENDPOINT", ""),
+			Region:          env("S3_REGION", "us-east-1"),
+			Bucket:          env("S3_BUCKET", ""),
+			AccessKeyID:     env("S3_ACCESS_KEY_ID", ""),
+			SecretAccessKey: env("S3_SECRET_ACCESS_KEY", ""),
+			UsePathStyle:    envBool("S3_USE_PATH_STYLE", true),
+		},
+		Documents: Documents{
+			PDFToTextBinary: env("PDFTOTEXT_BINARY", "pdftotext"),
+		},
+		Transcription: Transcription{
+			Endpoint:     env("TRANSCRIPTION_ENDPOINT", ""),
+			APIKey:       env("TRANSCRIPTION_API_KEY", ""),
+			Provider:     env("TRANSCRIPTION_PROVIDER", "unavailable"),
+			Model:        env("TRANSCRIPTION_MODEL", "unavailable"),
+			ModelVersion: env("TRANSCRIPTION_MODEL_VERSION", "none"),
 		},
 	}
 	return cfg, errors.Join(cfg.Validate(), validateEnvironmentValues())
@@ -145,6 +187,30 @@ func (c Config) Validate() error {
 	if c.Auth.SessionTTL <= 0 {
 		errs = append(errs, errors.New("SESSION_TTL must be positive"))
 	}
+	if c.Role == RoleAPI || c.Role == RoleWorker {
+		if strings.TrimSpace(c.ObjectStore.Region) == "" ||
+			strings.TrimSpace(c.ObjectStore.Bucket) == "" {
+			errs = append(errs, errors.New("S3_REGION and S3_BUCKET are required"))
+		}
+		if (c.ObjectStore.AccessKeyID == "") != (c.ObjectStore.SecretAccessKey == "") {
+			errs = append(errs, errors.New("S3 access key ID and secret must be configured together"))
+		}
+	}
+	if c.Role == RoleWorker && strings.TrimSpace(c.Documents.PDFToTextBinary) == "" {
+		errs = append(errs, errors.New("PDFTOTEXT_BINARY is required for worker role"))
+	}
+	if c.Transcription.Endpoint != "" {
+		endpoint, err := url.Parse(c.Transcription.Endpoint)
+		if err != nil || !endpoint.IsAbs() ||
+			(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+			errs = append(errs, errors.New("TRANSCRIPTION_ENDPOINT must be an absolute HTTP(S) URL"))
+		}
+		if strings.TrimSpace(c.Transcription.Provider) == "" ||
+			strings.TrimSpace(c.Transcription.Model) == "" ||
+			strings.TrimSpace(c.Transcription.ModelVersion) == "" {
+			errs = append(errs, errors.New("transcription model metadata is required"))
+		}
+	}
 	for name, value := range map[string]int{
 		"embedding":     c.Jobs.EmbeddingConcurrency,
 		"report":        c.Jobs.ReportConcurrency,
@@ -186,9 +252,11 @@ func validateEnvironmentValues() error {
 			}
 		}
 	}
-	if raw, ok := os.LookupEnv("SESSION_COOKIE_SECURE"); ok {
-		if _, err := strconv.ParseBool(raw); err != nil {
-			errs = append(errs, fmt.Errorf("SESSION_COOKIE_SECURE must be a boolean: %w", err))
+	for _, name := range []string{"SESSION_COOKIE_SECURE", "S3_USE_PATH_STYLE"} {
+		if raw, ok := os.LookupEnv(name); ok {
+			if _, err := strconv.ParseBool(raw); err != nil {
+				errs = append(errs, fmt.Errorf("%s must be a boolean: %w", name, err))
+			}
 		}
 	}
 	return errors.Join(errs...)

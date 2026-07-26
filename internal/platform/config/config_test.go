@@ -63,5 +63,9 @@ func validConfig(role Role) Config {
 			VisionConcurrency:        1,
 			TranscriptionConcurrency: 1,
 		},
+		ObjectStore: ObjectStore{
+			Region: "us-east-1",
+			Bucket: "test",
+		},
 	}
 }

@@ -15,4 +15,7 @@ web/node_modules/
 web/dist/
 mobile/.dart_tool/
 mobile/build/
-
+mobile/dist/
+mobile/macos/
+mobile/windows/
+mobile/.flutter-plugins-dependencies

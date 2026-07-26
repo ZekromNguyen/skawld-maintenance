@@ -107,6 +107,7 @@ func (r Repository) ResolvePrincipal(
 	}
 	defer rows.Close()
 	siteSet := make(map[string]struct{})
+	roleSet := make(map[domain.Role]struct{})
 	for rows.Next() {
 		var organizationID, siteID, role string
 		if err := rows.Scan(&organizationID, &siteID, &role); err != nil {
@@ -115,10 +116,23 @@ func (r Repository) ResolvePrincipal(
 		if principal.OrganizationID == "" {
 			principal.OrganizationID = organizationID
 		}
+		// The current product session is scoped to one organization. Do not
+		// merge roles or sites from another tenant into that session.
+		if organizationID != principal.OrganizationID {
+			continue
+		}
 		if siteID != "" {
 			siteSet[siteID] = struct{}{}
 		}
-		addRolePermissions(principal.Permissions, role)
+		trustedRole := domain.Role(role)
+		permissions := domain.PermissionsForRole(trustedRole)
+		if len(permissions) == 0 {
+			continue
+		}
+		roleSet[trustedRole] = struct{}{}
+		for _, permission := range permissions {
+			principal.Permissions[permission] = struct{}{}
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return domain.Principal{}, fmt.Errorf("iterate principal memberships: %w", err)
@@ -127,6 +141,12 @@ func (r Repository) ResolvePrincipal(
 		principal.SiteIDs = append(principal.SiteIDs, siteID)
 	}
 	sort.Strings(principal.SiteIDs)
+	for role := range roleSet {
+		principal.Roles = append(principal.Roles, role)
+	}
+	sort.Slice(principal.Roles, func(i, j int) bool {
+		return principal.Roles[i] < principal.Roles[j]
+	})
 	if _, ok := bootstrapSubjects[claims.Subject]; ok {
 		principal.Permissions[domain.PermissionOrganizationCreate] = struct{}{}
 	}
@@ -184,19 +204,4 @@ func (r Repository) RevokeSession(ctx context.Context, token string) error {
 		return fmt.Errorf("revoke web session: %w", err)
 	}
 	return nil
-}
-
-func addRolePermissions(target map[domain.Permission]struct{}, role string) {
-	switch role {
-	case "Administrator":
-		target[domain.PermissionOrganizationCreate] = struct{}{}
-		target[domain.PermissionWorkflowReview] = struct{}{}
-		target[domain.PermissionWorkflowPublish] = struct{}{}
-		target[domain.PermissionReportApprove] = struct{}{}
-	case "Maintenance Supervisor":
-		target[domain.PermissionWorkflowReview] = struct{}{}
-		target[domain.PermissionReportApprove] = struct{}{}
-	case "Senior Technician":
-		target[domain.PermissionWorkflowReview] = struct{}{}
-	}
 }
