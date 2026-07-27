@@ -14,11 +14,11 @@ RUN CGO_ENABLED=0 go build \
       -X github.com/ZekromNguyen/skawld-maintenance/internal/platform/buildinfo.builtAt=${BUILT_AT}" \
     -o /out/worker ./cmd/worker
 
-FROM docker.io/library/debian:bookworm-slim
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates poppler-utils \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 65532 --no-create-home --shell /usr/sbin/nologin nonroot
+# The worker binary is statically linked. Alpine supplies only the runtime
+# dependencies required for TLS and Poppler-based PDF extraction.
+FROM docker.io/library/alpine:3.23
+RUN apk add --no-cache ca-certificates poppler-utils \
+    && adduser -S -D -H -u 65532 nonroot
 COPY --from=build /out/worker /worker
 USER nonroot
 ENTRYPOINT ["/worker"]

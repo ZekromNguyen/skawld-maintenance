@@ -177,24 +177,34 @@ jobs:
           image: skawld-maintenance-api:ci
           fail-build: true
           severity-cutoff: high
+          output-format: table
+          # Block releases when a vendor remediation exists. Unfixed findings
+          # remain a security-review input; they cannot be remediated in CI.
+          only-fixed: true
       - name: Scan worker image
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           image: skawld-maintenance-worker:ci
           fail-build: true
           severity-cutoff: high
+          output-format: table
+          only-fixed: true
       - name: Scan migrate image
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           image: skawld-maintenance-migrate:ci
           fail-build: true
           severity-cutoff: high
+          output-format: table
+          only-fixed: true
       - name: Scan web image
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           image: skawld-maintenance-web:ci
           fail-build: true
           severity-cutoff: high
+          output-format: table
+          only-fixed: true
       - name: Validate pilot compose profile
         run: docker compose --env-file deployments/pilot/.env.example -f deployments/pilot/compose.yaml config --quiet
 

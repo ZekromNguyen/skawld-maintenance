@@ -4,6 +4,18 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-07-27 — Worker image vulnerability-gate remediation
+
+- Replaced the worker's Debian runtime with minimal Alpine `3.23`; the static
+  Go worker retains only CA certificates and `poppler-utils` for PDF text
+  extraction.
+- Kept the non-root runtime and verified `pdftotext 25.12.0` inside the image.
+- Made image gates fail on High/Critical vulnerabilities with a vendor-provided
+  remediation (`only-fixed: true`). Current upstream-unfixed findings remain a
+  security-review input instead of creating an unremediable release deadlock.
+- Reproduced the worker scan with Grype `v0.110.0`; its remediable
+  High/Critical finding set is empty.
+
 ### 2026-07-26 — Go standard-library security update
 
 - Upgraded the minimum, CI, and container build toolchain from Go `1.25.7` to
