@@ -22,6 +22,18 @@ type PutRequest struct {
 	Metadata    map[string]string
 }
 
+type UploadConstraints struct {
+	ContentType string
+	Size        int64
+	Metadata    map[string]string
+}
+
+type SignedURL struct {
+	URL       string
+	Headers   map[string]string
+	ExpiresAt time.Time
+}
+
 // Store is intentionally smaller than the S3 API. Product code depends only on
 // the binary-object capabilities it owns; provider-specific features remain in
 // adapters.
@@ -30,6 +42,6 @@ type Store interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, Object, error)
 	Head(ctx context.Context, key string) (Object, error)
 	Delete(ctx context.Context, key string) error
-	SignedUploadURL(ctx context.Context, key, contentType string, expiresIn time.Duration) (string, error)
+	SignedUploadURL(ctx context.Context, key string, constraints UploadConstraints, expiresIn time.Duration) (SignedURL, error)
 	SignedDownloadURL(ctx context.Context, key string, expiresIn time.Duration) (string, error)
 }

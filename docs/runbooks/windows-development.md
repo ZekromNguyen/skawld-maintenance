@@ -14,11 +14,13 @@ provided for compatible Go and Windows environments.
 ## Prerequisites
 
 - Windows 11 or a supported Windows 10 release.
-- Go `1.25.7` or a compatible newer patch release.
+- Go `1.25.12` or a compatible newer patch release.
 - Git for Windows.
 - Docker Desktop configured for Linux containers and Docker Compose.
 - PowerShell 7 is recommended; Windows PowerShell 5.1 is sufficient for the
   provided script.
+- Flutter stable and Visual Studio Desktop development with C++ are additionally
+  required to build the technician/workstation desktop application.
 
 ## Start from PowerShell
 
@@ -65,6 +67,9 @@ The Windows executables are not currently Authenticode-signed and no MSI
 installer or Windows service wrapper is provided. These packages are for
 development and controlled testing. Signing and service installation must be
 designed before enterprise Windows distribution.
+
+For the Flutter desktop user application rather than the Go backend archives,
+follow [Windows and macOS desktop application packages](./desktop-app-packages.md).
 
 ## Shutdown
 

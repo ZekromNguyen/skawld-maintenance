@@ -34,3 +34,28 @@ func TestSafeVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectTargets(t *testing.T) {
+	t.Parallel()
+
+	selected, err := selectTargets("windows, darwin")
+	if err != nil {
+		t.Fatalf("select desktop targets: %v", err)
+	}
+	if len(selected) != 4 {
+		t.Fatalf("selected %d targets, want 4", len(selected))
+	}
+	for _, buildTarget := range selected {
+		if buildTarget.goos != "windows" && buildTarget.goos != "darwin" {
+			t.Fatalf("unexpected target %s/%s", buildTarget.goos, buildTarget.goarch)
+		}
+	}
+}
+
+func TestSelectTargetsRejectsUnsupportedPlatform(t *testing.T) {
+	t.Parallel()
+
+	if _, err := selectTargets("windows,freebsd"); err == nil {
+		t.Fatal("expected unsupported platform to be rejected")
+	}
+}

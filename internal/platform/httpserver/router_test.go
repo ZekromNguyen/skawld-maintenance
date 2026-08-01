@@ -64,6 +64,22 @@ func TestLiveness(t *testing.T) {
 	}
 }
 
+func TestReadinessFailsClosedWhenDatabaseIsUnavailable(t *testing.T) {
+	t.Parallel()
+	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	response := httptest.NewRecorder()
+
+	readiness(nil).ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf(
+			"status = %d, want %d",
+			response.Code,
+			http.StatusServiceUnavailable,
+		)
+	}
+}
+
 func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
 	t.Parallel()
 	handler := New(Dependencies{

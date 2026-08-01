@@ -97,3 +97,47 @@ func TestCanAccessSite(t *testing.T) {
 		t.Fatal("organization-scoped membership should access its organization sites")
 	}
 }
+
+func TestPermissionsForUnknownRoleFailsClosed(t *testing.T) {
+	t.Parallel()
+	if permissions := PermissionsForRole("Unknown"); len(permissions) != 0 {
+		t.Fatalf("unknown role permissions = %v", permissions)
+	}
+	technician := PermissionsForRole(RoleTechnician)
+	foundWrite := false
+	foundWorkflowRead := false
+	foundPublish := false
+	for _, permission := range technician {
+		foundWrite = foundWrite || permission == PermissionExecutionWrite
+		foundWorkflowRead = foundWorkflowRead || permission == PermissionWorkflowRead
+		foundPublish = foundPublish || permission == PermissionWorkflowPublish
+	}
+	if !foundWrite || !foundWorkflowRead || foundPublish {
+		t.Fatalf("technician permissions = %v", technician)
+	}
+}
+
+func TestExternalImportPermissionIsRestrictedToImportAuthorities(t *testing.T) {
+	t.Parallel()
+	for _, role := range []Role{RoleAdministrator, RoleMaintenanceSupervisor} {
+		if !containsPermission(PermissionsForRole(role), PermissionExternalImport) {
+			t.Fatalf("%s should have external import permission", role)
+		}
+	}
+	for _, role := range []Role{
+		RoleSeniorTechnician, RoleTechnician, RoleManager,
+	} {
+		if containsPermission(PermissionsForRole(role), PermissionExternalImport) {
+			t.Fatalf("%s must not have external import permission", role)
+		}
+	}
+}
+
+func containsPermission(permissions []Permission, expected Permission) bool {
+	for _, permission := range permissions {
+		if permission == expected {
+			return true
+		}
+	}
+	return false
+}

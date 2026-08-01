@@ -42,7 +42,10 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["com.skawld.maintenance:/oauthredirect"],
+      "redirectUris": [
+        "http://localhost:*",
+        "com.skawld.maintenance:/oauthredirect"
+      ],
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256"
