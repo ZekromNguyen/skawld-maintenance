@@ -4,6 +4,19 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-01 — Web image vulnerability-gate remediation
+
+- Upgraded the web runtime from `nginx-unprivileged:1.29-alpine` (stale
+  Alpine `3.23.4` base, last rebuilt 2026-05-11) to
+  `nginx-unprivileged:1.31-alpine` (Alpine `3.24.1`).
+- Cleared the remediable High/Critical container findings that failed the CI
+  web image gate: stale `openssl` (`libcrypto3`/`libssl3` `3.5.6-r0`, including
+  CVEs-2026-9076/34181/34182), `libexpat` `2.7.5-r0`
+  (CVEs-2026-45186/41080), and `curl`/`libcurl` `8.17.0-r1`
+  (CVE-2026-6276).
+- Reproduced the scan with Grype `v0.116.1`; the new base image's remediable
+  High/Critical finding set is empty.
+
 ### 2026-07-27 — Worker image vulnerability-gate remediation
 
 - Replaced the worker's Debian runtime with minimal Alpine `3.23`; the static
