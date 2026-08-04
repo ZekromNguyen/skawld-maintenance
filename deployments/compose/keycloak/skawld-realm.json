@@ -86,6 +86,74 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000102",
+      "username": "dev.supervisor",
+      "firstName": "Dev",
+      "lastName": "Supervisor",
+      "email": "dev.supervisor@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-supervisor-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000103",
+      "username": "dev.senior",
+      "firstName": "Dev",
+      "lastName": "Senior Technician",
+      "email": "dev.senior@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-senior-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000104",
+      "username": "dev.technician",
+      "firstName": "Dev",
+      "lastName": "Technician",
+      "email": "dev.technician@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-technician-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000105",
+      "username": "dev.manager",
+      "firstName": "Dev",
+      "lastName": "Manager",
+      "email": "dev.manager@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-manager-pw",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

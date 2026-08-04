@@ -51,6 +51,24 @@ first organization is created, normal authorization comes from memberships.
 The bootstrap subject list is an installation/bootstrap mechanism, not a
 production IAM model.
 
+### Role test accounts
+
+Run `make seed` once so every role gets a principal, membership, and approval
+authority in the demo organization. Then sign in through the same Keycloak
+login with any of these accounts (all passwords match their username pattern):
+
+| Role                   | Username        | Password            | Subject ID |
+|------------------------|-----------------|---------------------|------------|
+| Administrator          | `phase0.admin`  | `phase0-admin-dev`  | `...0001`  |
+| Maintenance Supervisor | `dev.supervisor`| `dev-supervisor-pw` | `...0102`  |
+| Senior Technician      | `dev.senior`    | `dev-senior-pw`     | `...0103`  |
+| Technician             | `dev.technician`| `dev-technician-pw` | `...0104`  |
+| Manager                | `dev.manager`   | `dev-manager-pw`    | `...0105`  |
+
+The web console shows a "Sign out" button in the sidebar. Signing out revokes
+the local web session cookie and returns to the login screen; Keycloak keeps
+its own session, so the next login is a single click.
+
 ## Optional S3 contract-test service
 
 S3Mock is deliberately optional and is only a local adapter-test target:

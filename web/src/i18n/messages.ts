@@ -9,6 +9,7 @@ const en = {
   "nav.demonstrations": "Demonstrations",
   "nav.workflows": "Learned workflows",
   "nav.quality": "AI quality & safety",
+  "nav.signOut": "Sign out",
 
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
@@ -267,6 +268,7 @@ const vi: Record<MessageKey, string> = {
   "nav.demonstrations": "Trình diễn",
   "nav.workflows": "Quy trình học được",
   "nav.quality": "Chất lượng và an toàn AI",
+  "nav.signOut": "Đăng xuất",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",

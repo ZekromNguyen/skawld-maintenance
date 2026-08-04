@@ -216,6 +216,9 @@ export function App() {
           <strong>{t("sidebar.advisoryOnly")}</strong>
           <p>{t("sidebar.noControl")}</p>
         </div>
+        <button className="logout-button" onClick={() => void signOut()}>
+          {t("nav.signOut")}
+        </button>
       </aside>
 
       <main>
@@ -484,6 +487,15 @@ function NavItem(props: { active: boolean; labelKey: MessageKey; onClick: () => 
       {t(props.labelKey)}
     </button>
   );
+}
+
+async function signOut() {
+  try {
+    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    // Proceed to the login screen even if the session was already invalid.
+  }
+  window.location.assign("/auth/login");
 }
 
 const viewTitle: Record<View, MessageKey> = {

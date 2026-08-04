@@ -51,6 +51,8 @@ nav { display: grid; gap: 4px; margin-top: 20px; }
 .safety-boundary { margin-top: auto; border: 1px solid var(--line); padding: 12px; background: var(--sunken); }
 .safety-boundary strong { display: block; margin-top: 5px; font-size: 12px; }
 .safety-boundary p { color: var(--ink-muted); font-size: 10px; line-height: 1.5; margin: 5px 0 0; }
+.logout-button { margin-top: 12px; width: 100%; border: 1px solid var(--line-soft); background: transparent; color: var(--ink-soft); padding: 10px 9px; font-size: 12px; text-align: left; border-radius: 2px; }
+.logout-button:hover { background: var(--raised); color: var(--ink); }
 
 main { min-width: 0; padding: 0 28px 40px; }
 .topbar { min-height: 92px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
