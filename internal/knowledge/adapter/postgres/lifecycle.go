@@ -253,7 +253,7 @@ func loadRevisionForUpdate(
 		FROM document_revisions r
 		JOIN documents d ON d.id = r.document_id
 		WHERE r.id = $1::uuid AND r.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR d.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR d.site_id = ANY($3::uuid[]))
 		FOR UPDATE OF r
 	`, revisionID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.DocumentID, &value.Revision, &value.ApprovalStatus,

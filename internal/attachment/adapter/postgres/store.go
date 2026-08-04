@@ -247,7 +247,7 @@ func (s Store) load(
 		       size_bytes, checksum_sha256, state, object_key
 		FROM attachments
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, attachmentID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.EntityKind,
 		&value.EntityID, &value.ClientEventID, &value.OriginalFilename,

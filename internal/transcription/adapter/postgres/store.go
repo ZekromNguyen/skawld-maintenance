@@ -68,7 +68,7 @@ func (s Store) Request(
 			SELECT organization_id::text, site_id::text, checksum_sha256, verified_mime
 			FROM attachments
 			WHERE id = $1::uuid AND organization_id = $2::uuid
-			  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+			  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 			  AND state = 'AVAILABLE'
 			  AND verified_mime IN ('audio/m4a', 'audio/mp4', 'audio/mpeg', 'audio/wav')
 		`, attachmentID, principal.OrganizationID, principal.SiteIDs).Scan(
@@ -162,7 +162,7 @@ func load(
 		       source_sha256, version, created_at, updated_at
 		FROM transcriptions
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))`
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))`
 	if forUpdate {
 		statement += " FOR UPDATE"
 	}

@@ -73,7 +73,7 @@ func (s Store) LoadExecutionContext(
 		       )
 		FROM maintenance_executions e
 		WHERE e.id = $1::uuid AND e.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR e.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR e.site_id = ANY($3::uuid[]))
 		  AND (
 		    e.assigned_to = $4::uuid OR
 		    $5 = true
@@ -249,7 +249,7 @@ func (s Store) Get(
 		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
 		FROM maintenance_reports
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, reportID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.ExecutionID,
 		&value.Revision, &value.Version, &value.State, &content, &evidence,
@@ -469,7 +469,7 @@ func getForUpdate(
 		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
 		FROM maintenance_reports
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 		FOR UPDATE
 	`, reportID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.ExecutionID,

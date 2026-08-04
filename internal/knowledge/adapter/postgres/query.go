@@ -24,7 +24,7 @@ func (s Store) GetDocument(
 		FROM documents
 		WHERE id = $1::uuid AND organization_id = $2::uuid
 		  AND (
-		    cardinality($3::uuid[]) = 0 OR site_id IS NULL OR site_id = ANY($3::uuid[])
+		    COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id IS NULL OR site_id = ANY($3::uuid[])
 		  )
 	`, documentID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.Type, &value.Title,
@@ -49,7 +49,7 @@ func (s Store) ListDocuments(
 		SELECT id::text
 		FROM documents
 		WHERE organization_id = $1::uuid
-		  AND (cardinality($2::uuid[]) = 0 OR site_id IS NULL OR site_id = ANY($2::uuid[]))
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR site_id IS NULL OR site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR site_id::text = nullif($3, ''))
 		ORDER BY updated_at DESC
 		LIMIT 100
@@ -160,7 +160,7 @@ func (s Store) RevisionScope(
 		FROM document_revisions r
 		JOIN documents d ON d.id = r.document_id
 		WHERE r.id = $1::uuid AND r.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR d.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR d.site_id = ANY($3::uuid[]))
 	`, revisionID, principal.OrganizationID, principal.SiteIDs).Scan(&siteID, &documentID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", knowledgeapp.ErrNotFound

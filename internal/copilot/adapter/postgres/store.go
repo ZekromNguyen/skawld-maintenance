@@ -87,7 +87,7 @@ func (s Store) LoadIncidentContext(
 		JOIN assets a ON a.id = i.asset_id
 		LEFT JOIN selected_execution se ON true
 		WHERE i.id = $1::uuid AND i.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR i.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR i.site_id = ANY($3::uuid[]))
 	`, incidentID, principal.OrganizationID, principal.SiteIDs,
 		requestedExecutionID).Scan(
 		&value.OrganizationID, &value.SiteID, &value.IncidentID,
@@ -223,7 +223,7 @@ func (s Store) GetRecommendation(
 		       latency_ms, created_at
 		FROM recommendations
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, recommendationID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.IncidentID,
 		&value.ExecutionID, &output, &evidence, &value.Provider, &value.Model,
@@ -299,7 +299,7 @@ func (s Store) RecordFeedback(
 			       coalesce(execution_id::text, '')
 			FROM recommendations
 			WHERE id = $1::uuid AND organization_id = $2::uuid
-			  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+			  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 		`, recommendationID, principal.OrganizationID, principal.SiteIDs).Scan(
 			&organizationID, &siteID, &executionID,
 		)

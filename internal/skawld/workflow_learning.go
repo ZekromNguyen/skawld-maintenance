@@ -154,7 +154,7 @@ func (g WorkflowLearningGateway) Get(
 		JOIN workflow_versions v ON v.workflow_id = w.id
 		WHERE w.id = $1::uuid AND v.version = $2
 		  AND w.organization_id = $3::uuid
-		  AND (cardinality($4::uuid[]) = 0 OR v.site_id = ANY($4::uuid[]))
+		  AND (COALESCE(cardinality($4::uuid[]), 0) = 0 OR v.site_id = ANY($4::uuid[]))
 	`, workflowID, version, principal.OrganizationID, principal.SiteIDs).Scan(
 		&result.WorkflowID, &result.WorkflowKey, &result.Name,
 		&result.Description, &result.Version, &result.Status,
@@ -224,7 +224,7 @@ func (g WorkflowLearningGateway) List(
 		SELECT v.workflow_id::text, v.version
 		FROM workflow_versions v
 		WHERE v.organization_id = $1::uuid
-		  AND (cardinality($2::uuid[]) = 0 OR v.site_id = ANY($2::uuid[]))
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR v.site_id = ANY($2::uuid[]))
 		ORDER BY v.updated_at DESC
 		LIMIT 200
 	`, principal.OrganizationID, principal.SiteIDs)
@@ -587,7 +587,7 @@ func (g WorkflowLearningGateway) Applicable(
 		 AND (nullif(ap.manufacturer, '') IS NULL OR ap.manufacturer = a.manufacturer)
 		 AND (nullif(ap.model, '') IS NULL OR ap.model = a.model)
 		WHERE a.id = $1::uuid AND a.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR a.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR a.site_id = ANY($3::uuid[]))
 		ORDER BY v.version DESC
 	`, assetID, principal.OrganizationID, principal.SiteIDs, g.now())
 	if err != nil {
@@ -640,7 +640,7 @@ func (g WorkflowLearningGateway) loadReviewedDemonstrations(
 			LEFT JOIN demonstration_capture_deliveries c
 			  ON c.demonstration_id = d.id
 			WHERE d.id = $1::uuid AND d.organization_id = $2::uuid
-			  AND (cardinality($3::uuid[]) = 0 OR d.site_id = ANY($3::uuid[]))
+			  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR d.site_id = ANY($3::uuid[]))
 			GROUP BY d.id
 		`, demonstrationID, principal.OrganizationID, principal.SiteIDs).Scan(
 			&organizationID, &siteID, &workflowKey, &status, &reviewStatus,

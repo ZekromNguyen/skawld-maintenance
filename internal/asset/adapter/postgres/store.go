@@ -229,7 +229,7 @@ func (s Store) Get(
 		  ON r.child_asset_id = a.id AND r.relationship_type = 'CONTAINS'
 		WHERE a.id = $1::uuid
 		  AND a.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR a.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR a.site_id = ANY($3::uuid[]))
 	`, assetID, principal.OrganizationID, principal.SiteIDs))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return application.Asset{}, application.ErrNotFound
@@ -259,7 +259,7 @@ func (s Store) List(
 		LEFT JOIN asset_relationships r
 		  ON r.child_asset_id = a.id AND r.relationship_type = 'CONTAINS'
 		WHERE a.organization_id = $1::uuid
-		  AND (cardinality($2::uuid[]) = 0 OR a.site_id = ANY($2::uuid[]))
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR a.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR a.site_id = $3::uuid)
 		  AND (
 		      nullif($4, '') IS NULL

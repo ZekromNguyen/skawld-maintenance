@@ -84,7 +84,7 @@ func (s Store) LoadWindowContext(
 		)
 		FROM sites s
 		WHERE s.id = $2::uuid AND s.organization_id = $1::uuid
-		  AND (cardinality($5::uuid[]) = 0 OR s.id = ANY($5::uuid[]))
+		  AND (COALESCE(cardinality($5::uuid[]), 0) = 0 OR s.id = ANY($5::uuid[]))
 	`, principal.OrganizationID, command.SiteID, command.ShiftStart.UTC(),
 		command.ShiftEnd.UTC(), principal.SiteIDs).Scan(&snapshot)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -270,7 +270,7 @@ func get(
 		       created_at, updated_at
 		FROM shift_handovers
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))`
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))`
 	if forUpdate {
 		statement += " FOR UPDATE"
 	}

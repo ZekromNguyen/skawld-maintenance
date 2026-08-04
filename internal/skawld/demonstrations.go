@@ -115,7 +115,7 @@ func (g DemonstrationGateway) Get(
 		       subject_id::text, review_status, created_by::text, completed_at
 		FROM demonstrations
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, demonstrationID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&result.OrganizationID, &result.SiteID, &result.SubjectKind,
 		&result.SubjectID, &result.ReviewStatus, &result.CreatedBy, &completedAt,
@@ -173,7 +173,7 @@ func (g DemonstrationGateway) List(
 		FROM demonstrations
 		WHERE organization_id = $1::uuid
 		  AND ($2 = '' OR site_id::text = $2)
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 		ORDER BY started_at DESC
 		LIMIT 200
 	`, principal.OrganizationID, siteID, principal.SiteIDs)
@@ -443,7 +443,7 @@ func (g DemonstrationGateway) loadSubject(
 			FROM maintenance_executions e
 			JOIN assets a ON a.id = e.asset_id
 			WHERE e.id = $1::uuid AND e.organization_id = $2::uuid
-			  AND (cardinality($3::uuid[]) = 0 OR e.site_id = ANY($3::uuid[]))
+			  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR e.site_id = ANY($3::uuid[]))
 		`, command.SubjectID, principal.OrganizationID, principal.SiteIDs).Scan(
 			&result.OrganizationID, &result.SiteID, &assetClass, &snapshot,
 		)
@@ -468,7 +468,7 @@ func (g DemonstrationGateway) loadSubject(
 			       )
 			FROM shift_handovers h
 			WHERE h.id = $1::uuid AND h.organization_id = $2::uuid
-			  AND (cardinality($3::uuid[]) = 0 OR h.site_id = ANY($3::uuid[]))
+			  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR h.site_id = ANY($3::uuid[]))
 		`, command.SubjectID, principal.OrganizationID, principal.SiteIDs).Scan(
 			&result.OrganizationID, &result.SiteID, &snapshot,
 		)
@@ -526,7 +526,7 @@ func (g DemonstrationGateway) validateEvidence(
 				WHERE c.id = $1::uuid AND d.organization_id = $2::uuid
 				  AND r.approval_status = 'APPROVED'
 				  AND r.ingestion_state = 'READY'
-				  AND (cardinality($3::uuid[]) = 0 OR d.site_id = ANY($3::uuid[]))
+				  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR d.site_id = ANY($3::uuid[]))
 			)
 		`, parts[1], principal.OrganizationID, principal.SiteIDs).Scan(&exists)
 		if err != nil {
@@ -537,7 +537,7 @@ func (g DemonstrationGateway) validateEvidence(
 			SELECT EXISTS (
 				SELECT 1 FROM incidents
 				WHERE id = $1::uuid AND organization_id = $2::uuid
-				  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+				  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 			)
 		`, parts[1], principal.OrganizationID, principal.SiteIDs).Scan(&exists)
 		if err != nil {
