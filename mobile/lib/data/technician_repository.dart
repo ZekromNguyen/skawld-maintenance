@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/access_token.dart';
+import '../core/repository_errors.dart';
 import 'database.dart';
 
 class TechnicianRepository {
@@ -58,7 +59,10 @@ class TechnicianRepository {
         database.cachedExecutions,
       )..where((row) => row.id.equals(executionId))).getSingle();
       if (execution.state != 'ASSIGNED') {
-        throw StateError('Only an assigned execution can start');
+        throw RepositoryException(
+          RepositoryErrorCode.notAssigned,
+          'Only an assigned execution can start',
+        );
       }
       final now = DateTime.now().toUtc();
       await (database.update(
@@ -171,7 +175,10 @@ class TechnicianRepository {
               ))
               .getSingle();
       if (execution.state != 'IN_PROGRESS') {
-        throw StateError('Execution is not in progress');
+        throw RepositoryException(
+          RepositoryErrorCode.notInProgress,
+          'Execution is not in progress',
+        );
       }
       final prerequisite = step.requiredPrerequisite;
       final verified = execution.verifiedPrerequisites
@@ -179,8 +186,10 @@ class TechnicianRepository {
           .where((item) => item.isNotEmpty)
           .toSet();
       if (prerequisite != null && !verified.contains(prerequisite)) {
-        throw StateError(
+        throw RepositoryException(
+          RepositoryErrorCode.prerequisiteUnverified,
           '$prerequisite must be verified by the external authority while online',
+          {'prerequisite': prerequisite},
         );
       }
       if (step.state == 'COMPLETED') return;
@@ -348,7 +357,8 @@ class TechnicianRepository {
     final http = _http;
     final token = await _tokens?.accessToken();
     if (http == null || token == null) {
-      throw StateError(
+      throw RepositoryException(
+        RepositoryErrorCode.copilotOffline,
         'Copilot requires a live authenticated connection. Offline field records remain safe.',
       );
     }
@@ -366,7 +376,12 @@ class TechnicianRepository {
       ),
     );
     final body = response.data;
-    if (body == null) throw StateError('Copilot returned an empty response');
+    if (body == null) {
+      throw RepositoryException(
+        RepositoryErrorCode.copilotEmptyResponse,
+        'Copilot returned an empty response',
+      );
+    }
     return CopilotRecommendation.fromJson(body);
   }
 }

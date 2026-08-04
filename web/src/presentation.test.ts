@@ -8,6 +8,8 @@ describe("maintenance presentation", () => {
   });
 
   it("shows deterministic elapsed time", () => {
-    expect(relativeTime("2026-07-26T00:00:00Z", Date.parse("2026-07-26T02:00:00Z"))).toBe("2h ago");
+    const t = Date.parse("2026-07-26T02:00:00Z");
+    expect(relativeTime("2026-07-26T00:00:00Z", "en", t)).toBe("2h ago");
+    expect(relativeTime("2026-07-26T00:00:00Z", "vi", t)).toBe("2 giờ trước");
   });
 });

@@ -25,6 +25,10 @@ nav { display: grid; gap: 5px; margin-top: 24px; }
 .nav-item:hover, .nav-item.active { background: #22332b; color: #f5f8f6; }
 .nav-indicator { width: 3px; height: 16px; background: transparent; }
 .nav-item.active .nav-indicator { background: #64b88d; }
+.lang-switch { display: block; margin-top: 22px; padding: 0 8px; }
+.lang-switch .eyebrow { display: block; margin-bottom: 6px; }
+.lang-switch select { width: 100%; padding: 8px 10px; border-radius: 3px; border: 1px solid #3f5048; background: #22332b; color: #e8efea; font-size: 13px; }
+.lang-switch select:focus { outline: 1px solid #64b88d; }
 .safety-boundary { margin-top: auto; border: 1px solid #3f5048; padding: 14px; background: #192a22; }
 .safety-boundary strong { display: block; margin-top: 5px; font-size: 13px; }
 .safety-boundary p { color: #94a69c; font-size: 11px; line-height: 1.5; margin: 5px 0 0; }

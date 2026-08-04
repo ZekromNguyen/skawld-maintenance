@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { relativeTime, severityTone } from "./presentation";
+import { useI18n } from "./i18n/I18nProvider";
+import type { Locale, MessageKey } from "./i18n/messages";
 import type {
   Asset,
   Demonstration,
@@ -28,6 +30,7 @@ type View =
   | "quality";
 
 export function App() {
+  const { t, locale, setLocale } = useI18n();
   const [view, setView] = useState<View>("overview");
   const [principal, setPrincipal] = useState<Principal>();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -66,7 +69,7 @@ export function App() {
       setWorkflows(workflowResult.items);
       setMessage(undefined);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to load maintenance data");
+      setMessage(error instanceof Error ? error.message : t("error.unableToLoad"));
     }
   }, []);
 
@@ -84,7 +87,7 @@ export function App() {
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Command failed");
+      setMessage(error instanceof Error ? error.message : t("error.commandFailed"));
     } finally {
       setBusy(false);
     }
@@ -156,7 +159,7 @@ export function App() {
         relevant_evidence: relevantEvidence
       });
       setQuality(await api.evaluationSummary());
-      setMessage("Quality review recorded as an append-only evaluation label.");
+      setMessage(t("message.qualityRecorded"));
     });
   }
 
@@ -192,34 +195,45 @@ export function App() {
             <small>Maintenance Intelligence</small>
           </span>
         </div>
-        <nav aria-label="Primary navigation">
-          <NavItem active={view === "overview"} label="Operations overview" onClick={() => setView("overview")} />
-          <NavItem active={view === "assets"} label="Asset knowledge" onClick={() => setView("assets")} />
-          <NavItem active={view === "incidents"} label="Incident execution" onClick={() => setView("incidents")} />
-          <NavItem active={view === "knowledge"} label="Procedures & evidence" onClick={() => setView("knowledge")} />
-          <NavItem active={view === "handover"} label="Shift handover" onClick={() => setView("handover")} />
-          <NavItem active={view === "demonstrations"} label="Demonstrations" onClick={() => setView("demonstrations")} />
-          <NavItem active={view === "workflows"} label="Learned workflows" onClick={() => setView("workflows")} />
-          <NavItem active={view === "quality"} label="AI quality & safety" onClick={() => void openQuality()} />
+        <nav aria-label={t("nav.overview")}>
+          <NavItem active={view === "overview"} labelKey="nav.overview" onClick={() => setView("overview")} />
+          <NavItem active={view === "assets"} labelKey="nav.assets" onClick={() => setView("assets")} />
+          <NavItem active={view === "incidents"} labelKey="nav.incidents" onClick={() => setView("incidents")} />
+          <NavItem active={view === "knowledge"} labelKey="nav.knowledge" onClick={() => setView("knowledge")} />
+          <NavItem active={view === "handover"} labelKey="nav.handover" onClick={() => setView("handover")} />
+          <NavItem active={view === "demonstrations"} labelKey="nav.demonstrations" onClick={() => setView("demonstrations")} />
+          <NavItem active={view === "workflows"} labelKey="nav.workflows" onClick={() => setView("workflows")} />
+          <NavItem active={view === "quality"} labelKey="nav.quality" onClick={() => void openQuality()} />
         </nav>
+        <label className="lang-switch">
+          <span className="eyebrow">Language / Ngôn ngữ</span>
+          <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+            <option value="en">English</option>
+            <option value="vi">Tiếng Việt</option>
+          </select>
+        </label>
         <div className="safety-boundary">
-          <span className="eyebrow">Safety boundary</span>
-          <strong>Advisory only</strong>
-          <p>No machinery control or permit authority.</p>
+          <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
+          <strong>{t("sidebar.advisoryOnly")}</strong>
+          <p>{t("sidebar.noControl")}</p>
         </div>
       </aside>
 
       <main>
         <header className="topbar">
           <div>
-            <span className="eyebrow">Maintenance operations</span>
-            <h1>{titleFor(view)}</h1>
+            <span className="eyebrow">{t("topbar.maintenanceOps")}</span>
+            <h1>{t(viewTitle[view])}</h1>
           </div>
           <div className="operator">
             <span className="presence" />
             <span>
-              <strong>{principal?.display_name ?? "Connecting…"}</strong>
-              <small>{principal?.site_ids.length || "All"} site scope</small>
+              <strong>{principal?.display_name ?? t("topbar.connecting")}</strong>
+              <small>
+                {principal?.site_ids.length
+                  ? t("topbar.siteScope", { count: principal.site_ids.length })
+                  : t("topbar.allSiteScope")}
+              </small>
             </span>
           </div>
         </header>
@@ -459,14 +473,26 @@ export function App() {
   );
 }
 
-function NavItem(props: { active: boolean; label: string; onClick: () => void }) {
+function NavItem(props: { active: boolean; labelKey: MessageKey; onClick: () => void }) {
+  const { t } = useI18n();
   return (
     <button className={props.active ? "nav-item active" : "nav-item"} onClick={props.onClick}>
       <span className="nav-indicator" />
-      {props.label}
+      {t(props.labelKey)}
     </button>
   );
 }
+
+const viewTitle: Record<View, MessageKey> = {
+  overview: "pageTitle.overview",
+  assets: "pageTitle.assets",
+  incidents: "pageTitle.incidents",
+  knowledge: "pageTitle.knowledge",
+  handover: "pageTitle.handover",
+  demonstrations: "pageTitle.demonstrations",
+  workflows: "pageTitle.workflows",
+  quality: "pageTitle.quality"
+};
 
 function Overview(props: {
   assets: Asset[];
@@ -475,21 +501,22 @@ function Overview(props: {
   criticalAssetCount: number;
   onOpenIncidents: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <>
-      <section className="metrics" aria-label="Operational status">
-        <Metric label="Registered assets" value={props.assets.length} detail="Native and external projections" />
-        <Metric label="Open incidents" value={props.openCount} detail="Require technician attention" accent />
-        <Metric label="Critical assets" value={props.criticalAssetCount} detail="Human-approved criticality A" />
-        <Metric label="Unsafe AI actions" value={0} detail="Hard safety boundary enforced" safe />
+      <section className="metrics" aria-label={t("overview.operationalStatus")}>
+        <Metric label={t("overview.registeredAssets")} value={props.assets.length} detail={t("overview.nativeExternal")} />
+        <Metric label={t("overview.openIncidents")} value={props.openCount} detail={t("overview.requireAttention")} accent />
+        <Metric label={t("overview.criticalAssets")} value={props.criticalAssetCount} detail={t("overview.criticalityA")} />
+        <Metric label={t("overview.unsafeAiActions")} value={0} detail={t("overview.safetyBoundaryEnforced")} safe />
       </section>
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Priority queue</span>
-            <h2>Active maintenance incidents</h2>
+            <span className="eyebrow">{t("overview.priorityQueue")}</span>
+            <h2>{t("overview.activeIncidents")}</h2>
           </div>
-          <button className="secondary-button" onClick={props.onOpenIncidents}>Open workbench</button>
+          <button className="secondary-button" onClick={props.onOpenIncidents}>{t("overview.openWorkbench")}</button>
         </div>
         <IncidentTable incidents={props.incidents.slice(0, 8)} />
       </section>
@@ -508,30 +535,31 @@ function Metric(props: { label: string; value: number; detail: string; accent?: 
 }
 
 function AssetsTable({ assets, onCreate }: { assets: Asset[]; onCreate: () => void }) {
+  const { t } = useI18n();
   return (
     <section className="panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Source-aware registry</span>
-          <h2>Asset knowledge</h2>
+          <span className="eyebrow">{t("assets.sourceAwareRegistry")}</span>
+          <h2>{t("assets.title")}</h2>
         </div>
-        <div className="heading-actions"><span className="count">{assets.length} assets</span><button className="secondary-button" onClick={onCreate}>Add asset</button></div>
+        <div className="heading-actions"><span className="count">{t("assets.count", { count: assets.length })}</span><button className="secondary-button" onClick={onCreate}>{t("assets.add")}</button></div>
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Tag</th><th>Asset</th><th>Class</th><th>Criticality</th><th>Authority</th><th>Status</th></tr></thead>
+          <thead><tr><th>{t("assets.tag")}</th><th>{t("assets.asset")}</th><th>{t("assets.class")}</th><th>{t("assets.criticality")}</th><th>{t("assets.authority")}</th><th>{t("assets.status")}</th></tr></thead>
           <tbody>
             {assets.map((asset) => (
               <tr key={asset.id}>
                 <td className="mono strong">{asset.tag}</td>
-                <td><strong>{asset.name}</strong><small>{[asset.manufacturer, asset.model].filter(Boolean).join(" · ") || "No OEM metadata"}</small></td>
+                <td><strong>{asset.name}</strong><small>{[asset.manufacturer, asset.model].filter(Boolean).join(" · ") || t("assets.noOem")}</small></td>
                 <td>{asset.class}</td>
                 <td><span className={`criticality rating-${asset.criticality?.rating ?? "none"}`}>{asset.criticality?.rating ?? "—"}</span></td>
-                <td><span className="source-badge">{asset.source_of_truth === "EXTERNAL_REFERENCE" ? "External projection" : "Skawld native"}</span></td>
+                <td><span className="source-badge">{asset.source_of_truth === "EXTERNAL_REFERENCE" ? t("assets.externalProjection") : t("assets.skawldNative")}</span></td>
                 <td><span className="status-dot" />{asset.status}</td>
               </tr>
             ))}
-            {assets.length === 0 && <EmptyRow columns={6} label="No assets in your authorized site scope." />}
+            {assets.length === 0 && <EmptyRow columns={6} labelKey="assets.empty" />}
           </tbody>
         </table>
       </div>
@@ -540,10 +568,11 @@ function AssetsTable({ assets, onCreate }: { assets: Asset[]; onCreate: () => vo
 }
 
 function IncidentTable({ incidents }: { incidents: Incident[] }) {
+  const { t, locale } = useI18n();
   return (
     <div className="table-wrap">
       <table>
-        <thead><tr><th>Incident</th><th>Asset</th><th>Summary</th><th>Severity</th><th>State</th><th>Detected</th></tr></thead>
+        <thead><tr><th>{t("incidents.incident")}</th><th>{t("assets.asset")}</th><th>{t("incidents.summary")}</th><th>{t("incidents.severity")}</th><th>{t("incidents.state")}</th><th>{t("incidents.detected")}</th></tr></thead>
         <tbody>
           {incidents.map((incident) => (
             <tr key={incident.id}>
@@ -552,10 +581,10 @@ function IncidentTable({ incidents }: { incidents: Incident[] }) {
               <td className="summary-cell">{incident.summary}</td>
               <td><span className={`severity ${severityTone(incident.severity)}`}>{incident.severity}</span></td>
               <td>{incident.state.replace("_", " ")}</td>
-              <td>{relativeTime(incident.detected_at)}</td>
+              <td>{relativeTime(incident.detected_at, locale)}</td>
             </tr>
           ))}
-          {incidents.length === 0 && <EmptyRow columns={6} label="No incidents in your authorized site scope." />}
+          {incidents.length === 0 && <EmptyRow columns={6} labelKey="incidents.empty" />}
         </tbody>
       </table>
     </div>
@@ -568,11 +597,12 @@ function IncidentQueue(props: {
   onSelect: (incident: Incident) => void;
   onCreate: () => void;
 }) {
+  const { t, locale } = useI18n();
   return (
     <section className="queue panel">
       <div className="panel-heading">
-        <div><span className="eyebrow">Authorized scope</span><h2>Incident queue</h2></div>
-        <div className="heading-actions"><span className="count">{props.incidents.length}</span><button className="secondary-button" onClick={props.onCreate}>New</button></div>
+        <div><span className="eyebrow">{t("incidents.authorizedScope")}</span><h2>{t("incidents.queue")}</h2></div>
+        <div className="heading-actions"><span className="count">{props.incidents.length}</span><button className="secondary-button" onClick={props.onCreate}>{t("incidents.new")}</button></div>
       </div>
       <div className="queue-list">
         {props.incidents.map((incident) => (
@@ -583,13 +613,13 @@ function IncidentQueue(props: {
           >
             <span className={`severity-bar ${severityTone(incident.severity)}`} />
             <span>
-              <span className="queue-meta"><span className="mono">{incident.number}</span><span>{relativeTime(incident.detected_at)}</span></span>
+              <span className="queue-meta"><span className="mono">{incident.number}</span><span>{relativeTime(incident.detected_at, locale)}</span></span>
               <strong>{incident.asset_tag} · {incident.summary}</strong>
               <small>{incident.state.replace("_", " ")} · {incident.severity}</small>
             </span>
           </button>
         ))}
-        {props.incidents.length === 0 && <div className="empty">No incidents available.</div>}
+        {props.incidents.length === 0 && <div className="empty">{t("incidents.none")}</div>}
       </div>
     </section>
   );
@@ -625,17 +655,18 @@ function ExecutionPanel(props: {
   onCapture: () => Promise<void>;
   onEvidenceView: (evidenceID: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   if (!props.incident) {
-    return <section className="execution panel empty-state"><strong>Select an incident</strong><p>Review context and start a deterministic inspection workflow.</p></section>;
+    return <section className="execution panel empty-state"><strong>{t("execution.selectIncident")}</strong><p>{t("execution.reviewContext")}</p></section>;
   }
   if (!props.execution) {
     return (
       <section className="execution panel empty-state">
         <span className={`severity ${severityTone(props.incident.severity)}`}>{props.incident.severity}</span>
         <strong>{props.incident.asset_tag} · {props.incident.summary}</strong>
-        <p>This creates a Skawld-owned execution record. It does not create or replace an authoritative CMMS work order.</p>
+        <p>{t("execution.cmmsDisclaimer")}</p>
         <button className="primary-button" disabled={props.busy || props.incident.state === "RESOLVED"} onClick={() => void props.onCreate()}>
-          Create pump inspection
+          {t("execution.createPumpInspection")}
         </button>
       </section>
     );
@@ -646,14 +677,14 @@ function ExecutionPanel(props: {
     <section className="execution panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Deterministic execution</span>
-          <h2>{props.execution.asset_tag} inspection</h2>
+          <span className="eyebrow">{t("execution.deterministicExecution")}</span>
+          <h2>{t("execution.inspection", { tag: props.execution.asset_tag })}</h2>
         </div>
         <span className="state-badge">{props.execution.state.replace("_", " ")}</span>
       </div>
-      <div className="progress-row"><span style={{ width: `${progress}%` }} /><small>{props.completedSteps}/{props.execution.steps.length} steps</small></div>
+      <div className="progress-row"><span style={{ width: `${progress}%` }} /><small>{t("execution.stepsProgress", { done: props.completedSteps, total: props.execution.steps.length })}</small></div>
       {props.execution.state === "ASSIGNED" && (
-        <button className="primary-button full" disabled={props.busy} onClick={() => void props.onStart()}>Start inspection</button>
+        <button className="primary-button full" disabled={props.busy} onClick={() => void props.onStart()}>{t("execution.startInspection")}</button>
       )}
       <div className="steps">
         {props.execution.steps.map((step) => (
@@ -662,7 +693,7 @@ function ExecutionPanel(props: {
             <div>
               <strong>{step.title}</strong>
               <small>{step.risk_level.replaceAll("_", " ")}</small>
-              {step.required_prerequisite && <span className="prerequisite">Requires verified {step.required_prerequisite.replaceAll("_", " ")}</span>}
+              {step.required_prerequisite && <span className="prerequisite">{t("execution.requiresVerified", { prerequisite: step.required_prerequisite.replaceAll("_", " ") })}</span>}
               {step.blocked_reason && <p className="blocked-reason">{step.blocked_reason}</p>}
             </div>
             <button
@@ -670,7 +701,7 @@ function ExecutionPanel(props: {
               disabled={props.busy || execution.state !== "IN_PROGRESS" || step.state === "COMPLETED"}
               onClick={() => void props.onCompleteStep(step)}
             >
-              {step.state === "COMPLETED" ? "Done" : step.state === "BLOCKED" ? "Retry" : "Complete"}
+              {step.state === "COMPLETED" ? t("execution.done") : step.state === "BLOCKED" ? t("execution.retry") : t("execution.complete")}
             </button>
           </article>
         ))}
@@ -680,7 +711,7 @@ function ExecutionPanel(props: {
       )}
       {props.execution.measurements.length > 0 && (
         <div className="evidence">
-          <span className="eyebrow">Recorded evidence</span>
+          <span className="eyebrow">{t("execution.recordedEvidence")}</span>
           {props.execution.measurements.map((measurement) => (
             <span key={measurement.id}><strong>{measurement.value}</strong> {measurement.unit.replaceAll("_", "/")} · {measurement.measurement_type.replaceAll("_", " ")}</span>
           ))}
@@ -688,13 +719,13 @@ function ExecutionPanel(props: {
       )}
       <div className="copilot-actions">
         <button className="primary-button" disabled={props.busy} onClick={() => void props.onCapture()}>
-          Start semantic demonstration
+          {t("execution.startSemanticDemo")}
         </button>
         <button className="secondary-button" disabled={props.busy} onClick={() => void props.onRecommend()}>
-          Generate evidence-backed recommendation
+          {t("execution.generateRecommendation")}
         </button>
         <button className="secondary-button" disabled={props.busy} onClick={() => void props.onDraftReport()}>
-          Prepare report draft
+          {t("execution.prepareReportDraft")}
         </button>
       </div>
       {props.recommendation && (
@@ -730,11 +761,12 @@ function RecommendationCard(props: {
   ) => Promise<void>;
   busy: boolean;
 }) {
+  const { t } = useI18n();
   const value = props.value;
   const [outcome, setOutcome] = useState<
     "ACCEPTED" | "REJECTED" | "CORRECTED" | "UNSAFE" | "UNSUPPORTED" | "INCORRECT_NEXT_STEP"
   >("ACCEPTED");
-  const [reason, setReason] = useState("Reviewed against the displayed evidence packet");
+  const [reason, setReason] = useState(t("recommendation.defaultReason"));
   const [materialClaims, setMaterialClaims] = useState(
     value.output.status === "RECOMMENDATION" ? 1 : 0
   );
@@ -751,30 +783,30 @@ function RecommendationCard(props: {
   return (
     <article className="ai-result">
       <div className="result-header">
-        <div><span className="eyebrow">Advisory proposal</span><h2>{value.output.status.replaceAll("_", " ")}</h2></div>
+        <div><span className="eyebrow">{t("recommendation.advisoryProposal")}</span><h2>{value.output.status.replaceAll("_", " ")}</h2></div>
         <span className="state-badge">{Math.round(value.output.confidence * 100)}% · {value.output.risk_level}</span>
       </div>
-      <p>{value.output.recommendation || "The eligible evidence packet is insufficient for a recommendation."}</p>
+      <p>{value.output.recommendation || t("recommendation.insufficient")}</p>
       <EvidenceLinks
         evidence={value.evidence}
         selected={value.output.evidence_ids}
         onView={props.onEvidenceView}
       />
-      <small>Unknowns: {value.output.unknowns.join(" · ") || "None stated"} · Human confirmation required</small>
+      <small>{t("recommendation.unknowns", { value: value.output.unknowns.join(" · ") || t("recommendation.noneStated") })} · {t("recommendation.humanConfirmation")}</small>
       <small className="provenance">{value.provider}/{value.model} · {value.prompt_version}</small>
       <div className="quality-review">
-        <span className="eyebrow">Pilot quality label</span>
+        <span className="eyebrow">{t("recommendation.pilotQualityLabel")}</span>
         <select value={outcome} onChange={(event) => setOutcome(event.target.value as typeof outcome)}>
-          <option value="ACCEPTED">Accepted</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="UNSAFE">Unsafe</option>
-          <option value="UNSUPPORTED">Unsupported claim</option>
-          <option value="INCORRECT_NEXT_STEP">Incorrect next step</option>
+          <option value="ACCEPTED">{t("recommendation.accepted")}</option>
+          <option value="REJECTED">{t("recommendation.rejected")}</option>
+          <option value="UNSAFE">{t("recommendation.unsafe")}</option>
+          <option value="UNSUPPORTED">{t("recommendation.unsupportedClaim")}</option>
+          <option value="INCORRECT_NEXT_STEP">{t("recommendation.incorrectNextStep")}</option>
         </select>
-        <input value={reason} onChange={(event) => setReason(event.target.value)} aria-label="Quality review reason" />
+        <input value={reason} onChange={(event) => setReason(event.target.value)} aria-label={t("recommendation.reason")} />
         <div className="quality-counts">
           <label>
-            Material claims
+            {t("recommendation.materialClaims")}
             <input
               type="number"
               min="0"
@@ -783,7 +815,7 @@ function RecommendationCard(props: {
             />
           </label>
           <label>
-            Supported claims
+            {t("recommendation.supportedClaims")}
             <input
               type="number"
               min="0"
@@ -793,7 +825,7 @@ function RecommendationCard(props: {
             />
           </label>
           <label>
-            Retrieved evidence
+            {t("recommendation.retrievedEvidence")}
             <input
               type="number"
               min="0"
@@ -802,7 +834,7 @@ function RecommendationCard(props: {
             />
           </label>
           <label>
-            Relevant evidence
+            {t("recommendation.relevantEvidence")}
             <input
               type="number"
               min="0"
@@ -826,7 +858,7 @@ function RecommendationCard(props: {
             )
           }
         >
-          Record review
+          {t("recommendation.recordReview")}
         </button>
       </div>
     </article>
@@ -838,50 +870,52 @@ function QualityPanel(props: {
   busy: boolean;
   onRefresh: () => Promise<void>;
 }) {
+  const { t } = useI18n();
   if (!props.value) {
-    return <section className="panel empty-state"><strong>No quality summary loaded</strong></section>;
+    return <section className="panel empty-state"><strong>{t("quality.noSummary")}</strong></section>;
   }
   const percent = (value: number) => `${Math.round(value * 100)}%`;
   return (
     <>
-      <section className="metrics" aria-label="AI quality and safety metrics">
-        <Metric label="Review coverage" value={Math.round(props.value.review_coverage * 100)} detail={`${props.value.reviewed}/${props.value.recommendations} recommendations reviewed`} />
-        <Metric label="Evidence coverage" value={Math.round(props.value.evidence_coverage * 100)} detail="Reviewer-labeled supported claims" />
-        <Metric label="Unsafe rate" value={Math.round(props.value.unsafe_recommendation_rate * 100)} detail="Must remain at zero" accent={props.value.unsafe_recommendation_rate > 0} safe={props.value.unsafe_recommendation_rate === 0} />
-        <Metric label="Workflow gates" value={Math.round(props.value.workflow_gate_pass_rate * 100)} detail={`${props.value.workflow_evaluations} evaluated versions`} />
+      <section className="metrics" aria-label={t("quality.pilotEvaluation")}>
+        <Metric label={t("quality.reviewCoverage")} value={Math.round(props.value.review_coverage * 100)} detail={t("quality.reviewedDetail", { reviewed: props.value.reviewed, total: props.value.recommendations })} />
+        <Metric label={t("quality.evidenceCoverage")} value={Math.round(props.value.evidence_coverage * 100)} detail={t("quality.labeledSupported")} />
+        <Metric label={t("quality.unsafeRate")} value={Math.round(props.value.unsafe_recommendation_rate * 100)} detail={t("quality.mustRemainZero")} accent={props.value.unsafe_recommendation_rate > 0} safe={props.value.unsafe_recommendation_rate === 0} />
+        <Metric label={t("quality.workflowGates")} value={Math.round(props.value.workflow_gate_pass_rate * 100)} detail={t("quality.evaluatedVersions", { count: props.value.workflow_evaluations })} />
       </section>
       <section className="panel quality-summary">
         <div className="panel-heading">
-          <div><span className="eyebrow">Pilot evaluation</span><h2>Human-reviewed quality signals</h2></div>
-          <button className="secondary-button" disabled={props.busy} onClick={() => void props.onRefresh()}>Refresh</button>
+          <div><span className="eyebrow">{t("quality.pilotEvaluation")}</span><h2>{t("quality.humanReviewedSignals")}</h2></div>
+          <button className="secondary-button" disabled={props.busy} onClick={() => void props.onRefresh()}>{t("quality.refresh")}</button>
         </div>
         <dl>
-          <div><dt>Acceptance</dt><dd>{percent(props.value.recommendation_acceptance)}</dd></div>
-          <div><dt>Human override</dt><dd>{percent(props.value.human_override_rate)}</dd></div>
-          <div><dt>Unsupported</dt><dd>{percent(props.value.unsupported_recommendation_rate)}</dd></div>
-          <div><dt>Incorrect next step</dt><dd>{percent(props.value.incorrect_next_step_rate)}</dd></div>
-          <div><dt>Retrieval precision</dt><dd>{percent(props.value.retrieval_precision)}</dd></div>
-          <div><dt>LLM calls</dt><dd>{props.value.llm_calls}</dd></div>
-          <div><dt>Average latency</dt><dd>{Math.round(props.value.average_latency_ms)} ms</dd></div>
-          <div><dt>Tokens</dt><dd>{props.value.tokens_in + props.value.tokens_out}</dd></div>
-          <div><dt>Estimated cost</dt><dd>{props.value.estimated_cost_micros} μ</dd></div>
+          <div><dt>{t("quality.acceptance")}</dt><dd>{percent(props.value.recommendation_acceptance)}</dd></div>
+          <div><dt>{t("quality.humanOverride")}</dt><dd>{percent(props.value.human_override_rate)}</dd></div>
+          <div><dt>{t("quality.unsupported")}</dt><dd>{percent(props.value.unsupported_recommendation_rate)}</dd></div>
+          <div><dt>{t("quality.incorrectNextStep")}</dt><dd>{percent(props.value.incorrect_next_step_rate)}</dd></div>
+          <div><dt>{t("quality.retrievalPrecision")}</dt><dd>{percent(props.value.retrieval_precision)}</dd></div>
+          <div><dt>{t("quality.llmCalls")}</dt><dd>{props.value.llm_calls}</dd></div>
+          <div><dt>{t("quality.avgLatency")}</dt><dd>{Math.round(props.value.average_latency_ms)} ms</dd></div>
+          <div><dt>{t("quality.tokens")}</dt><dd>{props.value.tokens_in + props.value.tokens_out}</dd></div>
+          <div><dt>{t("quality.estimatedCost")}</dt><dd>{props.value.estimated_cost_micros} μ</dd></div>
         </dl>
-        <p className="muted">Zero values mean “not yet labeled”, not proof of quality. Safety gates use the frozen offline evaluation dataset in CI in addition to these pilot observations.</p>
+        <p className="muted">{t("quality.muted")}</p>
       </section>
     </>
   );
 }
 
 function ReportCard({ value }: { value: MaintenanceReport }) {
+  const { t } = useI18n();
   return (
     <article className="ai-result">
       <div className="result-header">
-        <div><span className="eyebrow">Human-reviewable draft</span><h2>Maintenance report R{value.revision}</h2></div>
+        <div><span className="eyebrow">{t("report.humanReviewableDraft")}</span><h2>{t("report.title", { revision: value.revision })}</h2></div>
         <span className="state-badge">{value.state}</span>
       </div>
       <p>{value.structured_content.summary}</p>
       <EvidenceLinks evidence={value.evidence} selected={value.structured_content.evidence_ids} />
-      <small>Unknowns: {value.structured_content.unknowns.join(" · ")}</small>
+      <small>{t("recommendation.unknowns", { value: value.structured_content.unknowns.join(" · ") })}</small>
       <small className="provenance">{value.provider}/{value.model} · {value.prompt_version}</small>
     </article>
   );
@@ -929,6 +963,7 @@ function KnowledgePanel(props: {
   onRefresh: () => Promise<void>;
   onMutate: (action: () => Promise<void>) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [title, setTitle] = useState("P-302 High Vibration Inspection");
   const [assetClass, setAssetClass] = useState("CENTRIFUGAL_PUMP");
   const [file, setFile] = useState<File>();
@@ -949,15 +984,15 @@ function KnowledgePanel(props: {
   return (
     <div className="knowledge-layout">
       <form className="panel knowledge-form" onSubmit={submit}>
-        <div className="panel-heading"><div><span className="eyebrow">Controlled ingestion</span><h2>Add procedure revision</h2></div></div>
-        <label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-        <label>Asset class<input value={assetClass} onChange={(event) => setAssetClass(event.target.value)} /></label>
-        <label>PDF or text<input type="file" accept=".pdf,text/plain,application/pdf" onChange={(event) => setFile(event.target.files?.[0])} /></label>
-        <button className="primary-button" disabled={props.busy || !props.siteID || !file}>Upload and queue ingestion</button>
-        <p className="form-note">A revision remains ineligible for retrieval until ingestion is ready and an authorized approver publishes it.</p>
+        <div className="panel-heading"><div><span className="eyebrow">{t("knowledge.controlledIngestion")}</span><h2>{t("knowledge.addRevision")}</h2></div></div>
+        <label>{t("knowledge.title")}<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+        <label>{t("knowledge.assetClass")}<input value={assetClass} onChange={(event) => setAssetClass(event.target.value)} /></label>
+        <label>{t("knowledge.pdfOrText")}<input type="file" accept=".pdf,text/plain,application/pdf" onChange={(event) => setFile(event.target.files?.[0])} /></label>
+        <button className="primary-button" disabled={props.busy || !props.siteID || !file}>{t("knowledge.uploadQueue")}</button>
+        <p className="form-note">{t("knowledge.formNote")}</p>
       </form>
       <section className="panel">
-        <div className="panel-heading"><div><span className="eyebrow">Validity-aware corpus</span><h2>Document revisions</h2></div><span className="count">{props.documents.length}</span></div>
+        <div className="panel-heading"><div><span className="eyebrow">{t("knowledge.validityAware")}</span><h2>{t("knowledge.documentRevisions")}</h2></div><span className="count">{props.documents.length}</span></div>
         <div className="document-list">
           {props.documents.map((document) => (
             <article key={document.id}>
@@ -971,12 +1006,12 @@ function KnowledgePanel(props: {
               ))}
             </article>
           ))}
-          {props.documents.length === 0 && <div className="empty">No controlled documents in this site.</div>}
+          {props.documents.length === 0 && <div className="empty">{t("knowledge.noDocuments")}</div>}
         </div>
       </section>
       <section className="panel search-panel">
-        <div className="panel-heading"><div><span className="eyebrow">Authorization-first RRF</span><h2>Evidence search</h2></div></div>
-        <div className="search-row"><input value={query} onChange={(event) => setQuery(event.target.value)} /><button className="secondary-button" disabled={!props.siteID || props.busy} onClick={() => void props.onMutate(async () => setResults((await api.searchKnowledge(props.siteID!, query)).items))}>Search</button></div>
+        <div className="panel-heading"><div><span className="eyebrow">{t("knowledge.authorizationFirstRrf")}</span><h2>{t("knowledge.evidenceSearch")}</h2></div></div>
+        <div className="search-row"><input value={query} onChange={(event) => setQuery(event.target.value)} /><button className="secondary-button" disabled={!props.siteID || props.busy} onClick={() => void props.onMutate(async () => setResults((await api.searchKnowledge(props.siteID!, query)).items))}>{t("knowledge.search")}</button></div>
         <EvidenceLinks evidence={results} selected={results.map((item) => item.id)} />
       </section>
     </div>
@@ -990,38 +1025,39 @@ function HandoverPanel(props: {
   onPrepare: () => Promise<void>;
   onCapture: () => Promise<void>;
 }) {
+  const { t } = useI18n();
   return (
     <section className="panel handover-panel">
       <div className="panel-heading">
-        <div><span className="eyebrow">Normal-work intelligence</span><h2>Shift handover draft</h2></div>
+        <div><span className="eyebrow">{t("handover.normalWorkIntelligence")}</span><h2>{t("handover.draft")}</h2></div>
         <div className="heading-actions">
           {props.handover && (
             <button className="secondary-button" disabled={props.busy} onClick={() => void props.onCapture()}>
-              Start demonstration
+              {t("handover.startDemonstration")}
             </button>
           )}
-          <button className="primary-button" disabled={!props.siteID || props.busy} onClick={() => void props.onPrepare()}>Prepare from current records</button>
+          <button className="primary-button" disabled={!props.siteID || props.busy} onClick={() => void props.onPrepare()}>{t("handover.prepare")}</button>
         </div>
       </div>
       {!props.handover ? (
-        <div className="empty">Prepare a draft from authorized open incidents, active work, blocked prerequisites, and pending steps.</div>
+        <div className="empty">{t("handover.empty")}</div>
       ) : (
         <div className="handover-content">
           <div className="result-header"><p>{props.handover.structured_content.summary}</p><span className="state-badge">{props.handover.state}</span></div>
-          <HandoverSection title="Open incidents" items={props.handover.structured_content.open_incidents} />
-          <HandoverSection title="Active executions" items={props.handover.structured_content.active_executions} />
-          <HandoverSection title="Safety concerns" items={props.handover.structured_content.safety_concerns} />
-          <HandoverSection title="Follow-up" items={props.handover.structured_content.follow_up} />
+          <HandoverSection title={t("handover.openIncidents")} items={props.handover.structured_content.open_incidents} empty={t("handover.none")} />
+          <HandoverSection title={t("handover.activeExecutions")} items={props.handover.structured_content.active_executions} empty={t("handover.none")} />
+          <HandoverSection title={t("handover.safetyConcerns")} items={props.handover.structured_content.safety_concerns} empty={t("handover.none")} />
+          <HandoverSection title={t("handover.followUp")} items={props.handover.structured_content.follow_up} empty={t("handover.none")} />
           <EvidenceLinks evidence={props.handover.evidence} selected={props.handover.structured_content.evidence_ids} />
-          <small className="provenance">{props.handover.provider}/{props.handover.model} · {props.handover.prompt_version} · human acceptance required</small>
+          <small className="provenance">{props.handover.provider}/{props.handover.model} · {props.handover.prompt_version} · {t("handover.humanAcceptance")}</small>
         </div>
       )}
     </section>
   );
 }
 
-function HandoverSection({ title, items }: { title: string; items: string[] }) {
-  return <div className="handover-section"><strong>{title}</strong>{items.length ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</ul> : <p>None in the current authorized snapshot.</p>}</div>;
+function HandoverSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return <div className="handover-section"><strong>{title}</strong>{items.length ? <ul>{items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</ul> : <p>{empty}</p>}</div>;
 }
 
 function DemonstrationPanel(props: {
@@ -1042,13 +1078,14 @@ function DemonstrationPanel(props: {
     reason: string
   ) => Promise<void>;
 }) {
+  const { t, locale } = useI18n();
   const selected = props.selected;
 
   function complete() {
     if (!selected) return;
     const outcome = window.prompt(
-      "Final demonstration outcome",
-      "Maintenance work completed and outcome verified"
+      t("demo.outcomePrompt"),
+      t("demo.outcomeDefault")
     );
     if (outcome?.trim()) void props.onComplete(selected, outcome.trim());
   }
@@ -1058,10 +1095,10 @@ function DemonstrationPanel(props: {
   ) {
     if (!selected) return;
     const reason = window.prompt(
-      "Review reason",
+      t("demo.reviewReasonPrompt"),
       decision === "APPROVED"
-        ? "Semantic trace is coherent and suitable for learning review"
-        : "Trace requires expert follow-up"
+        ? t("demo.reviewApproveDefault")
+        : t("demo.reviewRejectDefault")
     );
     if (reason?.trim()) void props.onReview(selected, decision, reason.trim());
   }
@@ -1069,13 +1106,13 @@ function DemonstrationPanel(props: {
   function redact(eventID: string) {
     if (!selected) return;
     const path = window.prompt(
-      "JSON path to mask",
-      "output.value.narrative"
+      t("demo.jsonPathPrompt"),
+      t("demo.jsonPathDefault")
     );
     if (!path?.trim()) return;
     const reason = window.prompt(
-      "Redaction reason",
-      "Sensitive operational detail"
+      t("demo.redactReasonPrompt"),
+      t("demo.redactReasonDefault")
     );
     if (reason?.trim()) {
       void props.onRedact(selected, eventID, path.trim(), reason.trim());
@@ -1087,8 +1124,8 @@ function DemonstrationPanel(props: {
       <section className="panel demonstration-list">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Organizational memory</span>
-            <h2>Semantic demonstrations</h2>
+            <span className="eyebrow">{t("demo.organizationalMemory")}</span>
+            <h2>{t("demo.semanticDemonstrations")}</h2>
           </div>
           <span className="count">{props.values.length}</span>
         </div>
@@ -1105,18 +1142,18 @@ function DemonstrationPanel(props: {
             <span>
               <strong>{value.workflow_key}</strong>
               <small>
-                {value.subject_kind} · {value.events.length} semantic events
+                {value.subject_kind} · {t("demo.semanticEvents", { count: value.events.length })}
               </small>
             </span>
             <span className="state-badge">{value.status}</span>
             <small>
-              Review {value.review_status} · {relativeTime(value.started_at)}
+              {t("demo.review", { status: value.review_status })} · {relativeTime(value.started_at, locale)}
             </small>
           </button>
         ))}
         {props.values.length === 0 && (
           <div className="empty">
-            Start capture from an incident execution or shift handover.
+            {t("demo.startCapture")}
           </div>
         )}
       </section>
@@ -1124,10 +1161,9 @@ function DemonstrationPanel(props: {
       <section className="panel demonstration-timeline">
         {!selected ? (
           <div className="empty-state">
-            <strong>Select a demonstration</strong>
+            <strong>{t("demo.select")}</strong>
             <p>
-              Review domain meaning, actor, trust, source event, correction
-              links, and capture health.
+              {t("demo.reviewGuidance")}
             </p>
           </div>
         ) : (
@@ -1145,22 +1181,22 @@ function DemonstrationPanel(props: {
                     disabled={props.busy}
                     onClick={complete}
                   >
-                    Complete capture
+                    {t("demo.completeCapture")}
                   </button>
                 )}
               </div>
             </div>
             <div className="capture-health">
               <span>
-                <strong>{selected.capture.applied}</strong> applied
+                <strong>{selected.capture.applied}</strong> {t("demo.applied")}
               </span>
               <span>
-                <strong>{selected.capture.pending}</strong> pending
+                <strong>{selected.capture.pending}</strong> {t("demo.pending")}
               </span>
               <span className={selected.capture.failed ? "capture-failed" : ""}>
-                <strong>{selected.capture.failed}</strong> failed
+                <strong>{selected.capture.failed}</strong> {t("demo.failed")}
               </span>
-              <small className="mono">session {selected.session_id}</small>
+              <small className="mono">{t("demo.session", { id: selected.session_id })}</small>
             </div>
             {selected.capture.last_error && (
               <div className="notice">{selected.capture.last_error}</div>
@@ -1185,21 +1221,20 @@ function DemonstrationPanel(props: {
                     </div>
                     {event.intent && <p>{event.intent}</p>}
                     <small>
-                      {event.entity?.type ?? "event"} ·{" "}
+                      {event.entity?.type ?? t("demo.eventFallback")} ·{" "}
                       <span className="mono">{event.entity?.id ?? event.id}</span>
                     </small>
                     <small>
-                      Actor <span className="mono">{event.actor_id}</span> ·{" "}
+                      {t("demo.actor")} <span className="mono">{event.actor_id}</span> ·{" "}
                       {new Date(event.timestamp).toLocaleString()}
                     </small>
                     {event.correction_of && (
                       <span className="correction-link">
-                        Corrects event{" "}
-                        <span className="mono">{event.correction_of}</span>
+                        {t("demo.correctsEvent", { id: event.correction_of })}
                       </span>
                     )}
                     <details>
-                      <summary>Structured semantic payload</summary>
+                      <summary>{t("demo.structuredPayload")}</summary>
                       <pre>
                         {JSON.stringify(
                           {
@@ -1217,14 +1252,16 @@ function DemonstrationPanel(props: {
                       <span>{event.source}</span>
                       <span>{event.sensitivity}</span>
                       <span className="mono">
-                        domain {event.domain_event_id || "manual capture"}
+                        {event.domain_event_id
+                          ? t("demo.domain", { id: event.domain_event_id })
+                          : t("demo.manualCapture")}
                       </span>
                       <button
                         className="secondary-button"
                         disabled={props.busy}
                         onClick={() => redact(event.id)}
                       >
-                        Redact field
+                        {t("demo.redactField")}
                       </button>
                     </div>
                   </div>
@@ -1234,9 +1271,9 @@ function DemonstrationPanel(props: {
             {selected.status === "completed" && (
               <div className="review-actions">
                 <span>
-                  <strong>Human governance</strong>
+                  <strong>{t("demo.humanGovernance")}</strong>
                   <small>
-                    Review authority is separate from RBAC and checked by the API.
+                    {t("demo.governanceNote")}
                   </small>
                 </span>
                 <button
@@ -1244,21 +1281,21 @@ function DemonstrationPanel(props: {
                   disabled={props.busy}
                   onClick={() => review("REDACTION_REQUIRED")}
                 >
-                  Request redaction
+                  {t("demo.requestRedaction")}
                 </button>
                 <button
                   className="secondary-button"
                   disabled={props.busy}
                   onClick={() => review("REJECTED")}
                 >
-                  Reject
+                  {t("demo.reject")}
                 </button>
                 <button
                   className="primary-button"
                   disabled={props.busy}
                   onClick={() => review("APPROVED")}
                 >
-                  Approve trace
+                  {t("demo.approveTrace")}
                 </button>
               </div>
             )}
@@ -1284,6 +1321,7 @@ function WorkflowLearningPanel(props: {
   onPublish: (value: WorkflowVersion, reason: string) => Promise<void>;
   onRetire: (value: WorkflowVersion, reason: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [selectedDemonstrations, setSelectedDemonstrations] = useState<string[]>([]);
   const reviewed = props.demonstrations.filter(
     (value) => value.status === "completed" && value.review_status === "APPROVED"
@@ -1299,10 +1337,10 @@ function WorkflowLearningPanel(props: {
   }
 
   function reason(
-    promptText: string,
-    defaultValue: string
+    promptKey: MessageKey,
+    defaultKey: MessageKey
   ): string | undefined {
-    const value = window.prompt(promptText, defaultValue)?.trim();
+    const value = window.prompt(t(promptKey), t(defaultKey))?.trim();
     return value || undefined;
   }
 
@@ -1311,14 +1349,13 @@ function WorkflowLearningPanel(props: {
       <section className="panel queue-panel">
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">Reviewed evidence only</span>
-            <h2>Compile candidate</h2>
+            <span className="eyebrow">{t("workflow.reviewedEvidenceOnly")}</span>
+            <h2>{t("workflow.compileCandidate")}</h2>
           </div>
-          <span className="count">{reviewed.length} traces</span>
+          <span className="count">{t("workflow.traces", { count: reviewed.length })}</span>
         </div>
         <p className="muted">
-          Select at least two approved demonstrations with the same workflow key.
-          Compilation never publishes automatically.
+          {t("workflow.compileHint")}
         </p>
         <div className="selection-list">
           {reviewed.map((value) => (
@@ -1331,7 +1368,7 @@ function WorkflowLearningPanel(props: {
               <span>
                 <strong>{value.workflow_key}</strong>
                 <small>
-                  {value.subject_kind} · {value.events.length} semantic events
+                  {value.subject_kind} · {t("demo.semanticEvents", { count: value.events.length })}
                 </small>
               </span>
             </label>
@@ -1342,7 +1379,7 @@ function WorkflowLearningPanel(props: {
           disabled={props.busy || selectedDemonstrations.length < 2}
           onClick={() => void props.onCompile(selectedDemonstrations)}
         >
-          Compile review-only candidate
+          {t("workflow.compileButton")}
         </button>
         <div className="candidate-list">
           {props.values.map((value) => (
@@ -1373,15 +1410,15 @@ function WorkflowLearningPanel(props: {
       <section className="panel detail-panel workflow-review">
         {!selected && (
           <div className="empty-state">
-            <strong>Select a workflow candidate</strong>
-            <p>Review evidence, ambiguity, applicability and behavioral changes.</p>
+            <strong>{t("workflow.select")}</strong>
+            <p>{t("workflow.selectGuidance")}</p>
           </div>
         )}
         {selected && (
           <>
             <div className="panel-heading">
               <div>
-                <span className="eyebrow">Human-controlled workflow version</span>
+                <span className="eyebrow">{t("workflow.humanControlled")}</span>
                 <h2>{selected.name}</h2>
                 <small className="mono">
                   {selected.workflow_key} · v{selected.version}
@@ -1399,19 +1436,19 @@ function WorkflowLearningPanel(props: {
                     (selected.analysis.sequence_consistency ?? 0) * 100
                   )}%
                 </strong>
-                sequence consistency
+                {t("workflow.sequenceConsistency")}
               </span>
               <span>
                 <strong>{selected.analysis.conflicts?.length ?? 0}</strong>
-                ambiguous transitions
+                {t("workflow.ambiguousTransitions")}
               </span>
               <span>
                 <strong>{selected.source_demonstration_ids.length}</strong>
-                source demonstrations
+                {t("workflow.sourceDemos")}
               </span>
               <span>
                 <strong>{selected.improvement_candidates.length}</strong>
-                correction candidates
+                {t("workflow.correctionCandidates")}
               </span>
             </div>
 
@@ -1423,14 +1460,16 @@ function WorkflowLearningPanel(props: {
                     <strong>{step.name || step.id}</strong>
                     <small className="mono">{step.tool_name || step.kind}</small>
                     <p>
-                      {step.evidence.reduce(
-                        (count, value) => count + value.event_ids.length,
-                        0
-                      )}{" "}
-                      immutable event references across {step.evidence.length} traces
+                      {t("workflow.eventRefs", {
+                        count: step.evidence.reduce(
+                          (total, value) => total + value.event_ids.length,
+                          0
+                        ),
+                        traces: step.evidence.length
+                      })}
                     </p>
                     <details>
-                      <summary>Evidence identities</summary>
+                      <summary>{t("workflow.evidenceIdentities")}</summary>
                       <pre>{JSON.stringify(step.evidence, null, 2)}</pre>
                     </details>
                   </div>
@@ -1440,11 +1479,11 @@ function WorkflowLearningPanel(props: {
 
             <div className="workflow-review-grid">
               <article>
-                <span className="eyebrow">Behavioral diff</span>
+                <span className="eyebrow">{t("workflow.behavioralDiff")}</span>
                 <pre>{JSON.stringify(selected.behavioral_changes, null, 2)}</pre>
               </article>
               <article>
-                <span className="eyebrow">Applicability & validity</span>
+                <span className="eyebrow">{t("workflow.applicabilityValidity")}</span>
                 <pre>
                   {JSON.stringify(
                     {
@@ -1463,17 +1502,15 @@ function WorkflowLearningPanel(props: {
 
             {selected.improvement_candidates.length > 0 && (
               <div className="notice">
-                Human corrections are stored as improvement candidates only.
-                They have not modified this workflow.
+                {t("workflow.improvementNotice")}
               </div>
             )}
 
             <div className="review-actions">
               <span>
-                <strong>Governed release</strong>
+                <strong>{t("workflow.governedRelease")}</strong>
                 <small>
-                  RBAC, ApprovalAuthority, exact candidate digest and deterministic
-                  evaluation gates are checked independently.
+                  {t("workflow.governedReleaseNote")}
                 </small>
               </span>
               {(selected.status === "CANDIDATE" ||
@@ -1484,39 +1521,39 @@ function WorkflowLearningPanel(props: {
                     disabled={props.busy}
                     onClick={() => {
                       const value = reason(
-                        "Why does this candidate require more evidence?",
-                        "Ambiguity or applicability requires further review"
+                        "workflow.reviewRequiredPrompt",
+                        "workflow.reviewRequiredDefault"
                       );
                       if (value) void props.onReview(selected, "REVIEW_REQUIRED", value);
                     }}
                   >
-                    Require review
+                    {t("workflow.requireReview")}
                   </button>
                   <button
                     className="secondary-button"
                     disabled={props.busy}
                     onClick={() => {
                       const value = reason(
-                        "Why is this candidate rejected?",
-                        "Candidate is not supported for publication"
+                        "workflow.rejectPrompt",
+                        "workflow.rejectDefault"
                       );
                       if (value) void props.onReview(selected, "REJECTED", value);
                     }}
                   >
-                    Reject
+                    {t("workflow.reject")}
                   </button>
                   <button
                     className="primary-button"
                     disabled={props.busy}
                     onClick={() => {
                       const value = reason(
-                        "Record the review rationale",
-                        "Evidence, safe tool mapping and applicability reviewed"
+                        "workflow.approvePrompt",
+                        "workflow.approveDefault"
                       );
                       if (value) void props.onReview(selected, "APPROVED", value);
                     }}
                   >
-                    Approve candidate
+                    {t("workflow.approveCandidate")}
                   </button>
                 </>
               )}
@@ -1526,13 +1563,13 @@ function WorkflowLearningPanel(props: {
                   disabled={props.busy}
                   onClick={() => {
                     const value = reason(
-                      "Record publication rationale",
-                      "Review and deterministic evaluation gates satisfied"
+                      "workflow.publishPrompt",
+                      "workflow.publishDefault"
                     );
                     if (value) void props.onPublish(selected, value);
                   }}
                 >
-                  Evaluate and publish
+                  {t("workflow.evaluatePublish")}
                 </button>
               )}
               {selected.status === "PUBLISHED" && (
@@ -1541,13 +1578,13 @@ function WorkflowLearningPanel(props: {
                   disabled={props.busy}
                   onClick={() => {
                     const value = reason(
-                      "Record retirement rationale",
-                      "Workflow superseded or no longer applicable"
+                      "workflow.retirePrompt",
+                      "workflow.retireDefault"
                     );
                     if (value) void props.onRetire(selected, value);
                   }}
                 >
-                  Retire version
+                  {t("workflow.retireVersion")}
                 </button>
               )}
             </div>
@@ -1562,6 +1599,7 @@ function MeasurementForm(props: {
   busy: boolean;
   onSubmit: (type: string, value: string, unit: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [type, setType] = useState("VIBRATION_VELOCITY");
   const [value, setValue] = useState("8.1");
   const unit = useMemo(() => type === "TEMPERATURE" ? "DEG_C" : "MM_PER_S", [type]);
@@ -1571,11 +1609,11 @@ function MeasurementForm(props: {
   }
   return (
     <form className="measurement-form" onSubmit={submit}>
-      <span className="eyebrow">Record measurement</span>
-      <label>Type<select value={type} onChange={(event) => setType(event.target.value)}><option value="VIBRATION_VELOCITY">Vibration velocity</option><option value="TEMPERATURE">Bearing temperature</option></select></label>
-      <label>Value<input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} /></label>
-      <label>Unit<input value={unit} readOnly /></label>
-      <button className="secondary-button" disabled={props.busy}>Record</button>
+      <span className="eyebrow">{t("measurement.record")}</span>
+      <label>{t("measurement.type")}<select value={type} onChange={(event) => setType(event.target.value)}><option value="VIBRATION_VELOCITY">{t("measurement.vibrationVelocity")}</option><option value="TEMPERATURE">{t("measurement.bearingTemperature")}</option></select></label>
+      <label>{t("measurement.value")}<input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} /></label>
+      <label>{t("measurement.unit")}<input value={unit} readOnly /></label>
+      <button className="secondary-button" disabled={props.busy}>{t("measurement.recordButton")}</button>
     </form>
   );
 }
@@ -1591,6 +1629,7 @@ function CreateAssetForm(props: {
     class: string;
   }) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [tag, setTag] = useState("P-302");
   const [name, setName] = useState("Process Pump P-302");
   const [assetClass, setAssetClass] = useState("CENTRIFUGAL_PUMP");
@@ -1606,11 +1645,11 @@ function CreateAssetForm(props: {
   }
   return (
     <form className="command-form panel" onSubmit={submit}>
-      <div><span className="eyebrow">Lightweight native mode</span><h2>Create asset</h2></div>
-      <label>Tag<input value={tag} onChange={(event) => setTag(event.target.value)} required /></label>
-      <label>Name<input value={name} onChange={(event) => setName(event.target.value)} required /></label>
-      <label>Class<input value={assetClass} onChange={(event) => setAssetClass(event.target.value)} required /></label>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>Cancel</button><button className="primary-button" disabled={props.busy || !props.siteID}>Create</button></div>
+      <div><span className="eyebrow">{t("form.lightweightNative")}</span><h2>{t("form.createAsset")}</h2></div>
+      <label>{t("form.tag")}<input value={tag} onChange={(event) => setTag(event.target.value)} required /></label>
+      <label>{t("form.name")}<input value={name} onChange={(event) => setName(event.target.value)} required /></label>
+      <label>{t("form.classLabel")}<input value={assetClass} onChange={(event) => setAssetClass(event.target.value)} required /></label>
+      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>{t("form.cancel")}</button><button className="primary-button" disabled={props.busy || !props.siteID}>{t("form.create")}</button></div>
     </form>
   );
 }
@@ -1626,6 +1665,7 @@ function CreateIncidentForm(props: {
     severity: string;
   }) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [assetID, setAssetID] = useState(props.assets[0]?.id ?? "");
   const [summary, setSummary] = useState("High vibration");
   const [severity, setSeverity] = useState("HIGH");
@@ -1642,26 +1682,16 @@ function CreateIncidentForm(props: {
   }
   return (
     <form className="command-form panel incident-command" onSubmit={submit}>
-      <div><span className="eyebrow">Abnormal condition</span><h2>Create incident</h2></div>
-      <label>Asset<select value={assetID} onChange={(event) => setAssetID(event.target.value)} required><option value="" disabled>Select asset</option>{props.assets.map((item) => <option key={item.id} value={item.id}>{item.tag} · {item.name}</option>)}</select></label>
-      <label>Summary<input value={summary} onChange={(event) => setSummary(event.target.value)} required /></label>
-      <label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>Cancel</button><button className="primary-button" disabled={props.busy || !asset}>Create</button></div>
+      <div><span className="eyebrow">{t("form.abnormalCondition")}</span><h2>{t("form.createIncident")}</h2></div>
+      <label>{t("form.asset")}<select value={assetID} onChange={(event) => setAssetID(event.target.value)} required><option value="" disabled>{t("form.selectAsset")}</option>{props.assets.map((item) => <option key={item.id} value={item.id}>{item.tag} · {item.name}</option>)}</select></label>
+      <label>{t("form.summary")}<input value={summary} onChange={(event) => setSummary(event.target.value)} required /></label>
+      <label>{t("form.severity")}<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label>
+      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>{t("form.cancel")}</button><button className="primary-button" disabled={props.busy || !asset}>{t("form.create")}</button></div>
     </form>
   );
 }
 
-function EmptyRow({ columns, label }: { columns: number; label: string }) {
-  return <tr><td className="empty" colSpan={columns}>{label}</td></tr>;
-}
-
-function titleFor(view: View): string {
-  if (view === "assets") return "Asset knowledge";
-  if (view === "incidents") return "Incident execution";
-  if (view === "knowledge") return "Procedures and evidence";
-  if (view === "handover") return "Shift handover";
-  if (view === "demonstrations") return "Expert demonstrations";
-  if (view === "workflows") return "Learned workflow review";
-  if (view === "quality") return "AI quality and safety";
-  return "Operations overview";
+function EmptyRow({ columns, labelKey }: { columns: number; labelKey: MessageKey }) {
+  const { t } = useI18n();
+  return <tr><td className="empty" colSpan={columns}>{t(labelKey)}</td></tr>;
 }
