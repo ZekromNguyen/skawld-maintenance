@@ -67,11 +67,10 @@ export function App() {
       setDocuments(documentResult.items);
       setDemonstrations(demonstrationResult.items);
       setWorkflows(workflowResult.items);
-      setMessage(undefined);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t("error.unableToLoad"));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void reload();
@@ -315,19 +314,23 @@ export function App() {
               }}
             />
             {showIncidentForm && (
-              <CreateIncidentForm
-                assets={assets}
-                busy={busy}
-                onCancel={() => setShowIncidentForm(false)}
-                onCreate={(value) =>
-                  mutate(async () => {
-                    const created = await api.createIncident(value);
-                    setShowIncidentForm(false);
-                    setSelectedIncident(created);
-                    await reload();
-                  })
-                }
-              />
+              <>
+                <div className="modal-backdrop" onClick={() => setShowIncidentForm(false)} />
+                <CreateIncidentForm
+                  assets={assets}
+                  busy={busy}
+                  onCancel={() => setShowIncidentForm(false)}
+                  onCreate={(value) =>
+                    mutate(async () => {
+                      const created = await api.createIncident(value);
+                      setShowIncidentForm(false);
+                      setSelectedIncident(created);
+                      setExecution(undefined);
+                      await reload();
+                    })
+                  }
+                />
+              </>
             )}
           </div>
         )}
