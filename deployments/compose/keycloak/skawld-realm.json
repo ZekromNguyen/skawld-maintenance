@@ -21,7 +21,10 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:8080/auth/callback"],
+      "redirectUris": [
+        "http://localhost:8080/auth/callback",
+        "http://localhost:5173/auth/callback"
+      ],
       "webOrigins": ["http://localhost:5173"],
       "protocol": "openid-connect",
       "protocolMappers": [

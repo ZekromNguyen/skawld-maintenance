@@ -37,7 +37,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
   });
   if (response.status === 401) {
-    window.location.assign("/auth/login");
+    const login = new URL("/auth/login", window.location.origin);
+    login.searchParams.set("return_to", window.location.pathname + window.location.search);
+    window.location.assign(login.toString());
     throw new ApiError({ title: "Authentication required", status: 401 });
   }
   if (!response.ok) {
