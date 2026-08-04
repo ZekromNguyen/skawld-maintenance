@@ -153,10 +153,15 @@ func main() {
 		Store: knowledgeStore, Authorities: authorityReader,
 		Now: systemClock.Now,
 	}
+	openAPI, err := loadOpenAPIDocument()
+	if err != nil {
+		logger.Warn("openapi document not served", "error", err)
+	}
 	handler := httpserver.New(httpserver.Dependencies{
 		Logger:   logger,
 		Database: pool,
 		Auth:     authService,
+		OpenAPI:  openAPI,
 		Organizations: identityapp.OrganizationService{
 			Store: organizationStore,
 		},
@@ -229,4 +234,25 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("API stopped")
+}
+
+// loadOpenAPIDocument returns the bytes of the OpenAPI contract so the API can
+// serve it publicly. The location is explicit when SKAWLD_OPENAPI_PATH is set;
+// otherwise it is resolved relative to the working directory (the dev layout).
+func loadOpenAPIDocument() ([]byte, error) {
+	candidates := []string{os.Getenv("SKAWLD_OPENAPI_PATH"), "api/openapi.yaml"}
+	var firstErr error
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		document, err := os.ReadFile(candidate)
+		if err == nil {
+			return document, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return nil, firstErr
 }

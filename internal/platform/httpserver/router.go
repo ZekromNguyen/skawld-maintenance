@@ -44,6 +44,7 @@ type Dependencies struct {
 	Logger         *slog.Logger
 	Database       *pgxpool.Pool
 	Auth           Authenticator
+	OpenAPI        []byte
 	Organizations  identityapp.OrganizationService
 	Sites          identityapp.SiteService
 	Assets         assetapp.Service
@@ -74,6 +75,13 @@ func New(dependencies Dependencies) http.Handler {
 		})
 	})
 	router.Get("/health/ready", readiness(dependencies.Database))
+	if len(dependencies.OpenAPI) > 0 {
+		router.Get("/openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/yaml")
+			w.Header().Set("Cache-Control", "no-cache")
+			_, _ = w.Write(dependencies.OpenAPI)
+		})
+	}
 
 	router.Get("/auth/login", dependencies.Auth.Begin)
 	router.Get("/auth/callback", dependencies.Auth.Callback)

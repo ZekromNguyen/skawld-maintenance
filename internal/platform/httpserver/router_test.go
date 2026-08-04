@@ -64,6 +64,45 @@ func TestLiveness(t *testing.T) {
 	}
 }
 
+func TestOpenAPIDocumentServedWhenProvided(t *testing.T) {
+	t.Parallel()
+	handler := New(Dependencies{
+		Logger:  slog.New(slog.DiscardHandler),
+		Auth:    fakeAuth{},
+		OpenAPI: []byte("openapi: 3.1.0\n"),
+	})
+	request := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/yaml" {
+		t.Fatalf("content-type = %q, want application/yaml", contentType)
+	}
+	if body := response.Body.String(); body != "openapi: 3.1.0\n" {
+		t.Fatalf("body = %q, want openapi document", body)
+	}
+}
+
+func TestOpenAPIDocumentAbsentWhenNotProvided(t *testing.T) {
+	t.Parallel()
+	handler := New(Dependencies{
+		Logger: slog.New(slog.DiscardHandler),
+		Auth:   fakeAuth{},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
 func TestReadinessFailsClosedWhenDatabaseIsUnavailable(t *testing.T) {
 	t.Parallel()
 	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
