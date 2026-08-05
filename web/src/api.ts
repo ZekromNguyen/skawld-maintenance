@@ -26,16 +26,44 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers
+/** Parse an error body defensively: non-JSON bodies (proxy/gateway HTML,
+ * empty 5xx) must not crash the error path with a SyntaxError. */
+async function parseProblem(response: Response): Promise<Problem> {
+  try {
+    const body = (await response.json()) as Partial<Problem>;
+    if (body && typeof body === "object" && typeof body.status === "number") {
+      return {
+        status: body.status,
+        title: body.title ?? "Request failed",
+        detail: body.detail
+      };
     }
-  });
+  } catch {
+    // non-JSON error body; fall through to a status-derived problem
+  }
+  return {
+    status: response.status,
+    title: "Request failed",
+    detail: `Request failed with status ${response.status}`
+  };
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers
+      }
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ApiError({ status: 0, title: "Network error", detail: `Network error: ${message}` });
+  }
   if (response.status === 401) {
     const login = new URL("/auth/login", window.location.origin);
     login.searchParams.set("return_to", window.location.pathname + window.location.search);
@@ -43,8 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError({ title: "Authentication required", status: 401 });
   }
   if (!response.ok) {
-    const problem = (await response.json()) as Problem;
-    throw new ApiError(problem);
+    throw new ApiError(await parseProblem(response));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
