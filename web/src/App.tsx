@@ -21,6 +21,7 @@ import { IncidentDetailPage } from "./console/pages/IncidentDetailPage";
 import { ExecutionWorkbenchPage } from "./console/pages/ExecutionWorkbenchPage";
 import { ReportsPage } from "./console/pages/ReportsPage";
 import { ReportDetailPage } from "./console/pages/ReportDetailPage";
+import { DocumentDetailPage } from "./console/pages/DocumentDetailPage";
 import type {
   Asset,
   Demonstration,
@@ -62,7 +63,7 @@ export function App() {
           <Route path="/reports/:reportId" element={<ReportDetailPage />} />
           <Route path="/handovers" element={<HandoverPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />
-          <Route path="/knowledge/:documentId" element={<PlaceholderPage titleKey="nav.knowledge" />} />
+          <Route path="/knowledge/:documentId" element={<DocumentDetailPage />} />
           <Route path="/search" element={<PlaceholderPage titleKey="nav.search" />} />
           <Route path="/quality" element={<QualityPage />} />
           <Route path="/demonstrations" element={<DemonstrationsPage />} />

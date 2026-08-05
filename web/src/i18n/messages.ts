@@ -70,6 +70,14 @@ const en = {
   "report.none": "Nothing recorded yet.",
   "report.noOutcome": "No outcome recorded.",
 
+  "document.revisions": "Revisions",
+  "document.language": "Language",
+  "document.approve": "Approve",
+  "document.retire": "Retire",
+  "document.requestIngestion": "Request ingestion",
+  "document.applicability": "Applicability",
+  "document.none": "Not applicable",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -387,6 +395,14 @@ const vi: Record<MessageKey, string> = {
   "report.approve": "Duyệt",
   "report.none": "Chưa ghi nhận gì.",
   "report.noOutcome": "Chưa ghi nhận kết quả.",
+
+  "document.revisions": "Phiên bản",
+  "document.language": "Ngôn ngữ",
+  "document.approve": "Duyệt",
+  "document.retire": "Ngừng hiệu lực",
+  "document.requestIngestion": "Yêu cầu nhập liệu",
+  "document.applicability": "Phạm vi áp dụng",
+  "document.none": "Không áp dụng",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
