@@ -202,7 +202,7 @@ export const api = {
       attachment_id: manifest.id
     });
   },
-  searchKnowledge: (siteID: string, query: string, assetID?: string) =>
+  searchKnowledge: (siteID: string, query: string, assetID?: string, limit?: number) =>
     request<{ retrieval_run_id: string; items: import("./types").Evidence[] }>(
       "/search",
       {
@@ -211,7 +211,7 @@ export const api = {
           site_id: siteID,
           asset_id: assetID || "",
           query,
-          limit: 8
+          limit: limit ?? 8
         })
       }
     ),
