@@ -19,6 +19,8 @@ import { AssetDetailPage } from "./console/pages/AssetDetailPage";
 import { IncidentsPage } from "./console/pages/IncidentsPage";
 import { IncidentDetailPage } from "./console/pages/IncidentDetailPage";
 import { ExecutionWorkbenchPage } from "./console/pages/ExecutionWorkbenchPage";
+import { ReportsPage } from "./console/pages/ReportsPage";
+import { ReportDetailPage } from "./console/pages/ReportDetailPage";
 import type {
   Asset,
   Demonstration,
@@ -56,8 +58,8 @@ export function App() {
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
           <Route path="/executions/:executionId" element={<ExecutionWorkbenchPage />} />
-          <Route path="/reports" element={<PlaceholderPage titleKey="nav.reports" />} />
-          <Route path="/reports/:reportId" element={<PlaceholderPage titleKey="nav.reports" />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports/:reportId" element={<ReportDetailPage />} />
           <Route path="/handovers" element={<HandoverPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />
           <Route path="/knowledge/:documentId" element={<PlaceholderPage titleKey="nav.knowledge" />} />
