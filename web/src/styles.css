@@ -435,3 +435,10 @@ tr[onclick]:hover td { background: var(--raised); }
 .create-incident-form { display: grid; gap: 16px; margin-top: 16px; }
 .create-incident-form input, .create-incident-form select { width: 100%; border: 1px solid var(--line-soft); border-radius: var(--radius-input); background: var(--sunken); padding: 9px 10px; color: var(--ink); font-size: 12.5px; }
 .create-incident-form input:focus, .create-incident-form select:focus { outline: 1px solid var(--brand); border-color: var(--brand-dim); }
+
+/* ---------- Incident detail ---------- */
+.incident-subtitle { color: var(--ink-muted); font-size: 12px; margin: -6px 0 18px; }
+.incident-facts { padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 18px; }
+.incident-facts > div { display: grid; gap: 6px; align-content: start; }
+.incident-facts a { color: var(--brand); text-decoration: none; }
+.incident-facts a:hover { text-decoration: underline; }

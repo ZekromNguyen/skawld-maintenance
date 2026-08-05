@@ -1,136 +1,203 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { useCommand } from "../useCommand";
+import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
-import { relativeTime } from "../../presentation";
-import { Topbar } from "../layout/Topbar";
-import { Breadcrumbs } from "../layout/Breadcrumbs";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
+import { ConfirmDialog } from "../feedback/ConfirmDialog";
+import { DataTable } from "../ui/DataTable";
+import { StatusBadge } from "../ui/StatusBadge";
+import { RelativeTime } from "../ui/RelativeTime";
+import { ErrorState } from "../ui/ErrorState";
+import { Skeleton } from "../ui/Skeleton";
+import {
+  severityTone,
+  severityLabelKey,
+  incidentStateTone,
+  incidentStateLabelKey,
+} from "../labels";
 import type { Execution } from "../../types";
 
 /**
  * IncidentDetailPage: incident context, linked asset, executions, actions.
+ * Resolve requires confirmation; creation navigates straight to the workbench.
  */
 export function IncidentDetailPage() {
   const { incidentId } = useParams<{ incidentId: string }>();
   const { t, locale } = useI18n();
+  const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incident = useApi(() => api.incident(incidentId!));
-  const executions = useApi(() => api.listExecutions());
-  const [busy, setBusy] = useState(false);
+  const incident = useQuery(() => api.incident(incidentId ?? ""));
+  const executions = useQuery(() => api.listExecutions().then((list) => list.items));
+  const [confirmResolve, setConfirmResolve] = useState(false);
 
   const perms = principal?.permissions ?? [];
   const canCreateExecution = perms.includes("execution:write");
   const canResolve = perms.includes("incident:resolve");
 
-  if (incident.error) {
-    return <div className="toast-error" role="alert">{incident.error}</div>;
-  }
-  if (incident.loading || !incident.data) {
-    return <div className="skeleton" style={{ height: 220 }} />;
-  }
-  const value = incident.data;
-  const related: Execution[] = (executions.data?.items ?? []).filter(
-    (execution) => execution.incident_id === value.id,
+  const resolve = useCommand(
+    (id: string) => api.resolveIncident(id),
+    {
+      successMessage: t("incident.resolve.success"),
+      onSuccess: () => {
+        setConfirmResolve(false);
+        void incident.refetch();
+      },
+    },
   );
 
-  const createExecution = async () => {
-    setBusy(true);
-    try {
-      await api.createExecution(value.id);
-      await executions.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const createExecution = useCommand(
+    (id: string) => api.createExecution(id),
+    {
+      successMessage: t("incident.execution.created"),
+      onSuccess: (execution) => navigate(`/executions/${execution.id}`),
+    },
+  );
 
-  const resolve = async () => {
-    setBusy(true);
-    try {
-      await api.resolveIncident(value.id);
-      await incident.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  if (incident.error) {
+    return (
+      <section>
+        <PageHeader title={t("nav.incidents")} principal={principal} />
+        <ErrorState
+          message={incident.error}
+          onRetry={() => void incident.refetch()}
+          onBack={() => navigate("/incidents")}
+        />
+      </section>
+    );
+  }
+  if (incident.loading || !incident.data) {
+    return (
+      <section>
+        <PageHeader title={t("nav.incidents")} principal={principal} />
+        <Skeleton height={220} />
+      </section>
+    );
+  }
+
+  const value = incident.data;
+  const related =
+    executions.data?.filter((execution) => execution.incident_id === value.id) ?? [];
 
   return (
-    <section>
-      <Breadcrumbs
-        trail={[
-          { label: t("nav.incidents"), to: "/incidents" },
-          { label: value.number }
-        ]}
-      />
-      <Topbar title={value.number} principal={principal} />
-      <div style={{ display: "grid", gap: 16 }}>
-        <div className="panel">
-          <div className="panel-heading">
-            <h2>{value.summary}</h2>
-            <span className={`severity ${value.severity.toLowerCase()}`}>{value.severity}</span>
-          </div>
-          <div style={{ padding: 16, display: "grid", gap: 10 }}>
-            <div>{t("incident.state")} <span className="state-badge">{value.state}</span></div>
-            <div>
-              {t("incident.asset")}{" "}
-              <Link to={`/assets/${value.asset_id}`} className="strong">
-                {value.asset_tag ?? value.asset_id}
-              </Link>
-            </div>
-            <div>{t("incident.detected")} <span className="mono">{relativeTime(value.detected_at, locale)}</span></div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <PageTrailProvider
+      trail={[
+        { label: t("nav.incidents"), to: "/incidents" },
+        { label: value.number },
+      ]}
+    >
+      <section>
+        <PageHeader
+          title={value.summary}
+          principal={principal}
+          actions={
+            <>
               {canCreateExecution && (
-                <button className="primary-button" disabled={busy} onClick={() => void createExecution()}>
+                <button
+                  className="primary-button"
+                  disabled={createExecution.pending}
+                  onClick={() => void createExecution.run(value.id)}
+                >
                   {t("incident.createExecution")}
                 </button>
               )}
               {canResolve && value.state !== "RESOLVED" && (
-                <button className="secondary-button" disabled={busy} onClick={() => void resolve()}>
+                <button className="secondary-button" onClick={() => setConfirmResolve(true)}>
                   {t("incident.resolve")}
                 </button>
               )}
+            </>
+          }
+        />
+        <div className="incident-subtitle mono">{value.number}</div>
+        <div style={{ display: "grid", gap: 16 }}>
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>{t("incident.facts")}</h2>
+            </div>
+            <div className="incident-facts">
+              <div>
+                <span className="eyebrow">{t("incident.asset")}</span>
+                <Link to={`/assets/${value.asset_id}`} className="strong">
+                  {value.asset_tag ?? value.asset_id}
+                </Link>
+              </div>
+              <div>
+                <span className="eyebrow">{t("dashboard.table.severity")}</span>
+                <StatusBadge tone={severityTone(value.severity)} label={t(severityLabelKey(value.severity))} />
+              </div>
+              <div>
+                <span className="eyebrow">{t("incident.state")}</span>
+                <StatusBadge tone={incidentStateTone(value.state)} label={t(incidentStateLabelKey(value.state))} />
+              </div>
+              <div>
+                <span className="eyebrow">{t("incident.detected")}</span>
+                <RelativeTime time={value.detected_at} locale={locale} />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="panel">
-          <div className="panel-heading">
-            <h2>{t("incident.executions")}</h2>
-            <span className="count">{related.length}</span>
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>{t("incident.executions")}</h2>
+              <span className="count">{related.length}</span>
+            </div>
+            <DataTable<Execution>
+              columns={[
+                {
+                  key: "purpose",
+                  header: t("incident.purpose"),
+                  render: (execution) => (
+                    <Link to={`/executions/${execution.id}`} className="strong">
+                      {execution.purpose}
+                    </Link>
+                  ),
+                },
+                {
+                  key: "state",
+                  header: t("incident.state"),
+                  render: (execution) => (
+                    <StatusBadge
+                      tone={
+                        execution.state === "COMPLETED"
+                          ? "success"
+                          : execution.state === "IN_PROGRESS"
+                            ? "medium"
+                            : "info"
+                      }
+                      label={execution.state.replace("_", " ")}
+                    />
+                  ),
+                },
+                {
+                  key: "open",
+                  header: t("incident.openInWorkbench"),
+                  render: (execution) => (
+                    <Link to={`/executions/${execution.id}`}>{t("incident.openInWorkbench")}</Link>
+                  ),
+                },
+              ]}
+              rows={related}
+              rowKey={(execution) => execution.id}
+              emptyTitle={t("incident.noExecutions")}
+              loading={executions.loading}
+              error={executions.error}
+              onRetry={() => void executions.refetch()}
+            />
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("incident.purpose")}</th>
-                  <th>{t("incident.state")}</th>
-                  <th>{t("incident.openInWorkbench")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {related.map((execution) => (
-                  <tr key={execution.id}>
-                    <td>{execution.purpose}</td>
-                    <td><span className="state-badge">{execution.state}</span></td>
-                    <td>
-                      <Link to={`/executions/${execution.id}`} className="strong">
-                        {t("incident.openInWorkbench")}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {related.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="empty">
-                      {t("incident.noExecutions")}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </div>
-      </div>
-    </section>
+        <ConfirmDialog
+          open={confirmResolve}
+          onOpenChange={setConfirmResolve}
+          title={t("incident.resolve")}
+          message={t("incident.resolve.message")}
+          confirmLabel={t("incident.resolve")}
+          pending={resolve.pending}
+          onConfirm={() => void resolve.run(value.id)}
+        />
+      </section>
+    </PageTrailProvider>
   );
 }

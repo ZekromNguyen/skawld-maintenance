@@ -1,9 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { IncidentDetailPage } from "./IncidentDetailPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { PrincipalProvider } from "../state/PrincipalProvider";
+import { SiteProvider } from "../state/SiteContext";
+import { ToastProvider } from "../feedback/Toast";
+import { api } from "../../api";
 
 vi.mock("../../api", () => ({
   api: {
@@ -25,26 +28,59 @@ vi.mock("../../api", () => ({
       detected_at: new Date().toISOString(),
       version: 1
     }),
-    listExecutions: vi.fn().mockResolvedValue({ items: [] })
+    listExecutions: vi.fn().mockResolvedValue({ items: [] }),
+    resolveIncident: vi.fn().mockResolvedValue({})
   }
 }));
 
+function renderDetail() {
+  return render(
+    <I18nProvider>
+      <PrincipalProvider>
+        <SiteProvider>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/incidents/inc1"]}>
+              <Routes>
+                <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </ToastProvider>
+        </SiteProvider>
+      </PrincipalProvider>
+    </I18nProvider>,
+  );
+}
+
 describe("IncidentDetailPage", () => {
-  it("renders incident summary, severity, and create-execution action", async () => {
-    render(
-      <I18nProvider>
-        <PrincipalProvider>
-        <MemoryRouter initialEntries={["/incidents/inc1"]}>
-          <Routes>
-            <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-        </PrincipalProvider>
-      </I18nProvider>,
-    );
+  it("renders incident facts and actions", async () => {
+    renderDetail();
     expect(await screen.findByText("High vibration on pump")).toBeTruthy();
-    expect(screen.getByText("HIGH")).toBeTruthy();
-    expect(screen.getByText("Create execution")).toBeTruthy();
-    expect(screen.getByText("Resolve incident")).toBeTruthy();
+    expect(screen.getByText("High")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create execution" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resolve incident" })).toBeTruthy();
+  });
+
+  it("requires confirmation before resolving", async () => {
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Resolve incident" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("cannot be undone");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Resolve incident" }));
+    await waitFor(() =>
+      expect(api.resolveIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("inc1"),
+    );
+    expect(screen.getByText("Incident resolved")).toBeTruthy();
+  });
+
+  it("hides resolve for unauthorized principals", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Tech",
+      site_ids: ["s1"],
+      permissions: ["execution:write"]
+    });
+    renderDetail();
+    await screen.findByText("High vibration on pump");
+    expect(screen.queryByRole("button", { name: "Resolve incident" })).toBeNull();
   });
 });
