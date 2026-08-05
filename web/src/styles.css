@@ -391,3 +391,19 @@ a:focus:not(:focus-visible) {
 .dialog-description { color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; margin: 8px 0 0; }
 .dialog-message { color: var(--ink-soft); font-size: 13px; line-height: 1.6; margin: 14px 0 0; }
 .dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* ---------- UI primitives ---------- */
+.error-state { border: 1px solid var(--line); border-left: 3px solid var(--red); background: var(--surface); padding: 18px; }
+.error-state strong { font-size: 13px; }
+.error-state p { color: var(--ink-soft); font-size: 12px; margin: 8px 0 14px; }
+.error-actions, .empty-action { display: flex; gap: 8px; }
+.form-field { display: grid; gap: 6px; }
+.form-field > label { color: var(--ink-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+.form-hint { color: var(--ink-muted); font-size: 10px; margin: 0; }
+.form-error { color: var(--red); font-size: 11px; margin: 0; }
+.metric-link { text-decoration: none; color: inherit; display: block; }
+.metric-link:hover .metric { border-color: var(--brand-dim); }
+.sort-button { border: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; padding: 0; cursor: pointer; }
+.sort-button:hover { color: var(--ink); }
+tr[onclick] { cursor: pointer; }
+tr[onclick]:hover td { background: var(--raised); }
