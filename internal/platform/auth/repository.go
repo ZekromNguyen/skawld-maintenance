@@ -158,14 +158,15 @@ func (r Repository) CreateSession(
 	token string,
 	principalID string,
 	expiresAt time.Time,
+	idToken string,
 ) error {
 	hash := sha256.Sum256([]byte(token))
 	now := r.Clock.Now()
 	_, err := r.Pool.Exec(ctx, `
 		INSERT INTO web_sessions (
-			token_hash, principal_id, expires_at, created_at, last_seen_at
-		) VALUES ($1, $2::uuid, $3, $4, $4)
-	`, hash[:], principalID, expiresAt.UTC(), now)
+			token_hash, principal_id, expires_at, created_at, last_seen_at, id_token
+		) VALUES ($1, $2::uuid, $3, $4, $4, nullif($5, ''))
+	`, hash[:], principalID, expiresAt.UTC(), now, idToken)
 	if err != nil {
 		return fmt.Errorf("create web session: %w", err)
 	}
@@ -192,6 +193,24 @@ func (r Repository) PrincipalForSession(
 		return domain.Principal{}, fmt.Errorf("load web session: %w", err)
 	}
 	return r.ResolvePrincipal(ctx, claims, bootstrapSubjects)
+}
+
+// SessionIDToken returns the OIDC id_token bound to an active web session so
+// the API can pass it to the provider's end_session_endpoint as id_token_hint.
+func (r Repository) SessionIDToken(ctx context.Context, token string) (string, error) {
+	hash := sha256.Sum256([]byte(token))
+	var idToken string
+	err := r.Pool.QueryRow(ctx, `
+		SELECT coalesce(id_token, '')
+		FROM web_sessions
+		WHERE token_hash = $1
+		  AND revoked_at IS NULL
+		  AND expires_at > $2
+	`, hash[:], r.Clock.Now()).Scan(&idToken)
+	if err != nil {
+		return "", fmt.Errorf("load web session id_token: %w", err)
+	}
+	return idToken, nil
 }
 
 func (r Repository) RevokeSession(ctx context.Context, token string) error {

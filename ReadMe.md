@@ -75,6 +75,11 @@ Run `go run ./cmd/worker` in another shell. The worker image includes
 Fedora/Debian-family systems). See
 [the local development runbook](./docs/runbooks/local-development.md) for
 Docker equivalents, the development identity, verification, and cleanup.
+Run `make seed` (see
+[the demo data runbook](./docs/runbooks/demo-data.md)) to load a complete
+P-302 pump demo: asset, incident, execution with LOTO-gated intrusive step,
+ingested SOP, recommendation + correction, approved report and handover, two
+reviewed demonstrations, and a published workflow.
 
 Run the supervisor web:
 

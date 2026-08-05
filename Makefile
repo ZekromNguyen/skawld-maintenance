@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 COMPOSE ?= podman compose
 CONTAINER_ENGINE ?= podman
 
-.PHONY: fmt vet test test-integration check build eval sbom loadcheck package package-backend-desktop web-check mobile-check desktop-windows desktop-macos migrate-up migrate-status compose-up compose-up-objectstore compose-down container-build pilot-config
+.PHONY: fmt vet test test-integration check build eval sbom loadcheck package package-backend-desktop web-check mobile-check desktop-windows desktop-macos migrate-up migrate-status compose-up compose-up-objectstore compose-down container-build pilot-config seed
 
 fmt:
 	gofmt -w $$(find . -type f -name '*.go' -not -path './vendor/*')
@@ -75,3 +75,6 @@ container-build:
 
 pilot-config:
 	$(COMPOSE) --env-file deployments/pilot/.env.example -f deployments/pilot/compose.yaml config
+
+seed:
+	go run ./cmd/seed

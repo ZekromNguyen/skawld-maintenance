@@ -216,7 +216,7 @@ export function App() {
           <strong>{t("sidebar.advisoryOnly")}</strong>
           <p>{t("sidebar.noControl")}</p>
         </div>
-        <button className="logout-button" onClick={() => void signOut()}>
+        <button className="logout-button" onClick={() => signOut()}>
           {t("nav.signOut")}
         </button>
       </aside>
@@ -489,13 +489,18 @@ function NavItem(props: { active: boolean; labelKey: MessageKey; onClick: () => 
   );
 }
 
-async function signOut() {
-  try {
-    await fetch("/auth/logout", { method: "POST", credentials: "include" });
-  } catch {
-    // Proceed to the login screen even if the session was already invalid.
-  }
-  window.location.assign("/auth/login");
+function signOut() {
+  // Submit a POST form so the browser follows the full 303 → Keycloak → SPA
+  // redirect chain natively. Using fetch here would force it through a
+  // cross-origin redirect that Keycloak does not CORS-allow, leaving the page
+  // frozen on the SPA for several seconds before the catch block could fall
+  // back to /auth/login.
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = "/auth/logout";
+  form.style.display = "none";
+  document.body.appendChild(form);
+  form.submit();
 }
 
 const viewTitle: Record<View, MessageKey> = {

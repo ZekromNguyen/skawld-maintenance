@@ -4,6 +4,24 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-04 — Demo data seed, text/plain attachment MIME fix, runbook
+
+- Added `cmd/seed` (invoked with `make seed`) that loads a complete, coherent
+  P-302 pump demo through the same application services the API uses: identity
+  foundation, asset + approved criticality, incident, LOTO-gated execution
+  with exact `8.1 mm/s` / `94 °C` measurements, an ingested + approved SOP,
+  hybrid search, recommendation + correction feedback, approved report and
+  handover, two reviewed semantic demonstrations, and a compiled/reviewed/
+  published workflow. The command is idempotent and re-runnable.
+- Fixed a latent text/plain attachment bug: `http.DetectContentType` returns
+  `text/plain; charset=utf-8`, and the verified MIME was stored verbatim, so
+  document ingestion could never accept a text/plain document. Verified MIME
+  is now normalized to the stable media type before storage, with regression
+  tests in `internal/attachment/adapter/postgres/mime_test.go`.
+- Added `docs/runbooks/demo-data.md` covering usage, the Phase 0–5 data
+  workflow, UI login, verification, and demo cleanup SQL; linked it from the
+  ReadMe quick start.
+
 ### 2026-08-01 — Web image vulnerability-gate remediation
 
 - Upgraded the web runtime from `nginx-unprivileged:1.29-alpine` (stale

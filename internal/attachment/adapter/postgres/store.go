@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
@@ -168,6 +170,10 @@ func (s Store) Complete(
 	if err != nil {
 		return attachmentapp.Attachment{}, false, fmt.Errorf("inspect uploaded attachment: %w", err)
 	}
+	// Normalize the detected type before persistence so consumers (for
+	// example document ingestion eligibility) compare stable media types
+	// instead of raw detected strings that may carry parameters.
+	verifiedMIME = normalizeMIME(verifiedMIME)
 	if size != pending.SizeBytes || checksum != pending.ChecksumSHA256 ||
 		!mimeMatches(pending.DeclaredMIME, verifiedMIME) {
 		_ = s.reject(ctx, principal, pending, "uploaded object failed size, checksum, or MIME verification")
@@ -349,7 +355,18 @@ func mimeMatches(declared, verified string) bool {
 	if declared == verified {
 		return true
 	}
-	return declared == "audio/m4a" && verified == "audio/mp4"
+	// http.DetectContentType appends a parameters section such as
+	// "; charset=utf-8" for text types; treat that as the same media type.
+	return normalizeMIME(declared) != "" && normalizeMIME(verified) == normalizeMIME(declared) ||
+		declared == "audio/m4a" && verified == "audio/mp4"
+}
+
+func normalizeMIME(value string) string {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return strings.ToLower(strings.TrimSpace(mediaType))
 }
 
 func (s Store) reject(
