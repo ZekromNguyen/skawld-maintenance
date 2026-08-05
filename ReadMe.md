@@ -89,6 +89,12 @@ npm ci
 npm run dev
 ```
 
+The public marketing page lives at `/landing` (the SPA root stays the operator
+console). Before building or changing any web UI, read the
+[web UI design system](./docs/contributing/web-ui-design-system.md): it encodes
+Skawld's tokens, dials, accessibility, and pre-flight rules so new interfaces
+stay consistent with the brand.
+
 Run the field client after installing Flutter:
 
 ```bash

@@ -4,6 +4,33 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-05 — RP-initiated logout, id_token-bound web sessions, console sign-out, login-loop fix
+
+- Web sessions now persist the OIDC `id_token` (migration `00011` adds a
+  nullable `web_sessions.id_token` column), so `/auth/logout` can forward
+  it to the provider's `end_session_endpoint` as `id_token_hint`. Sign-out
+  therefore tears down the Keycloak SSO session in addition to the local
+  cookie, preventing the browser from silently re-authenticating back into
+  the SPA after the user pressed "Sign out".
+- Fixed the SPA login-loop: the OIDC callback redirect now targets the SPA
+  origin (`http://localhost:5173`) via the Vite dev proxy so the session
+  cookie is host-scoped to where the SPA actually runs, instead of being
+  set on `:8080` and dropped on the cross-origin hop back to `:5173`.
+- Added a per-role demo account set to the dev Keycloak realm
+  (`dev.supervisor`, `dev.senior`, `dev.technician`, `dev.manager`) plus a
+  `phase0.admin` bootstrap superuser. Product RBAC for the demo accounts is
+  provisioned by `make seed` (see `cmd/seed`), not by Keycloak realm roles;
+  `phase0.admin` is intentionally bootstrap-only (it can create the first
+  organization but has no demo memberships).
+- Added a "Sign out" action to the supervisor web console that posts a
+  hidden form so the browser follows the full `303 → Keycloak → SPA`
+  redirect chain natively (a `fetch`-based logout cannot, because Keycloak
+  does not CORS-allow the cross-origin RP-logout hop).
+- Hardened the OIDC layer: `RevokeSession` failures are now logged (no
+  longer silently discarded), and the end-session-endpoint discovery fetch
+  uses a dedicated 10 s-bounded HTTP client instead of `http.DefaultClient`
+  so a slow identity provider cannot wedge API startup indefinitely.
+
 ### 2026-08-04 — Demo data seed, text/plain attachment MIME fix, runbook
 
 - Added `cmd/seed` (invoked with `make seed`) that loads a complete, coherent
