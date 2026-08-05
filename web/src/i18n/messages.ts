@@ -47,6 +47,14 @@ const en = {
   "incident.openInWorkbench": "Open workbench",
   "incident.noExecutions": "No executions for this incident yet.",
 
+  "execution.steps": "Execution steps",
+  "execution.measurements": "Measurements",
+  "execution.observations": "Observations",
+  "execution.draftReport": "Draft report",
+  "execution.prerequisite": "Requires:",
+  "execution.noMeasurements": "No measurements recorded yet.",
+  "execution.noObservations": "No observations recorded yet.",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -341,6 +349,14 @@ const vi: Record<MessageKey, string> = {
   "incident.purpose": "Mục đích",
   "incident.openInWorkbench": "Mở bàn làm việc",
   "incident.noExecutions": "Chưa có công việc thực hiện cho sự cố này.",
+
+  "execution.steps": "Các bước thực hiện",
+  "execution.measurements": "Số đo",
+  "execution.observations": "Quan sát",
+  "execution.draftReport": "Soạn báo cáo",
+  "execution.prerequisite": "Yêu cầu:",
+  "execution.noMeasurements": "Chưa ghi nhận số đo nào.",
+  "execution.noObservations": "Chưa ghi nhận quan sát nào.",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
