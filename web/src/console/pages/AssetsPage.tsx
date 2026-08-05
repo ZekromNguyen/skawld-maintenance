@@ -1,59 +1,75 @@
 import { useState } from "react";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { useCommand } from "../useCommand";
+import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
+import { Dialog } from "../feedback/Dialog";
 import { AssetsTable } from "../components/AssetsTable";
 import { CreateAssetForm } from "../components/CreateAssetForm";
 
 /**
- * AssetsPage: asset registry with native creation (permission-gated).
+ * AssetsPage: asset registry with native creation inside a proper dialog.
+ * The create button is hidden without asset:create; site is explicit.
  */
 export function AssetsPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const assets = useApi(() => api.assets());
+  const assets = useQuery(() => api.assets().then((list) => list.items));
   const [showForm, setShowForm] = useState(false);
-  const [busy, setBusy] = useState(false);
   const canCreate = principal?.permissions.includes("asset:create") ?? false;
+  const siteIDs = principal?.site_ids ?? [];
 
-  const createAsset = async (value: { site_id: string; tag: string; name: string; class: string }) => {
-    setBusy(true);
-    try {
-      await api.createAsset(value);
-      setShowForm(false);
-      await assets.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const create = useCommand(
+    (value: { site_id: string; tag: string; name: string; class: string }) => api.createAsset(value),
+    {
+      successMessage: t("assets.create.success"),
+      onSuccess: () => {
+        setShowForm(false);
+        void assets.refetch();
+      },
+    },
+  );
 
   return (
-    <section>
-      <Topbar title={t("nav.assets")} principal={principal} />
-      {assets.error && (
-        <div className="toast-error" role="alert">{assets.error}</div>
-      )}
-      {showForm && (
-        <>
-          <div className="modal-backdrop" onClick={() => setShowForm(false)} />
-          <CreateAssetForm
-            siteID={principal?.site_ids[0]}
-            busy={busy}
-            onCancel={() => setShowForm(false)}
-            onCreate={createAsset}
-          />
-        </>
-      )}
-      {assets.loading && !assets.data ? (
-        <div className="skeleton" style={{ height: 300 }} />
-      ) : (
-        <AssetsTable
-          assets={assets.data?.items ?? []}
-          onCreate={() => (canCreate ? setShowForm(true) : undefined)}
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader
+          title={t("nav.assets")}
+          principal={principal}
+          actions={
+            canCreate ? (
+              <button className="primary-button" onClick={() => setShowForm(true)}>
+                {t("assets.add")}
+              </button>
+            ) : undefined
+          }
         />
-      )}
-    </section>
+        <AssetsTable
+          assets={assets.data ?? []}
+          loading={assets.loading}
+          error={assets.error}
+          onRetry={() => void assets.refetch()}
+          onRowClick={(asset) => navigate(`/assets/${asset.id}`)}
+        />
+        <Dialog
+          open={showForm}
+          onOpenChange={setShowForm}
+          title={t("form.createAsset")}
+          footer={null}
+        >
+          <CreateAssetForm
+            siteIDs={siteIDs}
+            pending={create.pending}
+            onCancel={() => setShowForm(false)}
+            onCreate={(value) => void create.run(value)}
+          />
+        </Dialog>
+      </section>
+    </PageTrailProvider>
   );
 }

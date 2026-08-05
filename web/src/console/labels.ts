@@ -81,3 +81,30 @@ export function stepStateTone(state: string): Tone {
       return "info";
   }
 }
+
+/** Asset status tone + label key. */
+export function assetStatusTone(status: string): Tone {
+  switch (status) {
+    case "OPERATIONAL":
+      return "success";
+    case "MAINTENANCE":
+      return "medium";
+    case "DECOMMISSIONED":
+      return "info";
+    default:
+      return "info";
+  }
+}
+
+export function assetStatusLabelKey(status: string): MessageKey | null {
+  switch (status) {
+    case "OPERATIONAL":
+      return "assets.status.operational";
+    case "DECOMMISSIONED":
+      return "assets.status.decommissioned";
+    case "MAINTENANCE":
+      return "assets.status.maintenance";
+    default:
+      return null;
+  }
+}
