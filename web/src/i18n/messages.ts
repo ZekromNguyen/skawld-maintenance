@@ -11,6 +11,19 @@ const en = {
   "nav.quality": "AI quality & safety",
   "nav.signOut": "Sign out",
 
+  "nav.search": "Search",
+  "nav.reports": "Reports",
+  "nav.executions": "Executions",
+
+  "sidebar.operations": "Operations",
+  "sidebar.knowledge": "Knowledge",
+  "sidebar.records": "Records",
+  "sidebar.learning": "Learning",
+  "sidebar.quality": "Quality",
+  "lang.label": "Language / Ngôn ngữ",
+
+  "placeholder.underConstruction": "This page is under construction.",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -269,6 +282,19 @@ const vi: Record<MessageKey, string> = {
   "nav.workflows": "Quy trình học được",
   "nav.quality": "Chất lượng và an toàn AI",
   "nav.signOut": "Đăng xuất",
+
+  "nav.search": "Tìm kiếm",
+  "nav.reports": "Báo cáo",
+  "nav.executions": "Thực hiện bảo trì",
+
+  "sidebar.operations": "Vận hành",
+  "sidebar.knowledge": "Kiến thức",
+  "sidebar.records": "Hồ sơ",
+  "sidebar.learning": "Học hỏi",
+  "sidebar.quality": "Chất lượng",
+  "lang.label": "Ngôn ngữ",
+
+  "placeholder.underConstruction": "Trang này đang được xây dựng.",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",

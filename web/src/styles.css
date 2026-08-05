@@ -305,3 +305,13 @@ tr:last-child td { border-bottom: 0; }
   .modal-backdrop { align-items: end; padding: 0; }
   .modal-backdrop .command-form { width: 100%; max-height: 88vh; overflow-y: auto; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; }
 }
+
+/* ---------- Router shell ---------- */
+.breadcrumbs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--ink-muted); margin-bottom: 2px; }
+.breadcrumbs a { color: var(--ink-soft); text-decoration: none; }
+.breadcrumbs a:hover { color: var(--ink); text-decoration: underline; }
+.breadcrumbs .sep { color: var(--ink-muted); }
+.nav-section { margin-top: 18px; padding: 0 6px; color: var(--ink-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+.skeleton { background: linear-gradient(90deg, var(--raised) 25%, var(--line) 50%, var(--raised) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 4px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.toast-error { position: fixed; bottom: 20px; right: 20px; z-index: 60; max-width: 360px; border: 1px solid var(--red); background: var(--surface); color: var(--ink); padding: 12px 16px; font-size: 13px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
