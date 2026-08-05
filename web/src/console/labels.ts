@@ -108,3 +108,28 @@ export function assetStatusLabelKey(status: string): MessageKey | null {
       return null;
   }
 }
+
+/** Report lifecycle state tone + label key. */
+export function reportStateTone(state: string): Tone {
+  switch (state) {
+    case "APPROVED":
+      return "success";
+    case "SUBMITTED":
+      return "medium";
+    default:
+      return "info";
+  }
+}
+
+export function reportStateLabelKey(state: string): MessageKey | null {
+  switch (state) {
+    case "DRAFT":
+      return "report.state.draft";
+    case "SUBMITTED":
+      return "report.state.submitted";
+    case "APPROVED":
+      return "report.state.approved";
+    default:
+      return null;
+  }
+}

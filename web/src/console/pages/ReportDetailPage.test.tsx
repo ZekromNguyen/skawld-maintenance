@@ -1,89 +1,89 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ReportDetailPage } from "./ReportDetailPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { PrincipalProvider } from "../state/PrincipalProvider";
+import { SiteProvider } from "../state/SiteContext";
+import { ToastProvider } from "../feedback/Toast";
 import { api } from "../../api";
 
-vi.mock("../../api", () => ({
-  api: {
-    principal: vi.fn().mockResolvedValue({
-      id: "p1",
-      display_name: "Supervisor",
-      site_ids: [],
-      permissions: ["report:write", "report:approve"]
-    }),
-    report: vi.fn().mockResolvedValue({
-      id: "rp1",
-      execution_id: "ex1",
-      revision: 1,
-      version: 1,
-      state: "DRAFT",
-      structured_content: {
-        summary: "Inspection found shaft alignment out of spec.",
-        measurements: ["8.1 mm/s vibration"],
-        observations: ["Bearing housing hot"],
-        actions: ["Realigned shaft"],
-        outcome: "Awaiting approval",
-        evidence_ids: ["e1"],
-        unknowns: ["Root cause of drift"],
-        requires_human_review: true
-      },
-      evidence: []
-    }),
-    submitReport: vi.fn(),
-    approveReport: vi.fn()
+const fixtures = vi.hoisted(() => ({
+  report: {
+    id: "r1",
+    execution_id: "e1",
+    revision: 1,
+    version: 1,
+    state: "DRAFT" as const,
+    structured_content: {
+      summary: "Pump inspection R1",
+      measurements: ["8.1 mm/s"],
+      observations: [],
+      actions: [],
+      outcome: "",
+      evidence_ids: [],
+      unknowns: ["root cause unconfirmed"],
+      requires_human_review: true
+    },
+    evidence: [],
+    provider: "skawld-copilot",
+    model: "copilot-v1",
+    prompt_version: "p17"
   }
 }));
 
+vi.mock("../../api", () => ({
+  api: {
+    principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", site_ids: ["s1"], permissions: ["report:write", "report:approve"] }),
+    report: vi.fn().mockResolvedValue(fixtures.report),
+    submitReport: vi.fn().mockResolvedValue({}),
+    approveReport: vi.fn().mockResolvedValue({})
+  }
+}));
+
+function renderDetail() {
+  return render(
+    <I18nProvider>
+      <PrincipalProvider>
+        <SiteProvider>
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/reports/r1"]}>
+              <Routes>
+                <Route path="/reports/:reportId" element={<ReportDetailPage />} />
+              </Routes>
+            </MemoryRouter>
+          </ToastProvider>
+        </SiteProvider>
+      </PrincipalProvider>
+    </I18nProvider>,
+  );
+}
+
 describe("ReportDetailPage", () => {
-  it("renders report content with submit action for DRAFT", async () => {
-    render(
-      <I18nProvider>
-        <PrincipalProvider>
-        <MemoryRouter initialEntries={["/reports/rp1"]}>
-          <Routes>
-            <Route path="/reports/:reportId" element={<ReportDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-        </PrincipalProvider>
-      </I18nProvider>,
-    );
-    expect(await screen.findByText("Inspection found shaft alignment out of spec.")).toBeTruthy();
-    expect(screen.getByText("Submit")).toBeTruthy();
+  it("renders content with submit action and human-review banner", async () => {
+    renderDetail();
+    expect(await screen.findByText("Pump inspection R1")).toBeTruthy();
+    expect(screen.getByText("Requires human review")).toBeTruthy();
+    expect(screen.getByText("root cause unconfirmed")).toBeTruthy();
+    expect(screen.getByText("copilot-v1")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeTruthy();
   });
 
-  it("renders approve action for SUBMITTED report", async () => {
-    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: "rp2",
-      execution_id: "ex1",
-      revision: 2,
-      version: 1,
-      state: "SUBMITTED",
-      structured_content: {
-        summary: "Second revision summary.",
-        measurements: [],
-        observations: [],
-        actions: [],
-        outcome: "Awaiting approval",
-        evidence_ids: [],
-        unknowns: [],
-        requires_human_review: true
-      },
-      evidence: []
-    });
-    render(
-      <I18nProvider>
-        <PrincipalProvider>
-        <MemoryRouter initialEntries={["/reports/rp2"]}>
-          <Routes>
-            <Route path="/reports/:reportId" element={<ReportDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-        </PrincipalProvider>
-      </I18nProvider>,
-    );
-    expect(await screen.findByText("Approve")).toBeTruthy();
+  it("submits with a success toast", async () => {
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(api.submitReport as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("r1"));
+    expect(screen.getByText("Report submitted")).toBeTruthy();
+  });
+
+  it("confirms before approving a submitted report", async () => {
+    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue({ ...fixtures.report, state: "SUBMITTED" });
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("official maintenance record");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(api.approveReport as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("r1"));
+    expect(screen.getByText("Report approved")).toBeTruthy();
   });
 });

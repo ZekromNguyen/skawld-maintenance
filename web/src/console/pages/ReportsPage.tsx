@@ -1,63 +1,82 @@
-import { Link } from "react-router-dom";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
+import { DataTable } from "../ui/DataTable";
+import { StatusBadge } from "../ui/StatusBadge";
+import { reportStateTone, reportStateLabelKey } from "../labels";
+import type { MaintenanceReport } from "../../types";
 
 /**
- * ReportsPage: maintenance report library with lifecycle state badges.
+ * ReportsPage: maintenance report library with lifecycle state badges,
+ * execution links, and a state filter.
  */
 export function ReportsPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const reports = useApi(() => api.reports());
+  const reports = useQuery(() => api.reports().then((list) => list.items));
 
   return (
-    <section>
-      <Topbar title={t("nav.reports")} principal={principal} />
-      {reports.error && (
-        <div className="toast-error" role="alert">{reports.error}</div>
-      )}
-      {reports.loading && !reports.data ? (
-        <div className="skeleton" style={{ height: 300 }} />
-      ) : (
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader title={t("nav.reports")} principal={principal} />
         <div className="panel">
           <div className="panel-heading">
             <h2>{t("report.library")}</h2>
-            <span className="count">{reports.data?.items.length ?? 0}</span>
+            <span className="count">{reports.data?.length ?? 0}</span>
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("report.workOrder")}</th>
-                  <th>{t("report.summary")}</th>
-                  <th>{t("report.state")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(reports.data?.items ?? []).map((report) => (
-                  <tr key={report.id}>
-                    <td className="mono strong">
-                      <Link to={`/reports/${report.id}`} style={{ color: "inherit" }}>
-                        RP-{report.revision}
-                      </Link>
-                    </td>
-                    <td className="summary-cell">{report.structured_content.summary}</td>
-                    <td><span className={`state-badge ${report.state.toLowerCase()}`}>{report.state}</span></td>
-                  </tr>
-                ))}
-                {(reports.data?.items ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="empty">{t("report.none")}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<MaintenanceReport>
+            columns={[
+              {
+                key: "workOrder",
+                header: t("report.workOrder"),
+                render: (report) => (
+                  <Link to={`/reports/${report.id}`} className="mono strong" onClick={(event) => event.stopPropagation()}>
+                    RP-{report.revision}
+                  </Link>
+                ),
+                sortValue: (r) => r.revision
+              },
+              {
+                key: "summary",
+                header: t("report.summary"),
+                render: (report) => <span className="summary-cell">{report.structured_content.summary}</span>
+              },
+              {
+                key: "execution",
+                header: t("report.execution"),
+                render: (report) =>
+                  report.execution_id ? (
+                    <Link to={`/executions/${report.execution_id}`} onClick={(event) => event.stopPropagation()}>
+                      {report.execution_id.slice(0, 8)}
+                    </Link>
+                  ) : (
+                    "—"
+                  )
+              },
+              {
+                key: "state",
+                header: t("report.state"),
+                render: (report) => (
+                  <StatusBadge tone={reportStateTone(report.state)} label={reportStateLabelKey(report.state) ? t(reportStateLabelKey(report.state)!) : report.state} />
+                ),
+                sortValue: (r) => r.state
+              }
+            ]}
+            rows={reports.data ?? []}
+            rowKey={(report) => report.id}
+            onRowClick={(report) => navigate(`/reports/${report.id}`)}
+            emptyTitle={t("report.none")}
+            loading={reports.loading}
+            error={reports.error}
+            onRetry={() => void reports.refetch()}
+          />
         </div>
-      )}
-    </section>
+      </section>
+    </PageTrailProvider>
   );
 }
