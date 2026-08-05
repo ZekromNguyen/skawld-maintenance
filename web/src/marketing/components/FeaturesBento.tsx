@@ -1,5 +1,7 @@
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 import {
   UsersThree,
   FlowArrow,
@@ -36,7 +38,7 @@ function FeatureCell({
           : "var(--surface)",
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 14,
       }}
     >
       <span
@@ -54,13 +56,13 @@ function FeatureCell({
       >
         <Icon size={20} weight="duotone" />
       </span>
-      <h3 style={{ fontSize: 16.5, fontWeight: 650, color: "var(--ink)", margin: 0 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.3, color: "var(--ink)", margin: 0 }}>
         {title}
       </h3>
       <p
         style={{
           margin: 0,
-          fontSize: 13.5,
+          fontSize: 14,
           lineHeight: 1.6,
           color: "var(--ink-soft)",
         }}
@@ -73,12 +75,13 @@ function FeatureCell({
 
 /** Live mini rail: a real step-state visual cell for bento diversity. */
 function WorkflowPeekCell() {
-  const steps = [
-    { label: "Capture", state: "done" as const },
-    { label: "Review", state: "done" as const },
-    { label: "Publish", state: "current" as const },
-    { label: "Assist", state: "pending" as const },
-    { label: "Verify", state: "pending" as const },
+  const { t } = useI18n();
+  const steps: Array<{ labelKey: MessageKey; state: "done" | "current" | "pending" }> = [
+    { labelKey: "landing.phase.capture", state: "done" },
+    { labelKey: "landing.phase.review", state: "done" },
+    { labelKey: "landing.phase.publish", state: "current" },
+    { labelKey: "landing.phase.assist", state: "pending" },
+    { labelKey: "landing.phase.verify", state: "pending" },
   ];
   return (
     <div
@@ -97,10 +100,10 @@ function WorkflowPeekCell() {
         className="eyebrow"
         style={{ marginBottom: 2 }}
       >
-        Workflow lifecycle
+        {t("landing.features.workflowLifecycle")}
       </span>
       {steps.map((step, index) => (
-        <div key={step.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div key={step.labelKey} style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span
             style={{
               width: 12,
@@ -122,7 +125,7 @@ function WorkflowPeekCell() {
               color: step.state === "pending" ? "var(--ink-muted)" : "var(--ink)",
             }}
           >
-            {step.label}
+            {t(step.labelKey)}
           </span>
           {index < steps.length - 1 ? (
             <span
@@ -140,48 +143,60 @@ function WorkflowPeekCell() {
   );
 }
 
-const FEATURES = [
+const FEATURES: Array<{
+  Icon: Icon;
+  titleKey: MessageKey;
+  bodyKey: MessageKey;
+  tinted?: boolean;
+}> = [
   {
     Icon: UsersThree,
-    title: "Capture real expertise",
-    body: "Technicians demonstrate their work; Skawld records decisions, corrections, and provenance as structured events, not free text.",
+    titleKey: "landing.features.captureExpertise.title",
+    bodyKey: "landing.features.captureExpertise.body",
     tinted: true,
   },
   {
     Icon: SealCheck,
-    title: "Human authority preserved",
-    body: "Recommendations are advisory and require human confirmation. LOTO gates and supervisor sign-off stay in the loop.",
+    titleKey: "landing.features.humanAuthority.title",
+    bodyKey: "landing.features.humanAuthority.body",
   },
   {
     Icon: MagnifyingGlass,
-    title: "Evidence-backed assistance",
-    body: "Every recommendation cites its sources: SOP revisions, resolved incidents, and measurements. No unsupported advice.",
+    titleKey: "landing.features.evidenceBacked.title",
+    bodyKey: "landing.features.evidenceBacked.body",
   },
   {
     Icon: FlowArrow,
-    title: "Reviewed, reusable workflows",
-    body: "Demonstrations are compiled, reviewed, and published into workflows your team can follow, with safety gates built in.",
+    titleKey: "landing.features.reusable.title",
+    bodyKey: "landing.features.reusable.body",
     tinted: true,
   },
   {
     Icon: ShieldCheck,
-    title: "Safety first, by design",
-    body: "Lockout-tagout verification gates, risk-leveled steps, and a strict boundary between advisory assistance and control.",
+    titleKey: "landing.features.safetyFirst.title",
+    bodyKey: "landing.features.safetyFirst.body",
   },
 ];
 
 export function FeaturesBento() {
+  const { t } = useI18n();
   return (
     <Section
       id="features"
-      eyebrow="Features"
-      title="A copilot that learns from your own people"
-      lead="Built around the workflow your technicians already trust: capture, review, publish, assist, verify. Skawld fits into it instead of replacing it."
+      eyebrow={t("landing.features.eyebrow")}
+      title={t("landing.features.title")}
+      lead={t("landing.features.lead")}
     >
       <Reveal>
         <div className="bento-grid">
           {FEATURES.map((feature) => (
-            <FeatureCell key={feature.title} {...feature} />
+            <FeatureCell
+              key={feature.titleKey}
+              Icon={feature.Icon}
+              title={t(feature.titleKey)}
+              body={t(feature.bodyKey)}
+              tinted={feature.tinted}
+            />
           ))}
           <WorkflowPeekCell />
         </div>

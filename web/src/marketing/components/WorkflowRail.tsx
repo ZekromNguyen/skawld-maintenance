@@ -1,55 +1,63 @@
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
 import { ShieldCheck, UserCheck } from "@phosphor-icons/react";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 
 /**
  * WorkflowRail: the architecture / workflow illustration.
  * Capture -> Review -> Publish -> Assist -> Verify, with LOTO and
  * human-confirmation gates highlighted. Content, not decoration.
  */
-const STEPS = [
+const STEPS: Array<{
+  phaseKey: MessageKey;
+  titleKey: MessageKey;
+  bodyKey: MessageKey;
+  gateKey: MessageKey | null;
+}> = [
   {
-    phase: "Capture",
-    title: "Technicians demonstrate real work",
-    body: "Executions and shift handovers are captured as structured domain events: decisions, measurements, corrections, and provenance.",
-    gate: null,
+    phaseKey: "landing.phase.capture",
+    titleKey: "landing.workflow.step1.title",
+    bodyKey: "landing.workflow.step1.body",
+    gateKey: null,
   },
   {
-    phase: "Review",
-    title: "Experts review every demonstration",
-    body: "Reviewed demonstrations become trusted training signal. Corrections are linked to the exact event they fix.",
-    gate: "Human review required",
+    phaseKey: "landing.phase.review",
+    titleKey: "landing.workflow.step2.title",
+    bodyKey: "landing.workflow.step2.body",
+    gateKey: "landing.workflow.gate.humanReview",
   },
   {
-    phase: "Publish",
-    title: "Reviewed workflows are published",
-    body: "Compiled workflows pass safety and privilege gates before your team can follow them. Nothing is promoted automatically.",
-    gate: "Safety gate",
+    phaseKey: "landing.phase.publish",
+    titleKey: "landing.workflow.step3.title",
+    bodyKey: "landing.workflow.step3.body",
+    gateKey: "landing.workflow.gate.safety",
   },
   {
-    phase: "Assist",
-    title: "Evidence-backed guidance on the job",
-    body: "Technicians get advisory recommendations citing SOP revisions, resolved incidents, and live measurements. Requires human confirmation.",
-    gate: "Human confirmation",
+    phaseKey: "landing.phase.assist",
+    titleKey: "landing.workflow.step4.title",
+    bodyKey: "landing.workflow.step4.body",
+    gateKey: "landing.workflow.gate.humanConfirmation",
   },
   {
-    phase: "Verify",
-    title: "Outcomes feed back into the loop",
-    body: "Reports and handovers record what actually happened, so the next capture starts from verified ground truth.",
-    gate: null,
+    phaseKey: "landing.phase.verify",
+    titleKey: "landing.workflow.step5.title",
+    bodyKey: "landing.workflow.step5.body",
+    gateKey: null,
   },
 ];
 
 export function WorkflowRail() {
+  const { t } = useI18n();
   return (
     <Section
       id="workflow"
-      title="From field expertise to team-wide capability"
-      lead="One loop, five stages. Every stage preserves evidence, authority, and the safety boundary that makes industrial assistance trustworthy."
+      title={t("landing.workflow.title")}
+      lead={t("landing.workflow.lead")}
     >
       <div style={{ marginTop: 56, display: "grid", gap: 0 }}>
         {STEPS.map((step, index) => (
-          <Reveal key={step.phase} delay={index * 60}>
+          <Reveal key={step.phaseKey} delay={index * 60}>
             <div
               style={{
                 display: "grid",
@@ -112,9 +120,9 @@ export function WorkflowRail() {
                     className="eyebrow"
                     style={{ marginBottom: 0, color: "var(--brand)" }}
                   >
-                    {step.phase}
+                    {t(step.phaseKey)}
                   </span>
-                  {step.gate ? (
+                  {step.gateKey ? (
                     <span
                       style={{
                         display: "inline-flex",
@@ -128,17 +136,17 @@ export function WorkflowRail() {
                         padding: "3px 9px",
                       }}
                     >
-                      {step.gate === "Safety gate" ? (
+                      {step.gateKey === "landing.workflow.gate.safety" ? (
                         <ShieldCheck size={12} weight="bold" aria-hidden="true" />
                       ) : (
                         <UserCheck size={12} weight="bold" aria-hidden="true" />
                       )}
-                      {step.gate}
+                      {t(step.gateKey)}
                     </span>
                   ) : null}
                 </div>
-                <h3 style={{ fontSize: 19, fontWeight: 650, color: "var(--ink)", margin: 0 }}>
-                  {step.title}
+                <h3 style={{ fontSize: 20, fontWeight: 650, color: "var(--ink)", margin: 0 }}>
+                  {t(step.titleKey)}
                 </h3>
                 <p
                   style={{
@@ -149,7 +157,7 @@ export function WorkflowRail() {
                     maxWidth: "56ch",
                   }}
                 >
-                  {step.body}
+                  {t(step.bodyKey)}
                 </p>
               </div>
             </div>

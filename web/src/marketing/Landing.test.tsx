@@ -126,4 +126,15 @@ describe("Landing marketing page", () => {
     renderLanding();
     expect(screen.getAllByLabelText(/language/i).length).toBe(1);
   });
+
+  it("keeps card titles visibly above body text across sections", () => {
+    renderLanding();
+    const featuresTitles = Array.from(document.querySelectorAll("#features h3"));
+    expect(featuresTitles.length).toBe(5);
+    for (const h3 of featuresTitles) {
+      expect((h3 as HTMLElement).style.fontSize).toBe("18px");
+    }
+    const workflowTitle = document.querySelector("#workflow h3") as HTMLElement;
+    expect(workflowTitle.style.fontSize).toBe("20px");
+  });
 });
