@@ -1,26 +1,74 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useI18n } from "../../i18n/I18nProvider";
+import { FormField } from "../ui/FormField";
 
+const TYPES: Array<{
+  value: string;
+  labelKey: "measurement.vibrationVelocity" | "measurement.bearingTemperature";
+  unit: string;
+}> = [
+  { value: "VIBRATION_VELOCITY", labelKey: "measurement.vibrationVelocity", unit: "MM_PER_S" },
+  { value: "TEMPERATURE", labelKey: "measurement.bearingTemperature", unit: "DEG_C" }
+];
 
+/**
+ * MeasurementForm: validated, no demo defaults, unit shown as a suffix
+ * (not a read-only input), form resets after a successful submit.
+ */
 export function MeasurementForm(props: {
-  busy: boolean;
-  onSubmit: (type: string, value: string, unit: string) => Promise<void>;
+  pending: boolean;
+  onSubmit: (type: string, value: string, unit: string) => void;
 }) {
   const { t } = useI18n();
-  const [type, setType] = useState("VIBRATION_VELOCITY");
-  const [value, setValue] = useState("8.1");
-  const unit = useMemo(() => type === "TEMPERATURE" ? "DEG_C" : "MM_PER_S", [type]);
+  const [type, setType] = useState(TYPES[0].value);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | undefined>(undefined);
+  const selected = TYPES.find((item) => item.value === type) ?? TYPES[0];
+
   function submit(event: FormEvent) {
     event.preventDefault();
-    void props.onSubmit(type, value, unit);
+    const numeric = Number(value);
+    if (!value.trim() || !Number.isFinite(numeric)) {
+      setError(t("workbench.invalidMeasurement"));
+      return;
+    }
+    setError(undefined);
+    props.onSubmit(type, value.trim(), selected.unit);
+    setValue("");
   }
+
   return (
-    <form className="measurement-form" onSubmit={submit}>
+    <form className="measurement-form" onSubmit={submit} noValidate>
       <span className="eyebrow">{t("measurement.record")}</span>
-      <label>{t("measurement.type")}<select value={type} onChange={(event) => setType(event.target.value)}><option value="VIBRATION_VELOCITY">{t("measurement.vibrationVelocity")}</option><option value="TEMPERATURE">{t("measurement.bearingTemperature")}</option></select></label>
-      <label>{t("measurement.value")}<input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} /></label>
-      <label>{t("measurement.unit")}<input value={unit} readOnly /></label>
-      <button className="secondary-button" disabled={props.busy}>{t("measurement.recordButton")}</button>
+      <FormField label={t("measurement.type")} htmlFor="measurement-type">
+        <select id="measurement-type" value={type} onChange={(event) => setType(event.target.value)}>
+          {TYPES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {t(item.labelKey)}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <FormField
+        label={t("measurement.value")}
+        htmlFor="measurement-value"
+        error={error}
+        required
+      >
+        <input
+          id="measurement-value"
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          required
+        />
+      </FormField>
+      <FormField label={t("measurement.unit")} htmlFor="measurement-unit">
+        <input id="measurement-unit" value={selected.unit} readOnly aria-readonly="true" />
+      </FormField>
+      <button className="secondary-button" disabled={props.pending}>
+        {t("measurement.recordButton")}
+      </button>
     </form>
   );
 }

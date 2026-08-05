@@ -1,74 +1,68 @@
 import { useI18n } from "../../i18n/I18nProvider";
+import { StatusBadge } from "../ui/StatusBadge";
+import { riskTone, stepStateTone } from "../labels";
 import type { Step } from "../../types";
 
 /**
  * StepRail: LOTO/safety-gated step list for the execution workbench.
+ * Blocked steps keep their reason readable (no disabled row swallowing
+ * focus); completed steps show a marker instead of a re-complete click.
  */
 export function StepRail({
   steps,
-  onToggle
+  onToggle,
+  canWrite
 }: {
   steps: Step[];
   onToggle: (step: Step) => void;
+  canWrite: boolean;
 }) {
   const { t } = useI18n();
+  const risk = (level: string) => riskTone(level);
   return (
     <div className="panel">
-      <div className="panel-heading"><h2>{t("execution.steps")}</h2></div>
-      <div>
-        {steps.map((step) => (
-          <button
-            key={step.id}
-            type="button"
-            className="step-row"
-            disabled={step.state === "BLOCKED"}
-            onClick={() => onToggle(step)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              width: "100%",
-              padding: "12px 16px",
-              border: 0,
-              borderBottom: "1px solid var(--line)",
-              background: "transparent",
-              color: "inherit",
-              textAlign: "left",
-              cursor: step.state === "BLOCKED" ? "not-allowed" : "pointer"
-            }}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background:
-                  step.state === "COMPLETED"
-                    ? "var(--brand)"
-                    : step.state === "BLOCKED"
-                      ? "var(--red)"
-                      : "var(--line-soft)",
-                flexShrink: 0
-              }}
-            />
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <strong>{step.title}</strong>
-              {step.required_prerequisite ? (
-                <small style={{ display: "block", color: "var(--ink-muted)" }}>
-                  {t("execution.prerequisite")} {step.required_prerequisite}
-                </small>
+      <div className="panel-heading">
+        <h2>{t("execution.steps")}</h2>
+        <span className="count">{steps.length}</span>
+      </div>
+      <div className="step-rail">
+        {steps.map((step) => {
+          const tone = risk(step.risk_level);
+          const actionable =
+            canWrite && step.state !== "COMPLETED" && step.state !== "BLOCKED";
+          return (
+            <div
+              key={step.id}
+              className={`step-row${step.state === "COMPLETED" ? " completed" : ""}${step.state === "BLOCKED" ? " blocked" : ""}`}
+            >
+              <span
+                className="step-dot"
+                data-state={step.state}
+                aria-hidden="true"
+              />
+              <div className="step-body">
+                <strong>{step.title}</strong>
+                {step.required_prerequisite ? (
+                  <small className="prerequisite">
+                    {t("execution.prerequisite")} {step.required_prerequisite}
+                  </small>
+                ) : null}
+                {step.state === "BLOCKED" && step.blocked_reason ? (
+                  <p className="blocked-reason">{step.blocked_reason}</p>
+                ) : null}
+              </div>
+              {tone ? (
+                <StatusBadge tone={tone} label={step.risk_level} />
               ) : null}
-            </span>
-            {step.risk_level !== "INFORMATIONAL" && (
-              <span className="severity high">{step.risk_level}</span>
-            )}
-            {step.state === "BLOCKED" && step.blocked_reason && (
-              <span className="state-badge">{step.blocked_reason}</span>
-            )}
-            <span className="state-badge">{step.state}</span>
-          </button>
-        ))}
+              <StatusBadge tone={stepStateTone(step.state)} label={step.state.replace("_", " ")} />
+              {actionable ? (
+                <button className="step-action" onClick={() => onToggle(step)}>
+                  {t("execution.complete")}
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

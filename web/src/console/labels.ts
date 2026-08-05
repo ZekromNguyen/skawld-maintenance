@@ -58,3 +58,26 @@ export function incidentStateTone(state: string): Tone {
       return "info";
   }
 }
+
+/** Workbench step risk tone: only safety-significant levels get a badge. */
+export function riskTone(level: string): Tone | null {
+  switch (level) {
+    case "SAFETY_SIGNIFICANT":
+      return "critical";
+    case "ADVISORY":
+      return "medium";
+    default:
+      return null;
+  }
+}
+
+export function stepStateTone(state: string): Tone {
+  switch (state) {
+    case "COMPLETED":
+      return "success";
+    case "BLOCKED":
+      return "critical";
+    default:
+      return "info";
+  }
+}
