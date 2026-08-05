@@ -78,6 +78,13 @@ const en = {
   "document.applicability": "Applicability",
   "document.none": "Not applicable",
 
+  "search.placeholder": "Search procedures, incidents, evidence...",
+  "search.submit": "Search",
+  "search.empty": "Type a query to search the knowledge base.",
+  "search.noResults": "No results for this query.",
+  "search.score": "Score",
+  "search.unknownAuthority": "Other sources",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -403,6 +410,13 @@ const vi: Record<MessageKey, string> = {
   "document.requestIngestion": "Yêu cầu nhập liệu",
   "document.applicability": "Phạm vi áp dụng",
   "document.none": "Không áp dụng",
+
+  "search.placeholder": "Tìm quy trình, sự cố, bằng chứng...",
+  "search.submit": "Tìm kiếm",
+  "search.empty": "Nhập truy vấn để tìm kiếm cơ sở tri thức.",
+  "search.noResults": "Không có kết quả cho truy vấn này.",
+  "search.score": "Điểm",
+  "search.unknownAuthority": "Nguồn khác",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
