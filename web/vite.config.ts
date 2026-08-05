@@ -16,6 +16,7 @@ export default defineConfig({
     environment: "jsdom",
     // Enable global afterEach so @testing-library/react auto-cleanup runs
     // between tests (prevents DOM leakage across test files).
-    globals: true
+    globals: true,
+    setupFiles: "./src/test/setup.ts"
   }
 });

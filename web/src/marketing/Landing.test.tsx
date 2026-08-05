@@ -112,4 +112,18 @@ describe("Landing marketing page", () => {
     expect(integrations!.querySelectorAll("a").length).toBe(6);
     expect(integrations!.textContent).toContain("Slack");
   });
+
+  it("opens the mobile menu and exposes nav links and sign-in", () => {
+    renderLanding();
+    const menuButton = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(menuButton);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("Features");
+    expect(dialog.textContent).toContain("Sign in");
+  });
+
+  it("keeps exactly one language switcher on the page", () => {
+    renderLanding();
+    expect(screen.getAllByLabelText(/language/i).length).toBe(1);
+  });
 });
