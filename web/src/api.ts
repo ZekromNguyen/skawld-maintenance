@@ -322,5 +322,37 @@ export const api = {
   applicableWorkflows: (assetID: string) =>
     request<ListResponse<WorkflowVersion>>(
       `/workflows/applicable?asset_id=${encodeURIComponent(assetID)}`
-    )
+    ),
+  asset: (id: string) => request<Asset>(`/assets/${id}`),
+  approveAssetCriticality: (assetID: string) =>
+    command<unknown>(`/assets/${assetID}/criticality-approvals`, {}),
+  incident: (id: string) => request<Incident>(`/incidents/${id}`),
+  listExecutions: () => request<ListResponse<Execution>>("/executions"),
+  resolveIncident: (incidentID: string) =>
+    command<Incident>(`/incidents/${incidentID}/resolution`, {}),
+  generateRecommendation: (incidentID: string) =>
+    command<Recommendation>(`/incidents/${incidentID}/recommendations`, {}),
+  recommendationFeedback: (
+    id: string,
+    value: { accepted: boolean; correction?: string }
+  ) => command<unknown>(`/recommendations/${id}/feedback`, value),
+  reports: () => request<ListResponse<MaintenanceReport>>("/reports"),
+  report: (id: string) => request<MaintenanceReport>(`/reports/${id}`),
+  submitReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/submit`, {}),
+  approveReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/approve`, {}),
+  editReport: (id: string, value: unknown) =>
+    command<MaintenanceReport>(`/reports/${id}/edit`, value),
+  document: (id: string) => request<KnowledgeDocument>(`/documents/${id}`),
+  approveDocumentRevision: (revisionID: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/approve`, {}),
+  retireDocumentRevision: (revisionID: string, reason: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/retire`, { reason }),
+  requestDocumentIngestion: (revisionID: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/ingestion`, {}),
+  handovers: () => request<ListResponse<ShiftHandover>>("/handovers"),
+  handover: (id: string) => request<ShiftHandover>(`/handovers/${id}`),
+  submitHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/submit`, {}),
+  acceptHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/accept`, {}),
+  acknowledgeHandover: (id: string) =>
+    command<ShiftHandover>(`/handovers/${id}/acknowledge`, {})
 };
