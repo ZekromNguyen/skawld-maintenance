@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "./DashboardPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { api } from "../../api";
 
 vi.mock("../../api", () => ({
   api: {
@@ -43,5 +44,23 @@ describe("DashboardPage", () => {
     );
     expect(await screen.findByText("Operations overview")).toBeTruthy();
     expect(screen.getByText("Pump vibration")).toBeTruthy();
+  });
+
+  it("shows supervisor shortcut for open incidents when report:approve present", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Supervisor",
+      site_ids: [],
+      permissions: ["report:approve", "incident:read"]
+    });
+    render(
+      <I18nProvider>
+        <MemoryRouter>
+          <DashboardPage />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    // "Open incidents" appears in the shortcut card AND the overview metric.
+    expect((await screen.findAllByText("Open incidents")).length).toBeGreaterThan(1);
   });
 });

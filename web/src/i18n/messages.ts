@@ -24,6 +24,12 @@ const en = {
 
   "placeholder.underConstruction": "This page is under construction.",
 
+  "dashboard.openIncidents": "Open incidents",
+  "dashboard.pendingReports": "Pending reports",
+  "dashboard.assignedExecutions": "Assigned executions",
+  "dashboard.pendingHandovers": "Pending handovers",
+  "dashboard.tapToOpen": "Tap to open",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -295,6 +301,12 @@ const vi: Record<MessageKey, string> = {
   "lang.label": "Ngôn ngữ",
 
   "placeholder.underConstruction": "Trang này đang được xây dựng.",
+
+  "dashboard.openIncidents": "Sự cố đang mở",
+  "dashboard.pendingReports": "Báo cáo chờ duyệt",
+  "dashboard.assignedExecutions": "Công việc được giao",
+  "dashboard.pendingHandovers": "Bàn giao chờ xử lý",
+  "dashboard.tapToOpen": "Nhấn để mở",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
