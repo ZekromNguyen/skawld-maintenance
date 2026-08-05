@@ -133,3 +133,37 @@ export function reportStateLabelKey(state: string): MessageKey | null {
       return null;
   }
 }
+
+/** Document revision approval status tone + label key. */
+export function approvalTone(status: string): Tone {
+  switch (status) {
+    case "APPROVED":
+      return "success";
+    case "DRAFT":
+      return "info";
+    case "REVIEW_REQUIRED":
+      return "medium";
+    case "SUPERSEDED":
+    case "RETIRED":
+      return "low";
+    default:
+      return "info";
+  }
+}
+
+export function approvalLabelKey(status: string): MessageKey | null {
+  switch (status) {
+    case "DRAFT":
+      return "document.approval.draft";
+    case "REVIEW_REQUIRED":
+      return "document.approval.reviewRequired";
+    case "APPROVED":
+      return "document.approval.approved";
+    case "SUPERSEDED":
+      return "document.approval.superseded";
+    case "RETIRED":
+      return "document.approval.retired";
+    default:
+      return null;
+  }
+}
