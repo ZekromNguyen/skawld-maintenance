@@ -85,6 +85,10 @@ const en = {
   "search.score": "Score",
   "search.unknownAuthority": "Other sources",
 
+  "handover.submit": "Submit",
+  "handover.accept": "Accept",
+  "handover.acknowledge": "Acknowledge",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -417,6 +421,10 @@ const vi: Record<MessageKey, string> = {
   "search.noResults": "Không có kết quả cho truy vấn này.",
   "search.score": "Điểm",
   "search.unknownAuthority": "Nguồn khác",
+
+  "handover.submit": "Gửi duyệt",
+  "handover.accept": "Chấp nhận",
+  "handover.acknowledge": "Xác nhận",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
