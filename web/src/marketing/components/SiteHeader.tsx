@@ -49,7 +49,7 @@ export function SiteHeader() {
           style={{ textDecoration: "none", display: "inline-flex", flexShrink: 0 }}
           aria-label="Skawld home"
         >
-          <Logo />
+          <Logo className="logo-link" />
         </a>
         <nav aria-label="Primary" className="nav-desktop">
           {NAV_LINKS.map((link) => (

@@ -313,6 +313,9 @@
   .landing .header-actions-mobile {
     display: flex;
   }
+  .landing .logo-link .logo-wordmark {
+    display: none;
+  }
 }
 
 @media (min-width: 1024px) {

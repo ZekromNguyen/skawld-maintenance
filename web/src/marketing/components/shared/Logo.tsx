@@ -2,9 +2,12 @@
  * Logo: Skawld wordmark. Simple geometric mark, brand-consistent.
  * A square instrument tile with an "S" cut, plus the wordmark in Geist.
  */
-export function Logo({ size = 34 }: { size?: number }) {
+export function Logo({ size = 34, className = "" }: { size?: number; className?: string }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 11 }}>
+    <span
+      className={className}
+      style={{ display: "inline-flex", alignItems: "center", gap: 11 }}
+    >
       <span
         aria-hidden="true"
         style={{
@@ -25,6 +28,7 @@ export function Logo({ size = 34 }: { size?: number }) {
         S
       </span>
       <span
+        className="logo-wordmark"
         style={{
           fontWeight: 700,
           fontSize: 17,
