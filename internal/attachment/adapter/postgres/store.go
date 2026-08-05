@@ -355,10 +355,16 @@ func mimeMatches(declared, verified string) bool {
 	if declared == verified {
 		return true
 	}
+	declaredType := normalizeMIME(declared)
+	verifiedType := normalizeMIME(verified)
 	// http.DetectContentType appends a parameters section such as
 	// "; charset=utf-8" for text types; treat that as the same media type.
-	return normalizeMIME(declared) != "" && normalizeMIME(verified) == normalizeMIME(declared) ||
-		declared == "audio/m4a" && verified == "audio/mp4"
+	if declaredType != "" && verifiedType == declaredType {
+		return true
+	}
+	// http.DetectContentType reports MP4 containers as audio/mp4 even when
+	// the caller declared the m4a alias; allow the alias to satisfy ingestion.
+	return declaredType == "audio/m4a" && verifiedType == "audio/mp4"
 }
 
 func normalizeMIME(value string) string {
