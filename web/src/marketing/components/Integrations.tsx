@@ -1,33 +1,38 @@
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
+import { useI18n } from "../../i18n/I18nProvider";
 
 /**
- * Integrations: compact card grid. Real marks where they exist
- * (Simple Icons CDN) and monogram tiles for the platform surface names.
+ * Integrations: compact card grid. Self-contained monogram tiles (text
+ * letters, no hand-rolled SVG paths) instead of CDN icons, so nothing
+ * depends on a third-party host at render time.
  */
-const INTEGRATIONS = [
-  { name: "Keycloak", href: "https://www.keycloak.org", slug: "keycloak" },
-  { name: "PostgreSQL", href: "https://www.postgresql.org", slug: "postgresql" },
-  { name: "S3 / MinIO", href: "https://min.io", slug: "minio" },
-  { name: "GitHub", href: "https://github.com", slug: "github" },
-  { name: "Slack", href: "https://slack.com", slug: "slack" },
-  { name: "Docker", href: "https://www.docker.com", slug: "docker" },
+const INTEGRATIONS: Array<{ name: string; href: string; initial: string; color: string }> = [
+  { name: "Keycloak", href: "https://www.keycloak.org", initial: "K", color: "#008aaa" },
+  { name: "PostgreSQL", href: "https://www.postgresql.org", initial: "P", color: "#336791" },
+  { name: "S3 / MinIO", href: "https://min.io", initial: "M", color: "#c72e49" },
+  { name: "GitHub", href: "https://github.com", initial: "G", color: "#f0f6fc" },
+  { name: "Slack", href: "https://slack.com", initial: "S", color: "#611f69" },
+  { name: "Docker", href: "https://www.docker.com", initial: "D", color: "#2496ED" },
 ];
 
 function IntegrationCard({
   name,
   href,
-  slug,
+  initial,
+  color,
 }: {
   name: string;
   href: string;
-  slug: string;
+  initial: string;
+  color: string;
 }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
+      title={name}
       style={{
         display: "flex",
         alignItems: "center",
@@ -48,14 +53,26 @@ function IntegrationCard({
         e.currentTarget.style.background = "var(--surface)";
       }}
     >
-      <img
-        src={`https://cdn.simpleicons.org/${slug}/9fb0a4`}
-        alt=""
-        width={22}
-        height={22}
-        loading="lazy"
-        style={{ flexShrink: 0 }}
-      />
+      <span
+        aria-hidden="true"
+        style={{
+          width: 28,
+          height: 28,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: 8,
+          border: "1px solid",
+          borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
+          background: `color-mix(in srgb, ${color} 10%, var(--surface))`,
+          fontFamily: '"Geist Mono Variable", monospace',
+          fontSize: 12,
+          fontWeight: 800,
+          color: "var(--ink)",
+          flexShrink: 0,
+        }}
+      >
+        {initial}
+      </span>
       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>
         {name}
       </span>
@@ -64,11 +81,12 @@ function IntegrationCard({
 }
 
 export function Integrations() {
+  const { t } = useI18n();
   return (
     <Section
       id="integrations"
-      title="Works with the stack you already run"
-      lead="Self-hosted, standards-based, and deliberately boring about infrastructure: OIDC for identity, PostgreSQL for truth, S3-compatible object storage for evidence."
+      title={t("landing.integrations.title")}
+      lead={t("landing.integrations.lead")}
       className=""
     >
       <Reveal>

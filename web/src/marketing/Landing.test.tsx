@@ -103,4 +103,13 @@ describe("Landing marketing page", () => {
     expect(current.length).toBe(1);
     expect((current[0] as HTMLElement).style.background).toBe("var(--amber)");
   });
+
+  it("renders integrations as self-contained monogram tiles", () => {
+    renderLanding();
+    const integrations = document.getElementById("integrations");
+    expect(integrations).toBeTruthy();
+    expect(integrations!.querySelectorAll("img").length).toBe(0);
+    expect(integrations!.querySelectorAll("a").length).toBe(6);
+    expect(integrations!.textContent).toContain("Slack");
+  });
 });
