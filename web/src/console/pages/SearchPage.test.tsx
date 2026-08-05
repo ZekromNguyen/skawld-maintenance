@@ -24,7 +24,7 @@ function renderPage(initialEntry = "/search") {
   return render(
     <I18nProvider>
       <PrincipalProvider>
-        <SiteProvider principal={{ id: "p1", display_name: "T", site_ids: ["s1"], permissions: [] }}>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }}>
           <MemoryRouter initialEntries={[initialEntry]}>
             <SearchPage />
           </MemoryRouter>
