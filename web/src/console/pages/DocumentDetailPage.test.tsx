@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { DocumentDetailPage } from "./DocumentDetailPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { PrincipalProvider } from "../state/PrincipalProvider";
 import { api } from "../../api";
 
 vi.mock("../../api", () => ({
@@ -49,11 +50,13 @@ describe("DocumentDetailPage", () => {
   it("renders document title and revisions with approve action", async () => {
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter initialEntries={["/knowledge/doc1"]}>
           <Routes>
             <Route path="/knowledge/:documentId" element={<DocumentDetailPage />} />
           </Routes>
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     // Title appears in breadcrumb and topbar.

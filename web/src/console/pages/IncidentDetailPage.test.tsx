@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { IncidentDetailPage } from "./IncidentDetailPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { PrincipalProvider } from "../state/PrincipalProvider";
 
 vi.mock("../../api", () => ({
   api: {
@@ -32,11 +33,13 @@ describe("IncidentDetailPage", () => {
   it("renders incident summary, severity, and create-execution action", async () => {
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter initialEntries={["/incidents/inc1"]}>
           <Routes>
             <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
           </Routes>
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     expect(await screen.findByText("High vibration on pump")).toBeTruthy();

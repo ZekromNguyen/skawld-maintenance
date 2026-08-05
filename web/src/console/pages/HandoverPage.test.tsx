@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { HandoverPage } from "./HandoverPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { PrincipalProvider } from "../state/PrincipalProvider";
 
 vi.mock("../../api", () => {
   const draftHandover = {
@@ -48,9 +49,11 @@ describe("HandoverPage", () => {
   it("renders handover with submit transition for DRAFT", async () => {
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter>
           <HandoverPage />
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     expect(await screen.findByText("Shift overview")).toBeTruthy();

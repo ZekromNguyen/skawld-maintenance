@@ -10,6 +10,7 @@ const en = {
   "nav.workflows": "Learned workflows",
   "nav.quality": "AI quality & safety",
   "nav.signOut": "Sign out",
+  "nav.mainNavigation": "Main navigation",
 
   "nav.search": "Search",
   "nav.reports": "Reports",
@@ -29,6 +30,15 @@ const en = {
   "dashboard.assignedExecutions": "Assigned executions",
   "dashboard.pendingHandovers": "Pending handovers",
   "dashboard.tapToOpen": "Tap to open",
+
+  "executions.title": "Executions",
+  "executions.lead": "Every procedure execution across your sites, with live state and progress.",
+  "executions.empty": "No executions yet.",
+  "executions.state": "State",
+  "executions.incident": "Incident",
+  "executions.asset": "Asset",
+  "executions.progress": "Progress",
+  "executions.started": "Started",
 
   "assets.manufacturer": "Manufacturer",
   "assets.model": "Model",
@@ -97,6 +107,9 @@ const en = {
   "topbar.connecting": "Connecting…",
   "topbar.siteScope": "{count} site scope",
   "topbar.allSiteScope": "All site scope",
+  "topbar.searchPlaceholder": "Search assets, incidents, documents…",
+  "site.switcherLabel": "Site",
+  "site.allSites": "All sites",
 
   "pageTitle.overview": "Operations overview",
   "pageTitle.assets": "Asset knowledge",
@@ -106,6 +119,7 @@ const en = {
   "pageTitle.demonstrations": "Expert demonstrations",
   "pageTitle.workflows": "Learned workflow review",
   "pageTitle.quality": "AI quality and safety",
+  "pageTitle.executions": "Executions",
 
   "overview.registeredAssets": "Registered assets",
   "overview.openIncidents": "Open incidents",
@@ -503,6 +517,7 @@ const vi: Record<MessageKey, string> = {
   "nav.workflows": "Quy trình học được",
   "nav.quality": "Chất lượng và an toàn AI",
   "nav.signOut": "Đăng xuất",
+  "nav.mainNavigation": "Điều hướng chính",
 
   "nav.search": "Tìm kiếm",
   "nav.reports": "Báo cáo",
@@ -522,6 +537,15 @@ const vi: Record<MessageKey, string> = {
   "dashboard.assignedExecutions": "Công việc được giao",
   "dashboard.pendingHandovers": "Bàn giao chờ xử lý",
   "dashboard.tapToOpen": "Nhấn để mở",
+
+  "executions.title": "Thực hiện bảo trì",
+  "executions.lead": "Mọi quy trình thực hiện trên các địa điểm của bạn, kèm trạng thái và tiến độ trực tiếp.",
+  "executions.empty": "Chưa có quy trình thực hiện nào.",
+  "executions.state": "Trạng thái",
+  "executions.incident": "Sự cố",
+  "executions.asset": "Tài sản",
+  "executions.progress": "Tiến độ",
+  "executions.started": "Bắt đầu",
 
   "assets.manufacturer": "Nhà sản xuất",
   "assets.model": "Mẫu",
@@ -590,6 +614,9 @@ const vi: Record<MessageKey, string> = {
   "topbar.connecting": "Đang kết nối…",
   "topbar.siteScope": "Phạm vi {count} nhà máy",
   "topbar.allSiteScope": "Tất cả phạm vi nhà máy",
+  "topbar.searchPlaceholder": "Tìm tài sản, sự cố, tài liệu…",
+  "site.switcherLabel": "Địa điểm",
+  "site.allSites": "Tất cả địa điểm",
 
   "pageTitle.overview": "Tổng quan vận hành",
   "pageTitle.assets": "Kiến thức tài sản",
@@ -599,6 +626,7 @@ const vi: Record<MessageKey, string> = {
   "pageTitle.demonstrations": "Trình diễn chuyên gia",
   "pageTitle.workflows": "Xem xét quy trình học được",
   "pageTitle.quality": "Chất lượng và an toàn AI",
+  "pageTitle.executions": "Thực hiện bảo trì",
 
   "overview.registeredAssets": "Tài sản đã đăng ký",
   "overview.openIncidents": "Sự cố đang mở",

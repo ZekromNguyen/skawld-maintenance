@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "./DashboardPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { PrincipalProvider } from "../state/PrincipalProvider";
 import { api } from "../../api";
 
 vi.mock("../../api", () => ({
@@ -37,9 +38,11 @@ describe("DashboardPage", () => {
   it("renders the dashboard with open incident metrics", async () => {
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter>
           <DashboardPage />
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     expect(await screen.findByText("Operations overview")).toBeTruthy();
@@ -55,9 +58,11 @@ describe("DashboardPage", () => {
     });
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter>
           <DashboardPage />
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     // "Open incidents" appears in the shortcut card AND the overview metric.

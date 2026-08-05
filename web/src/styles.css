@@ -407,3 +407,16 @@ a:focus:not(:focus-visible) {
 .sort-button:hover { color: var(--ink); }
 tr[onclick] { cursor: pointer; }
 tr[onclick]:hover td { background: var(--raised); }
+
+/* ---------- Page header ---------- */
+.skip-link { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--surface); color: var(--ink); padding: 10px 16px; }
+.skip-link:focus { left: 16px; top: 16px; outline: 2px solid var(--brand); }
+.page-header { min-height: 92px; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+.page-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 0 12px; }
+.page-header-row h1 { margin: 0; }
+.page-header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.global-search { min-width: 200px; padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-input); background: var(--sunken); color: var(--ink); font-size: 12px; }
+.global-search:focus { outline: 1px solid var(--brand); border-color: var(--brand-dim); }
+.site-switcher { display: grid; gap: 3px; }
+.site-switcher select { padding: 6px 8px; border: 1px solid var(--line-soft); border-radius: var(--radius-input); background: var(--raised); color: var(--ink); font-size: 12px; }
+.section-lead { color: var(--ink-soft); font-size: 13px; line-height: 1.6; max-width: 70ch; margin: 0 0 16px; }

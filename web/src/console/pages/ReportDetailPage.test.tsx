@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ReportDetailPage } from "./ReportDetailPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { PrincipalProvider } from "../state/PrincipalProvider";
 import { api } from "../../api";
 
 vi.mock("../../api", () => ({
@@ -40,11 +41,13 @@ describe("ReportDetailPage", () => {
   it("renders report content with submit action for DRAFT", async () => {
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter initialEntries={["/reports/rp1"]}>
           <Routes>
             <Route path="/reports/:reportId" element={<ReportDetailPage />} />
           </Routes>
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     expect(await screen.findByText("Inspection found shaft alignment out of spec.")).toBeTruthy();
@@ -72,11 +75,13 @@ describe("ReportDetailPage", () => {
     });
     render(
       <I18nProvider>
+        <PrincipalProvider>
         <MemoryRouter initialEntries={["/reports/rp2"]}>
           <Routes>
             <Route path="/reports/:reportId" element={<ReportDetailPage />} />
           </Routes>
         </MemoryRouter>
+        </PrincipalProvider>
       </I18nProvider>,
     );
     expect(await screen.findByText("Approve")).toBeTruthy();
