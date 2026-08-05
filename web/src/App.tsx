@@ -16,6 +16,8 @@ import { EmptyRow } from "./console/components/EmptyRow";
 import { EvidenceLinks } from "./console/components/EvidenceLinks";
 import { AssetsPage } from "./console/pages/AssetsPage";
 import { AssetDetailPage } from "./console/pages/AssetDetailPage";
+import { IncidentsPage } from "./console/pages/IncidentsPage";
+import { IncidentDetailPage } from "./console/pages/IncidentDetailPage";
 import type {
   Asset,
   Demonstration,
@@ -50,8 +52,8 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/assets" element={<AssetsPage />} />
           <Route path="/assets/:assetId" element={<AssetDetailPage />} />
-          <Route path="/incidents" element={<PlaceholderPage titleKey="nav.incidents" />} />
-          <Route path="/incidents/:incidentId" element={<PlaceholderPage titleKey="nav.incidents" />} />
+          <Route path="/incidents" element={<IncidentsPage />} />
+          <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
           <Route path="/executions/:executionId" element={<PlaceholderPage titleKey="nav.executions" />} />
           <Route path="/reports" element={<PlaceholderPage titleKey="nav.reports" />} />
           <Route path="/reports/:reportId" element={<PlaceholderPage titleKey="nav.reports" />} />
@@ -93,40 +95,6 @@ const viewTitle: Record<View, MessageKey> = {
   workflows: "pageTitle.workflows",
   quality: "pageTitle.quality"
 };
-
-function IncidentQueue(props: {
-  incidents: Incident[];
-  selected?: Incident;
-  onSelect: (incident: Incident) => void;
-  onCreate: () => void;
-}) {
-  const { t, locale } = useI18n();
-  return (
-    <section className="queue panel">
-      <div className="panel-heading">
-        <div><span className="eyebrow">{t("incidents.authorizedScope")}</span><h2>{t("incidents.queue")}</h2></div>
-        <div className="heading-actions"><span className="count">{props.incidents.length}</span><button className="secondary-button" onClick={props.onCreate}>{t("incidents.new")}</button></div>
-      </div>
-      <div className="queue-list">
-        {props.incidents.map((incident) => (
-          <button
-            key={incident.id}
-            className={props.selected?.id === incident.id ? "queue-item selected" : "queue-item"}
-            onClick={() => props.onSelect(incident)}
-          >
-            <span className={`severity-bar ${severityTone(incident.severity)}`} />
-            <span>
-              <span className="queue-meta"><span className="mono">{incident.number}</span><span>{relativeTime(incident.detected_at, locale)}</span></span>
-              <strong>{incident.asset_tag} · {incident.summary}</strong>
-              <small>{incident.state.replace("_", " ")} · {incident.severity}</small>
-            </span>
-          </button>
-        ))}
-        {props.incidents.length === 0 && <div className="empty">{t("incidents.none")}</div>}
-      </div>
-    </section>
-  );
-}
 
 function ExecutionPanel(props: {
   incident?: Incident;
@@ -403,43 +371,6 @@ function MeasurementForm(props: {
       <label>{t("measurement.value")}<input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} /></label>
       <label>{t("measurement.unit")}<input value={unit} readOnly /></label>
       <button className="secondary-button" disabled={props.busy}>{t("measurement.recordButton")}</button>
-    </form>
-  );
-}
-
-function CreateIncidentForm(props: {
-  assets: Asset[];
-  busy: boolean;
-  onCancel: () => void;
-  onCreate: (value: {
-    site_id: string;
-    asset_id: string;
-    summary: string;
-    severity: string;
-  }) => Promise<void>;
-}) {
-  const { t } = useI18n();
-  const [assetID, setAssetID] = useState(props.assets[0]?.id ?? "");
-  const [summary, setSummary] = useState("High vibration");
-  const [severity, setSeverity] = useState("HIGH");
-  const asset = props.assets.find((item) => item.id === assetID);
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!asset) return;
-    void props.onCreate({
-      site_id: asset.site_id,
-      asset_id: asset.id,
-      summary,
-      severity
-    });
-  }
-  return (
-    <form className="command-form panel incident-command" onSubmit={submit}>
-      <div><span className="eyebrow">{t("form.abnormalCondition")}</span><h2>{t("form.createIncident")}</h2></div>
-      <label>{t("form.asset")}<select value={assetID} onChange={(event) => setAssetID(event.target.value)} required><option value="" disabled>{t("form.selectAsset")}</option>{props.assets.map((item) => <option key={item.id} value={item.id}>{item.tag} · {item.name}</option>)}</select></label>
-      <label>{t("form.summary")}<input value={summary} onChange={(event) => setSummary(event.target.value)} required /></label>
-      <label>{t("form.severity")}<select value={severity} onChange={(event) => setSeverity(event.target.value)}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>{t("form.cancel")}</button><button className="primary-button" disabled={props.busy || !asset}>{t("form.create")}</button></div>
     </form>
   );
 }

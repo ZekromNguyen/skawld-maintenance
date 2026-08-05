@@ -37,6 +37,16 @@ const en = {
   "asset.productionImpact": "Production impact",
   "asset.approveCriticality": "Approve criticality",
 
+  "incident.state": "State",
+  "incident.asset": "Asset",
+  "incident.detected": "Detected",
+  "incident.createExecution": "Create execution",
+  "incident.resolve": "Resolve incident",
+  "incident.executions": "Executions",
+  "incident.purpose": "Purpose",
+  "incident.openInWorkbench": "Open workbench",
+  "incident.noExecutions": "No executions for this incident yet.",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -321,6 +331,16 @@ const vi: Record<MessageKey, string> = {
   "asset.safetyImpact": "Ảnh hưởng an toàn",
   "asset.productionImpact": "Ảnh hưởng sản xuất",
   "asset.approveCriticality": "Duyệt mức độ quan trọng",
+
+  "incident.state": "Trạng thái",
+  "incident.asset": "Tài sản",
+  "incident.detected": "Phát hiện",
+  "incident.createExecution": "Tạo công việc thực hiện",
+  "incident.resolve": "Giải quyết sự cố",
+  "incident.executions": "Công việc thực hiện",
+  "incident.purpose": "Mục đích",
+  "incident.openInWorkbench": "Mở bàn làm việc",
+  "incident.noExecutions": "Chưa có công việc thực hiện cho sự cố này.",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
