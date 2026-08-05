@@ -30,6 +30,13 @@ const en = {
   "dashboard.pendingHandovers": "Pending handovers",
   "dashboard.tapToOpen": "Tap to open",
 
+  "assets.manufacturer": "Manufacturer",
+  "assets.model": "Model",
+  "asset.criticality": "Approved criticality",
+  "asset.safetyImpact": "Safety impact",
+  "asset.productionImpact": "Production impact",
+  "asset.approveCriticality": "Approve criticality",
+
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
   "sidebar.noControl": "No machinery control or permit authority.",
@@ -307,6 +314,13 @@ const vi: Record<MessageKey, string> = {
   "dashboard.assignedExecutions": "Công việc được giao",
   "dashboard.pendingHandovers": "Bàn giao chờ xử lý",
   "dashboard.tapToOpen": "Nhấn để mở",
+
+  "assets.manufacturer": "Nhà sản xuất",
+  "assets.model": "Mẫu",
+  "asset.criticality": "Mức độ quan trọng đã duyệt",
+  "asset.safetyImpact": "Ảnh hưởng an toàn",
+  "asset.productionImpact": "Ảnh hưởng sản xuất",
+  "asset.approveCriticality": "Duyệt mức độ quan trọng",
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",

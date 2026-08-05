@@ -14,6 +14,8 @@ import { DemonstrationsPage } from "./console/pages/DemonstrationsPage";
 import { WorkflowsPage } from "./console/pages/WorkflowsPage";
 import { EmptyRow } from "./console/components/EmptyRow";
 import { EvidenceLinks } from "./console/components/EvidenceLinks";
+import { AssetsPage } from "./console/pages/AssetsPage";
+import { AssetDetailPage } from "./console/pages/AssetDetailPage";
 import type {
   Asset,
   Demonstration,
@@ -46,8 +48,8 @@ export function App() {
       <Routes>
         <Route element={<ConsoleLayout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/assets" element={<PlaceholderPage titleKey="nav.assets" />} />
-          <Route path="/assets/:assetId" element={<PlaceholderPage titleKey="nav.assets" />} />
+          <Route path="/assets" element={<AssetsPage />} />
+          <Route path="/assets/:assetId" element={<AssetDetailPage />} />
           <Route path="/incidents" element={<PlaceholderPage titleKey="nav.incidents" />} />
           <Route path="/incidents/:incidentId" element={<PlaceholderPage titleKey="nav.incidents" />} />
           <Route path="/executions/:executionId" element={<PlaceholderPage titleKey="nav.executions" />} />
@@ -91,39 +93,6 @@ const viewTitle: Record<View, MessageKey> = {
   workflows: "pageTitle.workflows",
   quality: "pageTitle.quality"
 };
-
-function AssetsTable({ assets, onCreate }: { assets: Asset[]; onCreate: () => void }) {
-  const { t } = useI18n();
-  return (
-    <section className="panel">
-      <div className="panel-heading">
-        <div>
-          <span className="eyebrow">{t("assets.sourceAwareRegistry")}</span>
-          <h2>{t("assets.title")}</h2>
-        </div>
-        <div className="heading-actions"><span className="count">{t("assets.count", { count: assets.length })}</span><button className="secondary-button" onClick={onCreate}>{t("assets.add")}</button></div>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>{t("assets.tag")}</th><th>{t("assets.asset")}</th><th>{t("assets.class")}</th><th>{t("assets.criticality")}</th><th>{t("assets.authority")}</th><th>{t("assets.status")}</th></tr></thead>
-          <tbody>
-            {assets.map((asset) => (
-              <tr key={asset.id}>
-                <td className="mono strong">{asset.tag}</td>
-                <td><strong>{asset.name}</strong><small>{[asset.manufacturer, asset.model].filter(Boolean).join(" · ") || t("assets.noOem")}</small></td>
-                <td>{asset.class}</td>
-                <td><span className={`criticality rating-${asset.criticality?.rating ?? "none"}`}>{asset.criticality?.rating ?? "—"}</span></td>
-                <td><span className="source-badge">{asset.source_of_truth === "EXTERNAL_REFERENCE" ? t("assets.externalProjection") : t("assets.skawldNative")}</span></td>
-                <td><span className="status-dot" />{asset.status}</td>
-              </tr>
-            ))}
-            {assets.length === 0 && <EmptyRow columns={6} labelKey="assets.empty" />}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
 
 function IncidentQueue(props: {
   incidents: Incident[];
@@ -434,42 +403,6 @@ function MeasurementForm(props: {
       <label>{t("measurement.value")}<input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} /></label>
       <label>{t("measurement.unit")}<input value={unit} readOnly /></label>
       <button className="secondary-button" disabled={props.busy}>{t("measurement.recordButton")}</button>
-    </form>
-  );
-}
-
-function CreateAssetForm(props: {
-  siteID?: string;
-  busy: boolean;
-  onCancel: () => void;
-  onCreate: (value: {
-    site_id: string;
-    tag: string;
-    name: string;
-    class: string;
-  }) => Promise<void>;
-}) {
-  const { t } = useI18n();
-  const [tag, setTag] = useState("P-302");
-  const [name, setName] = useState("Process Pump P-302");
-  const [assetClass, setAssetClass] = useState("CENTRIFUGAL_PUMP");
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!props.siteID) return;
-    void props.onCreate({
-      site_id: props.siteID,
-      tag,
-      name,
-      class: assetClass
-    });
-  }
-  return (
-    <form className="command-form panel" onSubmit={submit}>
-      <div><span className="eyebrow">{t("form.lightweightNative")}</span><h2>{t("form.createAsset")}</h2></div>
-      <label>{t("form.tag")}<input value={tag} onChange={(event) => setTag(event.target.value)} required /></label>
-      <label>{t("form.name")}<input value={name} onChange={(event) => setName(event.target.value)} required /></label>
-      <label>{t("form.classLabel")}<input value={assetClass} onChange={(event) => setAssetClass(event.target.value)} required /></label>
-      <div className="form-actions"><button type="button" className="secondary-button" onClick={props.onCancel}>{t("form.cancel")}</button><button className="primary-button" disabled={props.busy || !props.siteID}>{t("form.create")}</button></div>
     </form>
   );
 }
