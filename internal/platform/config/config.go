@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Role string
@@ -52,6 +54,13 @@ type Auth struct {
 	CookieSecure      bool
 	SessionTTL        time.Duration
 	BootstrapSubjects []string
+	// EmailDomainAllowlist restricts federated (Google / Microsoft Entra)
+	// sign-in to company accounts whose email domain is listed. Empty means
+	// the gate is disabled. Bootstrap and seeded principals are exempt.
+	EmailDomainAllowlist []string
+	// FederatedOrgID is the organization federated users are provisioned
+	// into when they carry a valid skawld_role claim.
+	FederatedOrgID string
 }
 
 type Jobs struct {
@@ -107,6 +116,8 @@ func Load(role Role) (Config, error) {
 			CookieSecure:      envBool("SESSION_COOKIE_SECURE", true),
 			SessionTTL:        envDuration("SESSION_TTL", 8*time.Hour),
 			BootstrapSubjects: envCSV("BOOTSTRAP_OIDC_SUBJECTS"),
+			EmailDomainAllowlist: envCSV("EMAIL_DOMAIN_ALLOWLIST"),
+			FederatedOrgID:     env("FEDERATED_ORG_ID", ""),
 		},
 		Jobs: Jobs{
 			EmbeddingConcurrency:     envInt("JOB_CONCURRENCY_EMBEDDING", 5),
@@ -182,6 +193,13 @@ func (c Config) Validate() error {
 		}
 		if c.Environment != "development" && c.Environment != "test" && !c.Auth.CookieSecure {
 			errs = append(errs, errors.New("SESSION_COOKIE_SECURE must be true outside development/test"))
+		}
+		if len(c.Auth.EmailDomainAllowlist) > 0 {
+			if strings.TrimSpace(c.Auth.FederatedOrgID) == "" {
+				errs = append(errs, errors.New("FEDERATED_ORG_ID is required when EMAIL_DOMAIN_ALLOWLIST is set"))
+			} else if _, err := uuid.Parse(c.Auth.FederatedOrgID); err != nil {
+				errs = append(errs, errors.New("FEDERATED_ORG_ID must be a valid UUID"))
+			}
 		}
 	}
 	if c.Auth.SessionTTL <= 0 {

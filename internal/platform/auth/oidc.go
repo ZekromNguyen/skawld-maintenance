@@ -20,6 +20,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// discoveryClient is a bounded HTTP client dedicated to OIDC discovery
+// lookups so boot does not block indefinitely if the identity provider is
+// slow or unreachable. The borrow happens after oidc.NewProvider has already
+// fetched the same document; this is a defense-in-depth for that second call.
+var discoveryClient = &http.Client{Timeout: 10 * time.Second}
+
 // discoverEndSessionEndpoint resolves the provider's RP-initiated logout
 // endpoint from the OIDC discovery document. It is a separate fetch because
 // the go-oidc library keeps raw discovery claims unexported.
@@ -33,7 +39,7 @@ func discoverEndSessionEndpoint(ctx context.Context, issuer string) (string, err
 	if err != nil {
 		return "", fmt.Errorf("build discovery request: %w", err)
 	}
-	response, err := http.DefaultClient.Do(request)
+	response, err := discoveryClient.Do(request)
 	if err != nil {
 		return "", fmt.Errorf("fetch OIDC discovery document: %w", err)
 	}
@@ -59,16 +65,52 @@ type Service struct {
 	endSessionURL     string
 	webVerifier       *oidc.IDTokenVerifier
 	bearerVerifier    *oidc.IDTokenVerifier
-	repository        Repository
+	repository        sessionRepository
 	clock             clock.Clock
 	logger            *slog.Logger
 	bootstrapSubjects map[string]struct{}
 }
 
+// sessionRepository captures the storage operations the OIDC service needs.
+// The concrete Repository struct satisfies it; tests may substitute a fake.
+type sessionRepository interface {
+	// SaveFlow persists a single-use OAuth state and its PKCE/nonce/return-to.
+	SaveFlow(ctx context.Context, state string, flow Flow) error
+	// ConsumeFlow atomically reads and deletes a state, returning its data.
+	ConsumeFlow(ctx context.Context, state string) (Flow, error)
+	// ResolvePrincipal upserts the principal for an OIDC subject and loads
+	// its memberships for the session's owning organization.
+	ResolvePrincipal(
+		ctx context.Context,
+		claims IdentityClaims,
+		bootstrapSubjects map[string]struct{},
+	) (domain.Principal, error)
+	// CreateSession inserts a new web session keyed by a hashed token.
+	CreateSession(
+		ctx context.Context,
+		token string,
+		principalID string,
+		expiresAt time.Time,
+		idToken string,
+	) error
+	// PrincipalForSession loads the principal for an active session token.
+	PrincipalForSession(
+		ctx context.Context,
+		token string,
+		bootstrapSubjects map[string]struct{},
+	) (domain.Principal, error)
+	// SessionIDToken returns the id_token bound to an active session so it
+	// can be forwarded as id_token_hint at RP-initiated logout.
+	SessionIDToken(ctx context.Context, token string) (string, error)
+	// RevokeSession marks a session revoked without deleting the row, so any
+	// last-known-good state is preserved for audit.
+	RevokeSession(ctx context.Context, token string) error
+}
+
 func New(
 	ctx context.Context,
 	cfg config.Auth,
-	repository Repository,
+	repository sessionRepository,
 	systemClock clock.Clock,
 	logger *slog.Logger,
 ) (*Service, error) {
@@ -233,7 +275,13 @@ func (s *Service) Logout(w http.ResponseWriter, r *http.Request) {
 		if loaded, loadErr := s.repository.SessionIDToken(r.Context(), cookie.Value); loadErr == nil {
 			idToken = loaded
 		}
-		_ = s.repository.RevokeSession(r.Context(), cookie.Value)
+		if err := s.repository.RevokeSession(r.Context(), cookie.Value); err != nil {
+			// Log but do not abort the handshake: the user's cookie is being
+			// cleared regardless, so a transient DB failure must not leave
+			// them stranded. The session row remains valid until it expires
+			// and will be visible in any session-audit query.
+			s.logger.Error("revoke web session", "error", err)
+		}
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.config.CookieName,
@@ -315,6 +363,7 @@ func claimsFromToken(token *oidc.IDToken) (tokenClaims, error) {
 		PreferredUsername string `json:"preferred_username"`
 		Email             string `json:"email"`
 		Nonce             string `json:"nonce"`
+		Role              string `json:"skawld_role"`
 	}
 	if err := token.Claims(&raw); err != nil {
 		return tokenClaims{}, fmt.Errorf("decode identity claims: %w", err)
@@ -331,6 +380,7 @@ func claimsFromToken(token *oidc.IDToken) (tokenClaims, error) {
 			Subject:     raw.Subject,
 			DisplayName: name,
 			Email:       raw.Email,
+			Role:        raw.Role,
 		},
 		Nonce: raw.Nonce,
 	}, nil

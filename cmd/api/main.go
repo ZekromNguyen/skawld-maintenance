@@ -66,7 +66,13 @@ func main() {
 
 	systemClock := clock.System{}
 	idGenerator := id.UUID{}
-	authRepository := auth.Repository{Pool: pool, IDs: idGenerator, Clock: systemClock}
+	authRepository := auth.Repository{
+		Pool:                 pool,
+		IDs:                  idGenerator,
+		Clock:                systemClock,
+		EmailDomainAllowlist: cfg.Auth.EmailDomainAllowlist,
+		FederatedOrgID:       cfg.Auth.FederatedOrgID,
+	}
 	authService, err := auth.New(ctx, cfg.Auth, authRepository, systemClock, logger)
 	if err != nil {
 		logger.Error("OIDC startup failed", "error", err)
