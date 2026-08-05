@@ -11,7 +11,9 @@ import (
 
 func mountExecutionRoutes(router chi.Router, service executionapp.Service) {
 	router.Get("/executions", listExecutions(service))
-	router.Get("/executions/{executionID}", getExecution(service))
+	// Register the subrouter first, then the exact-path GET handler. chi
+	// treats a Route() at the same pattern as owning that node; adding the
+	// Get handler afterward keeps both the subroutes and the detail GET.
 	router.Route("/executions/{executionID}", func(route chi.Router) {
 		route.Post("/start", startExecution(service))
 		route.Post("/prerequisite-verifications", verifyPrerequisite(service))
@@ -22,6 +24,7 @@ func mountExecutionRoutes(router chi.Router, service executionapp.Service) {
 		route.Post("/decisions", recordDecision(service))
 		route.Post("/complete", completeExecution(service))
 	})
+	router.Get("/executions/{executionID}", getExecution(service))
 }
 
 func listExecutions(service executionapp.Service) http.HandlerFunc {

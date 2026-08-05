@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * useApi: fetch wrapper with data/loading/error + refetch. The fetcher must
- * be stable (wrap in useCallback) to avoid refetch loops.
+ * useApi: fetch wrapper with data/loading/error + refetch.
+ * The fetcher may be an inline closure: it is held in a ref so the effect
+ * runs once on mount and once per refetch, never on every render.
  */
 export function useApi<T>(fetcher: () => Promise<T>) {
+  const fetcherRef = useRef(fetcher);
+  fetcherRef.current = fetcher;
   const [data, setData] = useState<T | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [tick, setTick] = useState(0);
 
-  const load = useCallback(() => {
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(undefined);
-    fetcher()
+    fetcherRef
+      .current()
       .then((value) => {
         if (!cancelled) setData(value);
       })
@@ -26,9 +31,9 @@ export function useApi<T>(fetcher: () => Promise<T>) {
     return () => {
       cancelled = true;
     };
-  }, [fetcher]);
+  }, [tick]);
 
-  useEffect(() => load(), [load]);
+  const refetch = useCallback(() => setTick((n) => n + 1), []);
 
-  return { data, loading, error, refetch: load };
+  return { data, loading, error, refetch };
 }

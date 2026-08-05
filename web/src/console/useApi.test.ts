@@ -18,4 +18,17 @@ describe("useApi", () => {
     await waitFor(() => expect(result.current.error).toBe("boom"));
     expect(result.current.loading).toBe(false);
   });
+
+  it("does not refetch on every render (inline closure safe)", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    const { result, rerender } = renderHook(({ f }) => useApi(f), {
+      initialProps: { f: fetcher }
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const callsAfterLoad = fetcher.mock.calls.length;
+    rerender({ f: vi.fn().mockResolvedValue({ ok: true }) });
+    rerender({ f: vi.fn().mockResolvedValue({ ok: true }) });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetcher.mock.calls.length).toBe(callsAfterLoad);
+  });
 });
