@@ -1,5 +1,7 @@
 import { Reveal } from "./shared/Reveal";
 import { Button } from "./shared/Button";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 
 /**
  * InstrumentPanel: the hero visual. A live product-shaped composition of
@@ -8,6 +10,7 @@ import { Button } from "./shared/Button";
  * the operator console renders, simplified for a marketing context.
  */
 function InstrumentPanel() {
+  const { t } = useI18n();
   const stepBar = (
     state: "done" | "current" | "pending" | "gate",
     label: string,
@@ -45,7 +48,7 @@ function InstrumentPanel() {
   return (
     <div
       role="img"
-      aria-label="Skawld workflow panel: a pump incident execution with completed LOTO steps, an in-progress inspection step, and evidence-backed guidance."
+      aria-label={t("landing.hero.panelAria")}
       style={{
         border: "1px solid var(--line)",
         borderRadius: 16,
@@ -64,15 +67,28 @@ function InstrumentPanel() {
           borderBottom: "1px solid var(--line)",
         }}
       >
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--ink)",
-            letterSpacing: "0.01em",
-          }}
-        >
-          P-302 · Circulation pump inspection
+        <span style={{ display: "grid", gap: 2 }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontFamily: '"Geist Mono Variable", monospace',
+              color: "var(--brand)",
+              textTransform: "uppercase",
+              letterSpacing: "0.14em",
+            }}
+          >
+            {t("landing.hero.panelLabel")}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--ink)",
+              letterSpacing: "0.01em",
+            }}
+          >
+            {t("landing.hero.panelTitle")}
+          </span>
         </span>
         <span
           style={{
@@ -85,7 +101,7 @@ function InstrumentPanel() {
             borderRadius: 999,
           }}
         >
-          EXECUTION IN PROGRESS
+          {t("landing.hero.panelStatus")}
         </span>
       </div>
 
@@ -109,7 +125,7 @@ function InstrumentPanel() {
               marginBottom: 6,
             }}
           >
-            Copilot recommendation · advisory
+            {t("landing.hero.recommendationLabel")}
           </div>
           <p
             style={{
@@ -119,8 +135,7 @@ function InstrumentPanel() {
               color: "var(--ink)",
             }}
           >
-            Rotor shaft alignment is 0.05 mm out of spec. Review the two cited
-            SOP revisions before proceeding.
+            {t("landing.hero.recommendationBody")}
           </p>
           <div
             style={{
@@ -132,9 +147,9 @@ function InstrumentPanel() {
               color: "var(--ink-muted)",
             }}
           >
-            <span>evidence · 3 sources</span>
-            <span>confidence · 0.94</span>
-            <span>requires human confirmation</span>
+            <span>{t("landing.hero.evidence")}</span>
+            <span>{t("landing.hero.confidence")}</span>
+            <span>{t("landing.hero.requiresConfirmation")}</span>
           </div>
         </div>
 
@@ -148,11 +163,11 @@ function InstrumentPanel() {
             gap: 10,
           }}
         >
-          {stepBar("done", "LOTO applied · energy isolated")}
-          {stepBar("done", "Torque values recorded · 8.1 mm/s vibration")}
-          {stepBar("gate", "LOTO verification gate · supervisor sign-off")}
-          {stepBar("current", "Inspection step 4 · in progress")}
-          {stepBar("pending", "Report and handover")}
+          {stepBar("done", t("landing.hero.step.lotoApplied"))}
+          {stepBar("done", t("landing.hero.step.torqueRecorded"))}
+          {stepBar("gate", t("landing.hero.step.lotoGate"))}
+          {stepBar("current", t("landing.hero.step.inspection"))}
+          {stepBar("pending", t("landing.hero.step.report"))}
         </div>
 
         {/* Metrics row */}
@@ -164,9 +179,9 @@ function InstrumentPanel() {
           }}
         >
           {[
-            ["8.1", "mm/s vibration"],
-            ["94", "°C bearing temp"],
-            ["0.94", "evidence score"],
+            ["8.1", t("landing.hero.metric.vibration")],
+            ["94", t("landing.hero.metric.bearingTemp")],
+            ["0.94", t("landing.hero.metric.evidenceScore")],
           ].map(([value, label]) => (
             <div
               key={label}
@@ -199,7 +214,87 @@ function InstrumentPanel() {
             </div>
           ))}
         </div>
+        <div
+          style={{
+            fontSize: 9.5,
+            fontFamily: '"Geist Mono Variable", monospace',
+            color: "var(--ink-muted)",
+            borderLeft: "1px solid var(--callout-line)",
+            paddingLeft: 8,
+            lineHeight: 1.5,
+          }}
+        >
+          {t("landing.hero.callout")}
+        </div>
       </div>
+    </div>
+  );
+}
+
+const PHASES: Array<{ labelKey: MessageKey; state: "done" | "current" | "pending" }> = [
+  { labelKey: "landing.phase.capture", state: "done" },
+  { labelKey: "landing.phase.review", state: "done" },
+  { labelKey: "landing.phase.publish", state: "current" },
+  { labelKey: "landing.phase.assist", state: "pending" },
+  { labelKey: "landing.phase.verify", state: "pending" },
+];
+
+/** ProcedureMeter: the page's signature. The product's real workflow states
+ * on a single rail, with the executing phase lit (same grammar as the bento
+ * peek cell and the workflow rail). */
+function ProcedureMeter() {
+  const { t } = useI18n();
+  return (
+    <div
+      className="hero-meter"
+      role="group"
+      aria-label={t("landing.hero.panelAria")}
+      style={{ marginTop: 40, display: "flex", alignItems: "flex-start", gap: 0 }}
+    >
+      {PHASES.map((phase, index) => {
+        const isCurrent = phase.state === "current";
+        return (
+          <div
+            key={phase.labelKey}
+            style={{ display: "flex", alignItems: "center", gap: 0, flex: 1, minWidth: 0 }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <span
+                data-current={isCurrent}
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  background: isCurrent
+                    ? "var(--amber)"
+                    : phase.state === "done"
+                      ? "var(--brand)"
+                      : "var(--line-soft)",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontFamily: '"Geist Mono Variable", monospace',
+                  color: isCurrent ? "var(--ink)" : phase.state === "done" ? "var(--ink-soft)" : "var(--ink-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t(phase.labelKey)}
+              </span>
+            </div>
+            {index < PHASES.length - 1 ? (
+              <span
+                aria-hidden="true"
+                style={{ flex: 1, height: 1, background: "var(--line)", margin: "0 10px", marginTop: 6 }}
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -209,14 +304,31 @@ function InstrumentPanel() {
  * right instrument panel. Max 4 text elements, no version labels.
  */
 export function Hero() {
+  const { t } = useI18n();
   return (
     <section
       style={{
+        position: "relative",
         paddingTop: "clamp(64px, 8vw, 96px)",
         paddingBottom: "clamp(48px, 6vw, 72px)",
       }}
     >
-      <div className="container hero-grid">
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          backgroundImage:
+            "linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage:
+            "radial-gradient(ellipse 70% 55% at 50% 0%, black 25%, transparent 72%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 70% 55% at 50% 0%, black 25%, transparent 72%)",
+        }}
+      />
+      <div className="container hero-grid" style={{ position: "relative" }}>
         <Reveal>
           <div style={{ maxWidth: 560 }}>
             <h1
@@ -229,8 +341,7 @@ export function Hero() {
                 marginBottom: 22,
               }}
             >
-              Capture how your best technicians work. Then help every
-              technician work like them.
+              {t("landing.hero.title")}
             </h1>
             <p
               style={{
@@ -241,9 +352,7 @@ export function Hero() {
                 marginBottom: 30,
               }}
             >
-              Skawld turns expert work into reviewed, reusable workflows, and
-              gives every technician evidence-backed guidance. Human authority
-              stays in control.
+              {t("landing.hero.subtitle")}
             </p>
             <div
               style={{
@@ -253,11 +362,12 @@ export function Hero() {
                 alignItems: "center",
               }}
             >
-              <Button href="/auth/login">Book a pilot</Button>
+              <Button href="/auth/login">{t("landing.bookPilot")}</Button>
               <Button href="#features" variant="ghost">
-                See how it works
+                {t("landing.hero.seeHowItWorks")}
               </Button>
             </div>
+            <ProcedureMeter />
           </div>
         </Reveal>
         <Reveal delay={120}>

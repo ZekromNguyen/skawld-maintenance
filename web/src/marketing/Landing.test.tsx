@@ -1,10 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { I18nProvider } from "../i18n/I18nProvider";
 import { Landing } from "./Landing";
 
+function renderLanding() {
+  return render(
+    <I18nProvider>
+      <Landing />
+    </I18nProvider>
+  );
+}
+
 describe("Landing marketing page", () => {
-  it("renders hero value proposition and primary CTA", () => {
-    render(<Landing />);
+  it("renders hero value proposition and primary CTA in English by default", () => {
+    renderLanding();
     expect(
       screen.getByRole("heading", {
         level: 1,
@@ -15,7 +24,7 @@ describe("Landing marketing page", () => {
   });
 
   it("renders all major sections", () => {
-    render(<Landing />);
+    renderLanding();
     const sections = [
       "features",
       "workflow",
@@ -31,7 +40,7 @@ describe("Landing marketing page", () => {
   });
 
   it("renders FAQ answers when opened", () => {
-    render(<Landing />);
+    renderLanding();
     // StrictMode double-renders in test env, so the button may appear twice.
     const firstQuestion = screen.getAllByRole("button", {
       name: /what does a skawld pilot actually involve/i,
@@ -41,5 +50,57 @@ describe("Landing marketing page", () => {
       /a bounded scope: one site or one pump line/i,
     );
     expect(answers.length).toBeGreaterThan(0);
+  });
+
+  it("switches the whole page to Vietnamese and back", () => {
+    renderLanding();
+    const select = screen.getByLabelText(/language/i) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "vi" } });
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: /ghi lại cách những kỹ thuật viên giỏi nhất của bạn làm việc/i,
+      }),
+    ).toBeTruthy();
+    expect(screen.getAllByText("Đặt lịch thí điểm").length).toBeGreaterThan(0);
+
+    fireEvent.change(select, { target: { value: "en" } });
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: /capture how your best technicians work/i,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("translates FAQ content when Vietnamese is selected", () => {
+    renderLanding();
+    const select = screen.getByLabelText(/language/i) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "vi" } });
+    const firstQuestion = screen.getAllByRole("button", {
+      name: /thí điểm skawld thực sự bao gồm những gì/i,
+    })[0];
+    firstQuestion.click();
+    const answers = screen.getAllByText(
+      /một phạm vi giới hạn: một địa điểm hoặc một dây bơm/i,
+    );
+    expect(answers.length).toBeGreaterThan(0);
+    fireEvent.change(select, { target: { value: "en" } });
+  });
+
+  it("shows exactly one P-302 tag in the hero panel header", () => {
+    renderLanding();
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "en" } });
+    expect(document.body.textContent).not.toContain("P-302 · P-302");
+    expect(screen.getByText("Work order")).toBeTruthy();
+    expect(screen.getByText("P-302 · Circulation pump inspection")).toBeTruthy();
+  });
+
+  it("renders the procedure meter with exactly one current phase", () => {
+    renderLanding();
+    const current = document.querySelectorAll('.hero-meter [data-current="true"]');
+    expect(current.length).toBe(1);
+    expect((current[0] as HTMLElement).style.background).toBe("var(--amber)");
   });
 });

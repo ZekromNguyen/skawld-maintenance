@@ -20,6 +20,8 @@
   --amber: #f0b35a;
   --red: #e0665a;
   --blue: #7fb3e0;
+  --grid-line: color-mix(in srgb, var(--brand) 7%, transparent);
+  --callout-line: var(--line-soft);
 }
 
 @media (prefers-color-scheme: light) {
