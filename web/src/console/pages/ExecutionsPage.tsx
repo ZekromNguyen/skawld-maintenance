@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
@@ -14,15 +15,37 @@ const EXECUTION_TONE: Record<string, Tone> = {
   COMPLETED: "success",
 };
 
+type StateFilter = "ALL" | "IN_PROGRESS" | "ASSIGNED" | "COMPLETED";
+const STATE_FILTERS: StateFilter[] = ["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLETED"];
+
 export function ExecutionsPage() {
   const { t } = useI18n();
   const executions = useQuery(() => api.listExecutions().then((list) => list.items));
+  const [filter, setFilter] = useState<StateFilter>("ALL");
+
+  const rows = useMemo(() => {
+    const items = executions.data ?? [];
+    return filter === "ALL" ? items : items.filter((execution) => execution.state === filter);
+  }, [executions.data, filter]);
 
   return (
     <PageTrailProvider trail={[]}>
       <section>
         <PageHeader title={t("pageTitle.executions")} />
         <p className="section-lead">{t("executions.lead")}</p>
+        <div className="incident-tabs" role="tablist" aria-label={t("executions.state")}>
+          {STATE_FILTERS.map((state) => (
+            <button
+              key={state}
+              role="tab"
+              aria-selected={filter === state}
+              className={`tab${filter === state ? " active" : ""}`}
+              onClick={() => setFilter(state)}
+            >
+              {state === "ALL" ? t("incidents.tabs.all") : state.replace("_", " ")}
+            </button>
+          ))}
+        </div>
         <DataTable<Execution>
           columns={[
             {
@@ -75,7 +98,7 @@ export function ExecutionsPage() {
               sortValue: (e) => e.steps?.filter((s) => s.state === "COMPLETED").length ?? 0,
             },
           ]}
-          rows={executions.data ?? []}
+          rows={rows}
           rowKey={(execution) => execution.id}
           emptyTitle={t("executions.empty")}
           loading={executions.loading}
