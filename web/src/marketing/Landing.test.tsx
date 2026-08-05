@@ -137,4 +137,10 @@ describe("Landing marketing page", () => {
     const workflowTitle = document.querySelector("#workflow h3") as HTMLElement;
     expect(workflowTitle.style.fontSize).toBe("20px");
   });
+
+  it("links the API spec to /openapi.yaml", () => {
+    renderLanding();
+    const specLink = screen.getByRole("link", { name: /read the api spec/i });
+    expect(specLink.getAttribute("href")).toBe("/openapi.yaml");
+  });
 });

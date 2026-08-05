@@ -37,6 +37,7 @@ package-backend-desktop:
 	go run ./tools/package -version "$${VERSION:-dev}" -platforms windows,darwin -clean
 
 web-check:
+	cp api/openapi.yaml web/public/openapi.yaml
 	cd web && npm ci && npm run lint && npm test && npm run build
 
 mobile-check:

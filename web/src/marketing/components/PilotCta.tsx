@@ -1,21 +1,39 @@
 import { Reveal } from "./shared/Reveal";
 import { Button } from "./shared/Button";
+import { useI18n } from "../../i18n/I18nProvider";
 
 /**
  * PilotCta: full-width conversion band. Single CTA intent ("Book a pilot"),
  * consistent with the header and hero. No duplicate labels on the page.
  */
 export function PilotCta() {
+  const { t } = useI18n();
   return (
     <section
       style={{
+        position: "relative",
         paddingBlock: "clamp(72px, 9vw, 120px)",
         borderTop: "1px solid var(--line)",
         background:
           "linear-gradient(180deg, var(--bg) 0%, color-mix(in srgb, var(--brand) 6%, var(--bg)) 100%)",
       }}
     >
-      <div className="container">
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          backgroundImage:
+            "linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage:
+            "radial-gradient(ellipse 70% 60% at 50% 100%, black 25%, transparent 75%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 70% 60% at 50% 100%, black 25%, transparent 75%)",
+        }}
+      />
+      <div className="container" style={{ position: "relative" }}>
         <Reveal>
           <div style={{ textAlign: "center", maxWidth: 640, marginInline: "auto" }}>
             <h2
@@ -28,7 +46,7 @@ export function PilotCta() {
                 margin: 0,
               }}
             >
-              Run a pilot on one pump line, one site, one shift
+              {t("landing.pilot.title")}
             </h2>
             <p
               style={{
@@ -39,9 +57,7 @@ export function PilotCta() {
                 maxWidth: "52ch",
               }}
             >
-              See Skawld capture real expertise on your equipment, with your
-              people, on your infrastructure. You keep control of the scope,
-              the data, and the rollout.
+              {t("landing.pilot.body")}
             </p>
             <div
               style={{
@@ -52,9 +68,9 @@ export function PilotCta() {
                 flexWrap: "wrap",
               }}
             >
-              <Button href="/auth/login">Book a pilot</Button>
+              <Button href="/auth/login">{t("landing.bookPilot")}</Button>
               <Button href="/openapi.yaml" variant="ghost">
-                Read the API spec
+                {t("landing.pilot.readApiSpec")}
               </Button>
             </div>
           </div>
