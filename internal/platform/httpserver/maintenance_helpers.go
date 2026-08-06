@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -74,4 +75,29 @@ func writeDomainError(
 	default:
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", "request could not be completed")
 	}
+}
+
+const (
+	defaultPageSize = 25
+	maxPageSize     = 100
+)
+
+func parsePageSize(w http.ResponseWriter, r *http.Request) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get("page_size"))
+	if raw == "" {
+		return defaultPageSize, true
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 || value > maxPageSize {
+		writeProblem(w, http.StatusBadRequest, "Invalid Request", "page_size must be an integer between 1 and 100")
+		return 0, false
+	}
+	return value, true
+}
+
+func nullableString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

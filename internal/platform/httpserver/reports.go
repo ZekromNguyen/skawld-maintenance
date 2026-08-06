@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
@@ -12,11 +13,44 @@ import (
 )
 
 func mountReportRoutes(router chi.Router, service reportapp.Service) {
+	router.Get("/reports", listReports(service))
 	router.Post("/executions/{executionID}/reports/draft", draftReport(service))
 	router.Get("/reports/{reportID}", getReport(service))
 	router.Post("/reports/{reportID}/edit", editReport(service))
 	router.Post("/reports/{reportID}/submit", submitReport(service))
 	router.Post("/reports/{reportID}/approve", approveReport(service))
+}
+
+func listReports(service reportapp.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := principalFromRequest(w, r)
+		if !ok {
+			return
+		}
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := reportapp.ReportFilter{PageSize: pageSize}
+		if siteID := r.URL.Query().Get("site_id"); siteID != "" {
+			if !validUUIDParam(w, siteID, "site ID") {
+				return
+			}
+			filter.SiteID = siteID
+		}
+		filter.States = r.URL.Query()["state"]
+		filter.Cursor = strings.TrimSpace(r.URL.Query().Get("cursor"))
+		result, err := service.List(r.Context(), principal, filter)
+		if err != nil {
+			writeReportError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       result.Items,
+			"next_cursor": nullableString(result.NextCursor),
+			"has_more":    result.HasMore,
+		})
+	}
 }
 
 func draftReport(service reportapp.Service) http.HandlerFunc {
