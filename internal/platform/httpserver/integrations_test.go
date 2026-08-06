@@ -124,3 +124,57 @@ func TestIntegrationImportForbidden(t *testing.T) {
 		t.Fatalf("status = %d, want 403", recorder.Code)
 	}
 }
+
+func TestIntegrationImportRejectsOversizedBody(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionExternalImport: {},
+		},
+	}
+	handler := integrationImportHandler(&recordSink{}, principal)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, _ := writer.CreateFormFile("snapshot", "snapshot.ndjson")
+	part.Write(make([]byte, maxImportBytes+1))
+	writer.WriteField("system", "CMMS-X")
+	writer.WriteField("instance", "import-test")
+	writer.WriteField("version", "1.0")
+	writer.Close()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/imports", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestIntegrationImportRejectsMissingIdentityFields(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionExternalImport: {},
+		},
+	}
+	handler := integrationImportHandler(&recordSink{}, principal)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, _ := writer.CreateFormFile("snapshot", "snapshot.ndjson")
+	part.Write([]byte("{}\n"))
+	writer.WriteField("system", "CMMS-X")
+	writer.Close()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/imports", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}

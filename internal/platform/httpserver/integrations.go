@@ -46,7 +46,7 @@ func runIntegrationImport(sink integrationapp.ProjectionSink) http.HandlerFunc {
 			return
 		}
 		defer os.Remove(tempFile.Name())
-		if _, err := io.Copy(tempFile, io.LimitReader(snapshot, maxImportBytes+1)); err != nil {
+		if _, err := io.Copy(tempFile, snapshot); err != nil {
 			tempFile.Close()
 			writeProblem(w, http.StatusBadRequest, "Invalid Request",
 				"could not read snapshot upload")
@@ -93,6 +93,11 @@ func runIntegrationImport(sink integrationapp.ProjectionSink) http.HandlerFunc {
 				})
 				return
 			}
+			if page.NextCursor == "" {
+				writeProblem(w, http.StatusInternalServerError, "Server Error",
+					"import connector returned an incomplete page without a cursor")
+				return
+			}
 			cursor = page.NextCursor
 		}
 	}
@@ -107,7 +112,7 @@ func writeIntegrationImportError(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusBadRequest, "Invalid Request",
 			"connector snapshot failed validation")
 	default:
-		writeProblem(w, http.StatusBadRequest, "Invalid Request",
+		writeProblem(w, http.StatusInternalServerError, "Server Error",
 			fmt.Sprintf("import failed: %v", err))
 	}
 }
