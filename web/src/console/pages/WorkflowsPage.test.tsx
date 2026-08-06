@@ -7,6 +7,7 @@ import { PrincipalProvider } from "../state/PrincipalProvider";
 import { SiteProvider } from "../state/SiteContext";
 import { ToastProvider } from "../feedback/Toast";
 import { api } from "../../api";
+import type { WorkflowVersion } from "../../types";
 
 const fixtures = vi.hoisted(() => ({
   approvedDemo: {
@@ -53,7 +54,7 @@ const fixtures = vi.hoisted(() => ({
 vi.mock("../../api", () => ({
   api: {
     principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["workflow:review", "workflow:publish"] }),
-    workflows: vi.fn().mockResolvedValue({ items: [fixtures.workflow] }),
+    workflows: vi.fn().mockResolvedValue({ items: [fixtures.workflow], next_cursor: null, has_more: false }),
     demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.approvedDemo] }),
     assets: vi.fn().mockResolvedValue({ items: [] }),
     compileWorkflow: vi.fn().mockResolvedValue({}),
@@ -120,4 +121,17 @@ describe("WorkflowsPage", () => {
     const reject = screen.getByRole("button", { name: "Reject" }) as HTMLButtonElement;
     expect(reject.disabled).toBe(true);
   });
+});
+
+it("shows load more and appends the next page", async () => {
+  const list = vi.mocked(api.workflows);
+  list
+    .mockResolvedValueOnce({ items: [fixtures.workflow as unknown as WorkflowVersion], next_cursor: "c1", has_more: true })
+    .mockResolvedValueOnce({ items: [fixtures.workflow as unknown as WorkflowVersion], next_cursor: null, has_more: false });
+  renderPage();
+  const button = await screen.findByRole("button", { name: "Load more" });
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
+  );
 });

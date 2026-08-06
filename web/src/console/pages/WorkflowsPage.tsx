@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useSite } from "../state/SiteContext";
@@ -18,7 +19,7 @@ export function WorkflowsPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
   const { siteId } = useSite();
-  const workflows = useQuery(() => api.workflows().then((list) => list.items));
+  const workflows = usePaginatedList((params) => api.workflows(params), []);
   const demonstrations = useQuery(
     () => api.demonstrations(siteId).then((list) => list.items),
     [siteId],
@@ -82,7 +83,7 @@ export function WorkflowsPage() {
       <section>
         <PageHeader title={t("nav.workflows")} principal={principal} />
         <WorkflowLearningPanel
-          values={workflows.data ?? []}
+          values={workflows.items}
           demonstrations={demonstrations.data ?? []}
           selected={selected}
           busy={busy}
@@ -97,6 +98,18 @@ export function WorkflowsPage() {
           onPublish={(value, reason) => void publish.run(value, reason)}
           onRetire={(value, reason) => void retire.run(value, reason)}
         />
+        {workflows.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void workflows.loadMore()}
+            disabled={workflows.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
+
       </section>
     </PageTrailProvider>
   );

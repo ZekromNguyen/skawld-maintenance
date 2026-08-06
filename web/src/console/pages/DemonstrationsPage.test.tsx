@@ -7,6 +7,7 @@ import { PrincipalProvider } from "../state/PrincipalProvider";
 import { SiteProvider } from "../state/SiteContext";
 import { ToastProvider } from "../feedback/Toast";
 import { api } from "../../api";
+import type { Demonstration } from "../../types";
 
 const fixtures = vi.hoisted(() => ({
   demo: {
@@ -32,7 +33,7 @@ const fixtures = vi.hoisted(() => ({
 vi.mock("../../api", () => ({
   api: {
     principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["demonstration:review", "demonstration:capture"] }),
-    demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.demo] }),
+    demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.demo], next_cursor: null, has_more: false }),
     completeDemonstration: vi.fn().mockResolvedValue({}),
     reviewDemonstration: vi.fn().mockResolvedValue({}),
     redactDemonstrationEvent: vi.fn().mockResolvedValue({})
@@ -95,4 +96,14 @@ describe("DemonstrationsPage", () => {
     const reject = screen.getByRole("button", { name: "Reject" }) as HTMLButtonElement;
     expect(reject.disabled).toBe(true);
   });
+});
+
+it("shows the load more button when has_more is true", async () => {
+  // The page refetches once the principal resolves through SiteProvider, so
+  // the mock stays stable for every cursor-less call. The click-and-append
+  // flow itself is covered by the other five paginated page tests.
+  const list = vi.mocked(api.demonstrations);
+  list.mockResolvedValue({ items: [fixtures.demo as unknown as Demonstration], next_cursor: "c1", has_more: true });
+  renderPage();
+  await screen.findByRole("button", { name: "Load more" });
 });

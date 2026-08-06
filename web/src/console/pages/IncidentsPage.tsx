@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -31,7 +32,7 @@ export function IncidentsPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incidents = useQuery(() => api.incidents().then((list) => list.items));
+  const incidents = usePaginatedList((params) => api.incidents(params), []);
   const assets = useQuery(() => api.assets().then((list) => list.items));
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [severity, setSeverity] = useState("ALL");
@@ -53,7 +54,7 @@ export function IncidentsPage() {
   );
 
   const rows = useMemo(() => {
-    const items = incidents.data ?? [];
+    const items = incidents.items;
     return items
       .filter((incident) => tab === "ALL" || incident.state === tab)
       .filter((incident) => severity === "ALL" || incident.severity === severity)
@@ -66,17 +67,17 @@ export function IncidentsPage() {
           (incident.asset_tag ?? "").toLowerCase().includes(q)
         );
       });
-  }, [incidents.data, tab, severity, query]);
+  }, [incidents.items, tab, severity, query]);
 
   const counts = useMemo(() => {
-    const items = incidents.data ?? [];
+    const items = incidents.items;
     return {
       OPEN: items.filter((i) => i.state === "OPEN").length,
       IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
       RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
       ALL: items.length,
     } as Record<StateTab, number>;
-  }, [incidents.data]);
+  }, [incidents.items]);
 
   return (
     <PageTrailProvider trail={[]}>
@@ -179,6 +180,17 @@ export function IncidentsPage() {
           error={incidents.error}
           onRetry={() => void incidents.refetch()}
         />
+        {incidents.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void incidents.loadMore()}
+            disabled={incidents.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
         <Dialog
           open={showForm}
           onOpenChange={setShowForm}

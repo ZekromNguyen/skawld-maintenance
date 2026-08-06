@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { FormField } from "../ui/FormField";
 import { api } from "../../api";
-import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -19,7 +19,7 @@ export function KnowledgePage() {
   const { data: principal } = usePrincipal();
   const siteIDs = principal?.site_ids ?? [];
   const siteID = siteIDs[0];
-  const documents = useQuery(() => api.documents(siteID).then((list) => list.items), [siteID]);
+  const documents = usePaginatedList((params) => api.documents(siteID, params), [siteID]);
   const [showForm, setShowForm] = useState(false);
   const canWrite = principal?.permissions.includes("knowledge:write") ?? false;
 
@@ -53,11 +53,23 @@ export function KnowledgePage() {
           }
         />
         <KnowledgePanel
-          documents={documents.data ?? []}
+          documents={documents.items}
           loading={documents.loading}
           error={documents.error}
           onRetry={() => void documents.refetch()}
         />
+        {documents.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void documents.loadMore()}
+            disabled={documents.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
+
         <Dialog
           open={showForm}
           onOpenChange={setShowForm}

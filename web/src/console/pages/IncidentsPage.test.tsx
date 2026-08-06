@@ -7,6 +7,7 @@ import { PrincipalProvider } from "../state/PrincipalProvider";
 import { SiteProvider } from "../state/SiteContext";
 import { ToastProvider } from "../feedback/Toast";
 import { api } from "../../api";
+import type { Incident } from "../../types";
 
 const fixtures = vi.hoisted(() => ({
   OPEN_HIGH: {
@@ -55,7 +56,7 @@ vi.mock("../../api", () => ({
       site_ids: ["s1"],
       permissions: ["incident:create", "incident:read"]
     }),
-    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW] }),
+    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW], next_cursor: null, has_more: false }),
     assets: vi.fn().mockResolvedValue({
       items: [
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" }
@@ -140,4 +141,17 @@ describe("IncidentsPage", () => {
     );
     expect(screen.getByText("Incident created")).toBeTruthy();
   });
+});
+
+it("shows load more and appends the next page", async () => {
+  const list = vi.mocked(api.incidents);
+  list
+    .mockResolvedValueOnce({ items: [fixtures.OPEN_HIGH as unknown as Incident], next_cursor: "c1", has_more: true })
+    .mockResolvedValueOnce({ items: [fixtures.RESOLVED_LOW as unknown as Incident], next_cursor: null, has_more: false });
+  renderPage();
+  const button = await screen.findByRole("button", { name: "Load more" });
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
+  );
 });

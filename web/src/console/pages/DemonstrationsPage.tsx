@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../../api";
-import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useSite } from "../state/SiteContext";
@@ -17,10 +17,7 @@ export function DemonstrationsPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
   const { siteId } = useSite();
-  const demonstrations = useQuery(
-    () => api.demonstrations(siteId).then((list) => list.items),
-    [siteId],
-  );
+  const demonstrations = usePaginatedList((params) => api.demonstrations(siteId, params), [siteId]);
   const [selected, setSelected] = useState<string | undefined>(undefined);
 
   const complete = useCommand(
@@ -38,7 +35,7 @@ export function DemonstrationsPage() {
     { successMessage: t("demo.reviewSuccess"), onSuccess: () => void demonstrations.refetch() },
   );
 
-  const values = demonstrations.data ?? [];
+  const values = demonstrations.items;
   const selectedValue = values.find((value) => value.id === selected);
   const busy = complete.pending || redact.pending || review.pending;
   const perms = principal?.permissions ?? [];
@@ -60,6 +57,18 @@ export function DemonstrationsPage() {
           onRedact={(value, eventID, path, reason) => void redact.run(value.id, eventID, path, reason)}
           onReview={(value, decision, reason) => void review.run(value.id, decision, reason)}
         />
+        {demonstrations.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void demonstrations.loadMore()}
+            disabled={demonstrations.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
+
       </section>
     </PageTrailProvider>
   );
