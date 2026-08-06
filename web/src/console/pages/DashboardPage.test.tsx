@@ -135,4 +135,40 @@ describe("DashboardPage", () => {
     const pendingLink = await screen.findByRole("link", { name: /pending handovers/i });
     expect(pendingLink.textContent).toContain("1");
   });
+
+  it("renders the admin focus panel for a publisher", async () => {
+    vi.mocked(api.principal).mockResolvedValueOnce({
+      id: "p1",
+      display_name: "Admin",
+      organization_id: "o1",
+      site_ids: [],
+      permissions: ["workflow:publish", "incident:resolve", "report:approve"],
+    });
+    renderDashboard();
+    expect(await screen.findByText("Organization health")).toBeTruthy();
+  });
+
+  it("renders the supervisor focus panel", async () => {
+    vi.mocked(api.principal).mockResolvedValueOnce({
+      id: "p1",
+      display_name: "Supervisor",
+      organization_id: "o1",
+      site_ids: [],
+      permissions: ["incident:resolve", "report:approve"],
+    });
+    renderDashboard();
+    expect(await screen.findByText("Approvals & open incidents")).toBeTruthy();
+  });
+
+  it("renders the manager focus panel", async () => {
+    vi.mocked(api.principal).mockResolvedValueOnce({
+      id: "p1",
+      display_name: "Manager",
+      organization_id: "o1",
+      site_ids: [],
+      permissions: ["handover:accept", "recommendation:review"],
+    });
+    renderDashboard();
+    expect(await screen.findByText("Handovers & recommendations")).toBeTruthy();
+  });
 });

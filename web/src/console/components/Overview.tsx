@@ -13,6 +13,7 @@ import {
   incidentStateLabelKey,
 } from "../labels";
 import type { Asset, Execution, Incident } from "../../types";
+import type { FocusConfig } from "../dashboardFocus";
 
 /**
  * Overview: dashboard main content. Real KPIs computed from live data,
@@ -20,6 +21,7 @@ import type { Asset, Execution, Incident } from "../../types";
  * table (open incidents only, clickable rows). No fabricated metrics.
  */
 export function Overview({
+  focus,
   incidents,
   executions,
   assets,
@@ -28,6 +30,7 @@ export function Overview({
   error,
   onRetry,
 }: {
+  focus: FocusConfig;
   incidents: Incident[];
   executions: Execution[];
   assets: Asset[];
@@ -78,6 +81,19 @@ export function Overview({
           to="/handovers"
           tone="info"
         />
+      </section>
+
+      <section className="panel" style={{ marginBottom: 20 }}>
+        <div className="panel-heading">
+          <h2>{t(focus.titleKey)}</h2>
+        </div>
+        <div className="focus-links">
+          {focus.links.map((link) => (
+            <Link key={link.to} to={link.to} className="secondary-button">
+              {t(link.labelKey)}
+            </Link>
+          ))}
+        </div>
       </section>
 
       <section className="panel" style={{ marginBottom: 20 }}>

@@ -192,6 +192,7 @@ tr:last-child td { border-bottom: 0; }
 .primary-button.full { margin: 14px 16px 0; width: calc(100% - 32px); }
 .secondary-button { color: var(--brand); background: var(--raised); border: 1px solid var(--line-soft); padding: 7px 11px; }
 .secondary-button:hover { background: var(--sunken); color: var(--brand); }
+.focus-links { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
 .progress-row { height: 31px; margin: 0 16px; position: relative; background: linear-gradient(var(--line), var(--line)) left center / 100% 3px no-repeat; }
 .progress-row > span { position: absolute; top: 14px; left: 0; height: 3px; background: var(--brand); transition: width .2s; }
 .progress-row small { position: absolute; right: 0; top: 6px; background: var(--surface); padding-left: 8px; color: var(--ink-muted); }

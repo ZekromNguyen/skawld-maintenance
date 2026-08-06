@@ -5,6 +5,8 @@ import { useQuery } from "../useQuery";
 import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
 import { Overview } from "../components/Overview";
+import { focusRole } from "../permissions";
+import { FOCUS_CONFIG } from "../dashboardFocus";
 
 /**
  * DashboardPage: role-aware landing. Real KPIs, a "my queue" of in-progress
@@ -29,12 +31,14 @@ export function DashboardPage() {
     void handovers.refetch();
   };
   const pendingHandovers = handovers.data?.length ?? 0;
+  const focus = FOCUS_CONFIG[focusRole(principal)];
 
   return (
     <PageTrailProvider trail={[]}>
       <section>
         <PageHeader title={t("nav.overview")} principal={principal} />
         <Overview
+          focus={focus}
           incidents={incidents.data ?? []}
           executions={executions.data ?? []}
           assets={assets.data ?? []}
