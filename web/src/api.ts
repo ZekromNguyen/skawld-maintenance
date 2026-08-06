@@ -4,6 +4,7 @@ import type {
   EvaluationSummary,
   Execution,
   KnowledgeDocument,
+  ListPage,
   MaintenanceReport,
   Incident,
   ListResponse,
@@ -83,6 +84,37 @@ function command<T>(path: string, value: unknown): Promise<T> {
     headers: { "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify(value)
   });
+}
+
+export interface ListOptions {
+  site_id?: string;
+  state?: string[];
+  cursor?: string;
+  page_size?: number;
+}
+
+function listQuery(options: ListOptions): string {
+  const params = new URLSearchParams();
+  if (options.site_id) params.set("site_id", options.site_id);
+  for (const state of options.state ?? []) params.append("state", state);
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.page_size) params.set("page_size", String(options.page_size));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function fetchAll<T>(
+  first: ListPage<T>,
+  fetchPage: (cursor: string) => Promise<ListPage<T>>,
+): Promise<T[]> {
+  const items = [...first.items];
+  let cursor = first.next_cursor;
+  while (cursor) {
+    const page = await fetchPage(cursor);
+    items.push(...page.items);
+    cursor = page.next_cursor;
+  }
+  return items;
 }
 
 export const api = {
@@ -363,7 +395,8 @@ export const api = {
     id: string,
     value: { accepted: boolean; correction?: string }
   ) => command<unknown>(`/recommendations/${id}/feedback`, value),
-  reports: () => request<ListResponse<MaintenanceReport>>("/reports"),
+  reports: (options: ListOptions = {}) =>
+    request<ListPage<MaintenanceReport>>(`/reports${listQuery(options)}`),
   report: (id: string) => request<MaintenanceReport>(`/reports/${id}`),
   submitReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/submit`, {}),
   approveReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/approve`, {}),
@@ -376,7 +409,15 @@ export const api = {
     command<unknown>(`/document-revisions/${revisionID}/retire`, { reason }),
   requestDocumentIngestion: (revisionID: string) =>
     command<unknown>(`/document-revisions/${revisionID}/ingestion`, {}),
-  handovers: () => request<ListResponse<ShiftHandover>>("/handovers"),
+  handovers: (options: ListOptions = {}) =>
+    request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`),
+  pendingHandovers: async () => {
+    const options = { state: ["DRAFT", "SUBMITTED", "ACCEPTED"], page_size: 100 };
+    const first = await request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`);
+    return fetchAll(first, (cursor) =>
+      request<ListPage<ShiftHandover>>(`/handovers${listQuery({ ...options, cursor })}`)
+    );
+  },
   handover: (id: string) => request<ShiftHandover>(`/handovers/${id}`),
   submitHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/submit`, {}),
   acceptHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/accept`, {}),
