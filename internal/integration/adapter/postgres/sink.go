@@ -40,21 +40,24 @@ func (s Sink) Apply(
 	_, err := database.InTx(ctx, s.Pool, pgx.TxOptions{}, func(tx pgx.Tx) (outcome, error) {
 		for _, record := range records {
 			if record.Kind != "ASSET" {
-				return outcome{}, fmt.Errorf(
+				return outcome{}, errors.Join(application.ErrInvalid, fmt.Errorf(
 					"sink cannot project external record kind %q", record.Kind,
-				)
+				))
 			}
 			tag, err := requiredString(record.Attributes, "tag")
 			if err != nil {
-				return outcome{}, fmt.Errorf("external asset %s: %w", record.ExternalID, err)
+				return outcome{}, errors.Join(application.ErrInvalid,
+					fmt.Errorf("external asset %s: %w", record.ExternalID, err))
 			}
 			name, err := requiredString(record.Attributes, "name")
 			if err != nil {
-				return outcome{}, fmt.Errorf("external asset %s: %w", record.ExternalID, err)
+				return outcome{}, errors.Join(application.ErrInvalid,
+					fmt.Errorf("external asset %s: %w", record.ExternalID, err))
 			}
 			assetClass, err := requiredString(record.Attributes, "asset_class")
 			if err != nil {
-				return outcome{}, fmt.Errorf("external asset %s: %w", record.ExternalID, err)
+				return outcome{}, errors.Join(application.ErrInvalid,
+					fmt.Errorf("external asset %s: %w", record.ExternalID, err))
 			}
 			attributesJSON, err := json.Marshal(record.Attributes)
 			if err != nil {
