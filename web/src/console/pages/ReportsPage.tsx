@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../../api";
+import { api, type ListOptions } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -18,7 +19,34 @@ export function ReportsPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const reports = useQuery(() => api.reports().then((list) => list.items));
+  const [stateFilter, setStateFilter] = useState<string>("ALL");
+  const [history, setHistory] = useState<MaintenanceReport[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const options = useMemo<ListOptions>(
+    () => ({
+      ...(stateFilter !== "ALL" ? { state: [stateFilter] } : {}),
+      page_size: 25
+    }),
+    [stateFilter],
+  );
+  const reports = useQuery(() => api.reports(options), [options]);
+  const rows = useMemo(
+    () => [...(reports.data?.items ?? []), ...history],
+    [reports.data, history],
+  );
+
+  useEffect(() => {
+    setHistory([]);
+    setNextCursor(reports.data?.next_cursor ?? null);
+  }, [reports.data, stateFilter]);
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    const page = await api.reports({ ...options, cursor: nextCursor });
+    setHistory((prev) => [...prev, ...page.items]);
+    setNextCursor(page.next_cursor);
+  };
 
   return (
     <PageTrailProvider trail={[]}>
@@ -27,7 +55,18 @@ export function ReportsPage() {
         <div className="panel">
           <div className="panel-heading">
             <h2>{t("report.library")}</h2>
-            <span className="count">{reports.data?.length ?? 0}</span>
+            <select
+              aria-label="State"
+              className="filter-select"
+              value={stateFilter}
+              onChange={(event) => setStateFilter(event.target.value)}
+            >
+              <option value="ALL">{t("report.state.all")}</option>
+              <option value="DRAFT">{t("report.state.draft")}</option>
+              <option value="SUBMITTED">{t("report.state.submitted")}</option>
+              <option value="APPROVED">{t("report.state.approved")}</option>
+            </select>
+            <span className="count">{rows.length}</span>
           </div>
           <DataTable<MaintenanceReport>
             columns={[
@@ -67,7 +106,7 @@ export function ReportsPage() {
                 sortValue: (r) => r.state
               }
             ]}
-            rows={reports.data ?? []}
+            rows={rows}
             rowKey={(report) => report.id}
             onRowClick={(report) => navigate(`/reports/${report.id}`)}
             emptyTitle={t("report.none")}
@@ -75,6 +114,16 @@ export function ReportsPage() {
             error={reports.error}
             onRetry={() => void reports.refetch()}
           />
+          {nextCursor ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => void loadMore()}
+              style={{ marginTop: 12 }}
+            >
+              {t("common.loadMore")}
+            </button>
+          ) : null}
         </div>
       </section>
     </PageTrailProvider>
