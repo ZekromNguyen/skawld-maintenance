@@ -3,6 +3,7 @@ package skawld
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -90,8 +91,8 @@ func TestHTTPEmbeddingProviderRejectsInconsistentDimensions(t *testing.T) {
 			"model": "text-embedding-3-small"
 		}`))
 	})
-	if _, err := provider.Embed(context.Background(), []string{"a", "b"}); err == nil {
-		t.Fatal("expected inconsistent dimensions to be rejected")
+	if _, err := provider.Embed(context.Background(), []string{"a", "b"}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
 	}
 }
 

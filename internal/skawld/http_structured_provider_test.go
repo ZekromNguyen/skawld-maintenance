@@ -3,6 +3,7 @@ package skawld
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,8 +82,8 @@ func TestHTTPStructuredProviderRejectsEmptyContent(t *testing.T) {
 	})
 	if _, err := provider.Generate(context.Background(), GenerateRequest{
 		Capability: CapabilityRecommendation, SchemaVersion: "v1",
-	}); err == nil {
-		t.Fatal("expected empty content to be rejected")
+	}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
 	}
 }
 
@@ -94,8 +95,8 @@ func TestHTTPStructuredProviderRejectsNonJSON(t *testing.T) {
 	})
 	if _, err := provider.Generate(context.Background(), GenerateRequest{
 		Capability: CapabilityRecommendation, SchemaVersion: "v1",
-	}); err == nil {
-		t.Fatal("expected non-JSON content to be rejected")
+	}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
 	}
 }
 
