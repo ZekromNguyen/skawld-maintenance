@@ -62,7 +62,7 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 			"execution:write", "handover:accept", "handover:write",
 			"incident:create", "incident:resolve", "integration:external:import",
 			"knowledge:approve", "knowledge:write", "organization:create",
-			"prerequisite:verify",
+			"execution:prerequisite:verify",
 			"recommendation:review", "recommendation:run", "report:approve",
 			"report:write", "workflow:publish", "workflow:review",
 		),
@@ -71,14 +71,14 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 			"demonstration:capture", "demonstration:review", "execution:read:all",
 			"execution:write", "handover:accept", "handover:write",
 			"incident:create", "incident:resolve", "integration:external:import",
-			"knowledge:approve", "knowledge:write", "prerequisite:verify",
+			"knowledge:approve", "knowledge:write", "execution:prerequisite:verify",
 			"recommendation:review", "recommendation:run", "report:approve",
 			"report:write", "workflow:review",
 		),
 		RoleSeniorTechnician: append(slices.Clone(read),
 			"attachment:write", "demonstration:capture", "demonstration:review",
 			"execution:write", "handover:write", "incident:create",
-			"prerequisite:verify", "recommendation:run", "report:write",
+			"execution:prerequisite:verify", "recommendation:run", "report:write",
 			"workflow:review",
 		),
 		RoleTechnician: append(slices.Clone(read),
@@ -128,7 +128,11 @@ import (
 - [ ] **Step 2: Run the test**
 
 Run: `go test ./internal/identity/domain/ -run TestPermissionsForRoleMatrix -v`
-Expected: PASS — the current `PermissionsForRole` already matches the matrix (this is a characterization lock; `permissionSet` dedupes the overlap between `read` and the role additions, e.g. none today). If it FAILS, the diff lists the offending permission strings; fix `PermissionsForRole` in `authorization.go` so the sets match the test exactly (that is the matrix), then re-run to green.
+Expected: FAIL on the first run — the real permission string is
+`execution:prerequisite:verify` (authorization.go:31), not the abbreviated
+`prerequisite:verify`; the expected sets use the real string. The test's
+`permissionSet`/`matrixSet` helpers sort both sides so ordering never causes
+false failures.
 
 - [ ] **Step 3: Run the full package test suite**
 
