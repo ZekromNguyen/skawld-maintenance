@@ -295,3 +295,26 @@ No AI output controls equipment or silently changes a published workflow.
   permit authority, workflow self-modification, or industrial control path.
 
 See [Plan.md](./Plan.md) for current progress and the dependency-ordered tasks.
+
+## Importing external EAM/CMMS data
+
+A pilot operator can project external asset records from an EAM/CMMS export
+into the database as `EXTERNAL_REFERENCE` assets (never overwriting
+Skawld-owned records) with the import CLI:
+
+```bash
+go run ./cmd/import \
+  -snapshot test/fixtures/import-p302.ndjson \
+  -site-id <site-uuid> \
+  -database-url "$DATABASE_URL" \
+  -external-subject seed-admin
+```
+
+The snapshot is a newline-delimited JSON export (see
+`test/fixtures/import-p302.ndjson` for the record shape). The CLI runs under
+the tenant/site scope of the named administrator, rewrites the tenant-neutral
+`REPLACED_BY_PRINCIPAL` / `REPLACED_BY_SITE` placeholders, and imports in
+bounded pages (`-limit`, default 100, max 500). It is idempotent: records
+whose external version already exists are skipped, and a later
+`-cursor` resumes where a previous run stopped. The same projection is also
+available to administrators through `POST /api/v1/integrations/imports`.

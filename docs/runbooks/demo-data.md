@@ -205,3 +205,15 @@ manifest, uploads the object at the generated key, and completes the upload so
 size/checksum/MIME verification runs. `verified_mime` is persisted normalized
 (`text/plain`), which document ingestion requires. See the MIME regression
 test in `internal/attachment/adapter/postgres/mime_test.go`.
+
+## Importing external asset data (cmd/import)
+
+`go run ./cmd/import -snapshot <file.ndjson> -site-id <uuid> -database-url "$DATABASE_URL"`
+projects external asset records from an EAM/CMMS snapshot into the site as
+`EXTERNAL_REFERENCE` assets. Use `-external-subject` to pick the administrator
+principal (default `import-admin`; `seed-admin` also works), `-limit` to bound
+page size (1-500, default 100), and `-cursor` to resume an interrupted import.
+The snapshot may use the `REPLACED_BY_PRINCIPAL` / `REPLACED_BY_SITE`
+placeholders shown in `test/fixtures/import-p302.ndjson`; the CLI rewrites
+them to the running principal's organization and site. Re-running the same
+snapshot is safe: matching external versions are skipped.
