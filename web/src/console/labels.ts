@@ -49,7 +49,7 @@ export function incidentStateLabelKey(state: string): MessageKey {
 export function incidentStateTone(state: string): Tone {
   switch (state) {
     case "OPEN":
-      return "high";
+      return "info";
     case "IN_PROGRESS":
       return "medium";
     case "RESOLVED":

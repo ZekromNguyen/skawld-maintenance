@@ -7,12 +7,14 @@ export function MetricCard({
   detail,
   tone = "info",
   to,
+  onClick,
 }: {
   label: string;
   value: string;
   detail?: string;
   tone?: Tone;
   to?: string;
+  onClick?: () => void;
 }) {
   const body = (
     <div className={`metric metric-${tone}`}>
@@ -21,11 +23,19 @@ export function MetricCard({
       {detail ? <small>{detail}</small> : null}
     </div>
   );
-  return to ? (
-    <Link to={to} className="metric-link">
-      {body}
-    </Link>
-  ) : (
-    body
-  );
+  if (to) {
+    return (
+      <Link to={to} className="metric-link">
+        {body}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" className="metric-link metric-button" onClick={onClick}>
+        {body}
+      </button>
+    );
+  }
+  return body;
 }
