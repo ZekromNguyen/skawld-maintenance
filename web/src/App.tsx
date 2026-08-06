@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { ToastProvider } from "./console/feedback/Toast";
 import { PrincipalProvider } from "./console/state/PrincipalProvider";
 import { ConsoleLayout } from "./console/layout/ConsoleLayout";

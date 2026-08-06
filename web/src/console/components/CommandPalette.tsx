@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useI18n } from "../../i18n/I18nProvider";

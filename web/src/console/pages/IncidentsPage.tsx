@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { useCommand } from "../useCommand";

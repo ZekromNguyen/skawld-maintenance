@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { ThemeProvider } from "../../theme/ThemeProvider";

@@ -53,9 +53,9 @@ func TestNormalizeMIMEReturnsStableMediaType(t *testing.T) {
 // a WAV file's RIFF/WAVE header and an MP4 container's ftyp box.
 func TestDetectMIMERecognizesRIFFWAVAndFtypMP4Prefixes(t *testing.T) {
 	tests := []struct {
-		name    string
-		prefix  []byte
-		want    string
+		name   string
+		prefix []byte
+		want   string
 	}{
 		{
 			name:   "WAV RIFF header",

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useI18n } from "../../i18n/I18nProvider";
 import type { Principal } from "../../types";
 import { Breadcrumbs } from "./Breadcrumbs";

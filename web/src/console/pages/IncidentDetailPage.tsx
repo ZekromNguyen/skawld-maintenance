@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { useCommand } from "../useCommand";

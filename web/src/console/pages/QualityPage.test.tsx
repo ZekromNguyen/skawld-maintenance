@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { QualityPage } from "./QualityPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { PrincipalProvider } from "../state/PrincipalProvider";
