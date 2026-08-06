@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
@@ -44,40 +45,60 @@ func (s Store) ListDocuments(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter knowledgeapp.Filter,
-) ([]knowledgedomain.Document, error) {
-	rows, err := s.Pool.Query(ctx, `
+) ([]knowledgedomain.Document, bool, error) {
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	query := `
 		SELECT id::text
 		FROM documents
 		WHERE organization_id = $1::uuid
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR site_id IS NULL OR site_id = ANY($2::uuid[]))
-		  AND (nullif($3, '') IS NULL OR site_id::text = nullif($3, ''))
-		ORDER BY updated_at DESC
-		LIMIT 100
-	`, principal.OrganizationID, principal.SiteIDs, filter.SiteID)
+		  AND (nullif($3, '') IS NULL OR site_id::text = nullif($3, ''))`
+	args := []any{principal.OrganizationID, principal.SiteIDs, filter.SiteID}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, knowledgeapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (updated_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY updated_at DESC, id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 	var ids []string
 	for rows.Next() {
 		var documentID string
 		if err := rows.Scan(&documentID); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		ids = append(ids, documentID)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	hasMore := len(ids) > filter.PageSize
+	if hasMore {
+		ids = ids[:filter.PageSize]
 	}
 	result := make([]knowledgedomain.Document, 0, len(ids))
 	for _, documentID := range ids {
 		value, err := s.GetDocument(ctx, principal, documentID)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, value)
 	}
-	return result, nil
+	return result, hasMore, nil
 }
 
 func (s Store) loadRevisions(
