@@ -35,7 +35,7 @@
   - `func Encode(timestamp time.Time, id string) string`
   - `func Decode(cursor string) (Key, error)` — returns `ErrInvalidCursor` (wrapped with reason) on any malformed input.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `internal/platform/keyset/keyset_test.go`:
 
@@ -85,12 +85,12 @@ func TestEncodeProducesURLSafeBase64(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./internal/platform/keyset/ -v`
 Expected: FAIL — package does not exist (compile error: no Go files).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `internal/platform/keyset/keyset.go`:
 
@@ -150,12 +150,12 @@ func Decode(cursor string) (Key, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./internal/platform/keyset/ -v`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/platform/keyset/
@@ -178,7 +178,7 @@ git commit -m "feat: add keyset cursor codec for paginated list endpoints"
   - Store method: `List(ctx context.Context, principal identitydomain.Principal, filter ReportFilter) ([]Report, bool, error)` — returns `(items, hasMore, err)`; items already truncated to `PageSize`; `hasMore` true when a page_size+1th row existed.
   - Service method: `func (s Service) List(ctx context.Context, principal identitydomain.Principal, filter ReportFilter) (ListResult, error)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `internal/report/application/service_test.go` (keep the existing `editStore`; add `List` to it and add these tests):
 
@@ -272,12 +272,12 @@ func TestListReportsComputesCursor(t *testing.T) {
 
 Update imports in `service_test.go`: add `"errors"` and `"time"` (check current imports; `context`, `encoding/json`, `testing` and the domain packages are already there).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./internal/report/application/ -run TestList -v`
 Expected: FAIL — `ReportFilter` / `List` undefined, and `editStore` no longer satisfies `Store`.
 
-- [ ] **Step 3: Implement the service changes**
+- [x] **Step 3: Implement the service changes**
 
 In `internal/report/application/service.go`:
 
@@ -365,12 +365,12 @@ func (s Service) List(
 
 > Note: the decoded cursor is passed to the store as `"<RFC3339Nano>|<uuid>"` in `filter.Cursor` to avoid adding a keyset type to the store signature. The store splits on the last `|`. This keeps the store free of codec imports.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./internal/report/application/`
 Expected: PASS (existing tests + 4 new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/report/application/
@@ -389,7 +389,7 @@ git commit -m "feat: add report list query with filters and keyset cursor"
 - Consumes: `reportapp.ReportFilter` (with `Cursor` carrying `"<RFC3339Nano>|<uuid>"` when set), `reportapp.Report` from Task 2.
 - Produces: `func (s Store) List(ctx context.Context, principal identitydomain.Principal, filter reportapp.ReportFilter) ([]reportapp.Report, bool, error)`
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Add to `internal/report/adapter/postgres/store_integration_test.go` (reuse the seed pattern from `TestReportDraftEditAndApprovalPersistence` — org, site, principal, asset, execution — then insert reports directly):
 
@@ -493,12 +493,12 @@ func TestReportListPagination(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `TEST_DATABASE_URL=postgres://... go test ./internal/report/adapter/postgres/ -run TestReportList -v`
 Expected: FAIL — `store.List` undefined.
 
-- [ ] **Step 3: Implement `Store.List`**
+- [x] **Step 3: Implement `Store.List`**
 
 In `internal/report/adapter/postgres/store.go`:
 
@@ -582,13 +582,13 @@ func (s Store) List(
 
 > `strings` is already imported in this file (used by existing code).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `TEST_DATABASE_URL=postgres://... go test ./internal/report/adapter/postgres/ -run TestReportList -v`
 Expected: PASS.
 Also run `go test ./internal/report/...` to confirm the whole package compiles.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/report/adapter/postgres/
@@ -611,7 +611,7 @@ git commit -m "feat: paginate report list in postgres store"
   - Store method: `List(ctx context.Context, principal identitydomain.Principal, filter HandoverFilter) ([]Handover, bool, error)`
   - Service method: `func (s Service) List(ctx context.Context, principal identitydomain.Principal, filter HandoverFilter) (ListResult, error)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `internal/handover/application/service_test.go` currently contains only `TestDecodeContentRejectsUnknownEvidence` and imports `encoding/json`, `errors`, `testing`, `skawld`. Extend its imports with `context`, `time`, `identitydomain`, and `knowledgedomain`, and add a complete fake store plus the tests. The `Handover` struct requires `ID` and `ShiftStart` fields only for the List test.
 
@@ -702,12 +702,12 @@ func TestListHandoversComputesCursor(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./internal/handover/application/ -run TestList -v`
 Expected: FAIL — types/method undefined and fake no longer satisfies `Store`.
 
-- [ ] **Step 3: Implement the service changes**
+- [x] **Step 3: Implement the service changes**
 
 In `internal/handover/application/service.go`:
 
@@ -778,12 +778,12 @@ func (s Service) List(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./internal/handover/application/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/handover/application/
@@ -802,7 +802,7 @@ git commit -m "feat: add handover list query with filters and keyset cursor"
 - Consumes: `handoverapp.HandoverFilter`, `handoverapp.Handover` from Task 4.
 - Produces: `func (s Store) List(ctx context.Context, principal identitydomain.Principal, filter handoverapp.HandoverFilter) ([]handoverapp.Handover, bool, error)`
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Add to `internal/handover/adapter/postgres/store_integration_test.go`, mirroring the seed pattern from the existing test (`TestPrepareHandoverPersistsExactProvenance`): seed org, site, principal, asset, execution, then insert shift_handovers directly:
 
@@ -908,12 +908,12 @@ func TestHandoverListPagination(t *testing.T) {
 
 Check the existing test's import aliases (e.g., `handoverpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/handover/adapter/postgres"`, `handoverapp "github.com/ZekromNguyen/skawld-maintenance/internal/handover/application"`) and match them.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `TEST_DATABASE_URL=postgres://... go test ./internal/handover/adapter/postgres/ -run TestHandoverList -v`
 Expected: FAIL — `store.List` undefined.
 
-- [ ] **Step 3: Implement `Store.List`**
+- [x] **Step 3: Implement `Store.List`**
 
 In `internal/handover/adapter/postgres/store.go`:
 
@@ -996,13 +996,13 @@ func (s Store) List(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `TEST_DATABASE_URL=postgres://... go test ./internal/handover/adapter/postgres/ -run TestHandoverList -v`
 Expected: PASS.
 Also run `go test ./internal/handover/...` to confirm the package compiles.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/handover/adapter/postgres/
@@ -1024,7 +1024,7 @@ git commit -m "feat: paginate handover list in postgres store"
 - Consumes: `reportapp.Service.List`, `handoverapp.Service.List`, `reportapp.ReportFilter`, `handoverapp.HandoverFilter` from Tasks 2/4.
 - Produces: `GET /api/v1/reports` and `GET /api/v1/handovers` handlers writing `{"items","next_cursor","has_more"}`.
 
-- [ ] **Step 1: Write the failing handler tests**
+- [x] **Step 1: Write the failing handler tests**
 
 Create `internal/platform/httpserver/reports_list_test.go`:
 
@@ -1154,12 +1154,12 @@ Create `internal/platform/httpserver/handovers_list_test.go` with the same struc
 
 The imports mirror the reports test: `context`, `encoding/json`, `log/slog`, `net/http`, `net/http/httptest`, `testing`, `time`, `identitydomain`, `skawld`, and `handoverapp`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./internal/platform/httpserver/ -run TestList -v`
 Expected: FAIL — routes return 404 (no handler registered).
 
-- [ ] **Step 3: Implement the handlers**
+- [x] **Step 3: Implement the handlers**
 
 In `internal/platform/httpserver/maintenance_helpers.go`:
 
@@ -1274,12 +1274,12 @@ Add `"strings"` to handovers.go imports.
 
 > Route-ordering note: `router.Get("/reports", ...)` is a static path; chi routes it independently of `/reports/{reportID}`, so no ordering hazard. Same for `/handovers` vs `/handovers/{handoverID}` and `/handovers/prepare-draft` (static wins over the `{handoverID}` param in chi).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./internal/platform/httpserver/ -run TestList -v`
 Expected: PASS. Then `go vet ./internal/platform/httpserver/` and `go test ./internal/...` to confirm nothing else broke.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/platform/httpserver/
@@ -1296,7 +1296,7 @@ git commit -m "feat: serve report and handover list endpoints"
 **Interfaces:**
 - Produces: index `maintenance_reports_list_idx (organization_id, created_at DESC, id DESC)`.
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 Create `migrations/00012_report_list_index.sql`:
 
@@ -1309,17 +1309,17 @@ CREATE INDEX maintenance_reports_list_idx
 DROP INDEX IF EXISTS maintenance_reports_list_idx;
 ```
 
-- [ ] **Step 2: Run the migration**
+- [x] **Step 2: Run the migration**
 
 Run: `make migrate-up` (requires `MIGRATION_DATABASE_URL`).
 Expected: `00012_report_list_index.sql` applied, no errors.
 
-- [ ] **Step 3: Verify the plan uses the index**
+- [x] **Step 3: Verify the plan uses the index**
 
 Run in `psql`: `EXPLAIN SELECT id FROM maintenance_reports WHERE organization_id = '...' ORDER BY created_at DESC, id DESC LIMIT 26;`
 Expected: index scan on `maintenance_reports_list_idx`. (Manual verification; if EXPLAIN shows a different plan for small tables, that is expected.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add migrations/00012_report_list_index.sql
@@ -1336,7 +1336,7 @@ git commit -m "feat: index report list ordering for paginated queries"
 **Interfaces:**
 - Produces: `GET /api/v1/reports` and `GET /api/v1/handovers` path definitions with `site_id`, `state`, `cursor`, `page_size` parameters and the `{items, next_cursor, has_more}` 200 response.
 
-- [ ] **Step 1: Add the `GET /api/v1/reports` path**
+- [x] **Step 1: Add the `GET /api/v1/reports` path**
 
 Insert immediately before the `  /api/v1/reports/{reportID}:` line (line 899):
 
@@ -1384,7 +1384,7 @@ Insert immediately before the `  /api/v1/reports/{reportID}:` line (line 899):
         "403": {$ref: "#/components/responses/Problem"}
 ```
 
-- [ ] **Step 2: Add the `GET /api/v1/handovers` path**
+- [x] **Step 2: Add the `GET /api/v1/handovers` path**
 
 Insert immediately before the `  /api/v1/handovers/prepare-draft:` line:
 
@@ -1431,12 +1431,12 @@ Insert immediately before the `  /api/v1/handovers/prepare-draft:` line:
         "403": {$ref: "#/components/responses/Problem"}
 ```
 
-- [ ] **Step 3: Validate the YAML**
+- [x] **Step 3: Validate the YAML**
 
 Run: `python3 -c "import yaml,sys; yaml.safe_load(open('api/openapi.yaml')); print('valid yaml')"` (or `ruby -e "require 'yaml'; YAML.load_file('api/openapi.yaml'); puts 'valid yaml'"`).
 Expected: `valid yaml` — no indentation/tab errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add api/openapi.yaml
@@ -1463,7 +1463,7 @@ git commit -m "docs: specify report and handover list endpoints"
   - `api.handovers(options?: ListOptions): Promise<ListPage<ShiftHandover>>`
   - `api.pendingHandovers(): Promise<ShiftHandover[]>` (walks all pages with `state=DRAFT,SUBMITTED,ACCEPTED`)
 
-- [ ] **Step 1: Write the failing client tests**
+- [x] **Step 1: Write the failing client tests**
 
 Add to `web/src/api.test.ts`:
 
@@ -1515,12 +1515,12 @@ describe("fetchAll", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npx vitest run src/api.test.ts`
 Expected: FAIL — `ListPage`, `fetchAll` undefined.
 
-- [ ] **Step 3: Implement the client**
+- [x] **Step 3: Implement the client**
 
 In `web/src/types.ts`, after `ListResponse`:
 
@@ -1599,12 +1599,12 @@ and near the report keys:
   "report.state.all": "All states",
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd web && npx vitest run src/api.test.ts`
 Expected: PASS. Then `cd web && npx tsc --noEmit` to confirm types compile.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/types.ts web/src/api.ts web/src/api.test.ts web/src/i18n/messages.ts
@@ -1623,7 +1623,7 @@ git commit -m "feat: add paginated report and handover client with page walking"
 - Consumes: `api.handovers(options)`, `ListPage<ShiftHandover>`, `useSite()` from Task 9.
 - Produces: HandoverPage fetches the first 25 handovers for the selected site (ordered `shift_start DESC` server-side), renders the first as `latest`, shows a "Load more" button (`common.loadMore`) that appends the next page, and resets accumulation when the site changes.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Update the `handovers` mock in `web/src/console/pages/HandoverPage.test.tsx` to the new envelope:
 
@@ -1659,12 +1659,12 @@ Add tests (inside the existing `describe`):
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npx vitest run src/console/pages/HandoverPage.test.tsx`
 Expected: FAIL — no "Load more" button.
 
-- [ ] **Step 3: Implement the page changes**
+- [x] **Step 3: Implement the page changes**
 
 In `web/src/console/pages/HandoverPage.tsx`:
 
@@ -1731,12 +1731,12 @@ In the render, add the load-more control immediately after the history panel's c
 
 > The page already computes `latest`/`history` client-side from `items`; server ordering (`shift_start DESC`) makes `items[0]` the latest shift. The old client-side `scoped` filter is removed because the server now filters by `site_id`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd web && npx vitest run src/console/pages/HandoverPage.test.tsx`
 Expected: PASS (existing tests + new load-more test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/console/pages/HandoverPage.tsx web/src/console/pages/HandoverPage.test.tsx
@@ -1755,7 +1755,7 @@ git commit -m "feat: paginate handover history with server-side site filter"
 - Consumes: `api.reports(options)`, `ListPage<MaintenanceReport>`, `reportStateLabelKey`/`reportStateTone` (already imported).
 - Produces: ReportsPage fetches paginated reports; a state `<select>` (All/Draft/Submitted/Approved) refetches with `state=[...]`; a "Load more" button appends the next page.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Update the `reports` mock in `web/src/console/pages/ReportsPage.test.tsx`:
 
@@ -1803,12 +1803,12 @@ Add tests:
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npx vitest run src/console/pages/ReportsPage.test.tsx`
 Expected: FAIL — no combobox / load more button.
 
-- [ ] **Step 3: Implement the page changes**
+- [x] **Step 3: Implement the page changes**
 
 In `web/src/console/pages/ReportsPage.tsx`:
 
@@ -1881,12 +1881,12 @@ Update the render:
         ) : null}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd web && npx vitest run src/console/pages/ReportsPage.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/console/pages/ReportsPage.tsx web/src/console/pages/ReportsPage.test.tsx
@@ -1905,7 +1905,7 @@ git commit -m "feat: paginate report library with server-side state filter"
 - Consumes: `api.pendingHandovers()` from Task 9.
 - Produces: `pendingHandoverCount` = `handovers.data?.length ?? 0` (all returned handovers are non-ACKNOWLEDGED).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Update the mock in `web/src/console/pages/DashboardPage.test.tsx`: replace the `handovers` entry with
 
@@ -1935,12 +1935,12 @@ Add a test (asserts via the MetricCard link, whose text contains the label and t
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npx vitest run src/console/pages/DashboardPage.test.tsx`
 Expected: FAIL — `pendingHandovers` undefined (mock module missing the key) or count renders 0.
 
-- [ ] **Step 3: Implement the page changes**
+- [x] **Step 3: Implement the page changes**
 
 In `web/src/console/pages/DashboardPage.tsx`:
 
@@ -1969,12 +1969,12 @@ with:
   const pendingHandovers = handovers.data?.length ?? 0;
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd web && npx vitest run src/console/pages/DashboardPage.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/src/console/pages/DashboardPage.tsx web/src/console/pages/DashboardPage.test.tsx
@@ -1987,17 +1987,17 @@ git commit -m "feat: count pending handovers across paginated pages"
 
 **Files:** none (verification only).
 
-- [ ] **Step 1: Run the Go suite**
+- [x] **Step 1: Run the Go suite**
 
 Run: `make check` (runs `gofmt`, `go vet ./...`, `go test ./...`).
 Expected: all pass.
 
-- [ ] **Step 2: Run the web suite**
+- [x] **Step 2: Run the web suite**
 
 Run: `cd web && npm run lint && npm test && npm run build`
 Expected: all pass (lint clean, all vitest suites green, TypeScript build succeeds).
 
-- [ ] **Step 3: Smoke-test the endpoints against a live stack**
+- [x] **Step 3: Smoke-test the endpoints against a live stack**
 
 With `compose up` running and a seeded principal that has `report:write` and `handover:write`:
 
@@ -2011,7 +2011,7 @@ curl -s -o /dev/null -w '%{http_code}\n' 'http://localhost:8080/api/v1/reports?p
 
 Expected: first two return 200 with `next_cursor`/`has_more`; last returns 400.
 
-- [ ] **Step 4: Confirm the two pages load in the console**
+- [x] **Step 4: Confirm the two pages load in the console**
 
 Open `/reports`, `/handovers`, and `/` (dashboard) in the pilot console. Expected: no "Something went wrong" error states; reports/handovers lists render; dashboard shows the pending-handover KPI.
 
