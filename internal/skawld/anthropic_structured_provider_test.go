@@ -135,3 +135,15 @@ func TestAnthropicStructuredProviderConfigValidation(t *testing.T) {
 		t.Fatal("expected nil-client error")
 	}
 }
+
+func TestAnthropicStructuredProviderRejectsEmptyContentArray(t *testing.T) {
+	provider := newTestAnthropicProvider(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"content": []}`))
+	})
+	if _, err := provider.Generate(context.Background(), GenerateRequest{
+		Capability: CapabilityRecommendation, SchemaVersion: "v1",
+	}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
+	}
+}

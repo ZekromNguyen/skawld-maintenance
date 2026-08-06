@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -112,5 +113,38 @@ func TestHTTPEmbeddingProviderConfigValidation(t *testing.T) {
 		Provider: "openai", Model: "m", ModelVersion: "v",
 	}, nil); err == nil {
 		t.Fatal("expected nil-client error")
+	}
+}
+
+func TestHTTPEmbeddingProviderRejectsCountMismatch(t *testing.T) {
+	t.Parallel()
+	provider := newTestEmbeddingProvider(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data": [{"embedding": [0.1, 0.2, 0.3]}]}`)) // 1 result for 2 inputs
+	})
+	if _, err := provider.Embed(context.Background(), []string{"a", "b"}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
+	}
+}
+
+func TestHTTPEmbeddingProviderRejectsZeroLengthEmbedding(t *testing.T) {
+	t.Parallel()
+	provider := newTestEmbeddingProvider(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data": [{"embedding": []}]}`))
+	})
+	if _, err := provider.Embed(context.Background(), []string{"a"}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
+	}
+}
+
+func TestHTTPEmbeddingProviderRejectsNon2xx(t *testing.T) {
+	t.Parallel()
+	provider := newTestEmbeddingProvider(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "upstream failure", http.StatusServiceUnavailable)
+	})
+	if _, err := provider.Embed(context.Background(), []string{"a"}); err == nil ||
+		!strings.Contains(err.Error(), "status 503") {
+		t.Fatalf("error = %v, want status 503", err)
 	}
 }

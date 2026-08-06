@@ -133,3 +133,16 @@ func TestHTTPStructuredProviderConfigValidation(t *testing.T) {
 		t.Fatal("expected nil-client error")
 	}
 }
+
+func TestHTTPStructuredProviderRejectsEmptyChoices(t *testing.T) {
+	t.Parallel()
+	provider := newTestStructuredProvider(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"choices": []}`))
+	})
+	if _, err := provider.Generate(context.Background(), GenerateRequest{
+		Capability: CapabilityRecommendation, SchemaVersion: "v1",
+	}); !errors.Is(err, ErrInvalidOutput) {
+		t.Fatalf("error = %v, want ErrInvalidOutput", err)
+	}
+}
