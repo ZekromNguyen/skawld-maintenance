@@ -93,12 +93,12 @@ export interface ListOptions {
   page_size?: number;
 }
 
-function listQuery(options: ListOptions): string {
+function listQuery(options?: ListOptions): string {
   const params = new URLSearchParams();
-  if (options.site_id) params.set("site_id", options.site_id);
-  for (const state of options.state ?? []) params.append("state", state);
-  if (options.cursor) params.set("cursor", options.cursor);
-  if (options.page_size) params.set("page_size", String(options.page_size));
+  if (options?.site_id) params.set("site_id", options.site_id);
+  for (const state of options?.state ?? []) params.append("state", state);
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.page_size) params.set("page_size", String(options.page_size));
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -119,7 +119,8 @@ export async function fetchAll<T>(
 
 export const api = {
   principal: () => request<Principal>("/me"),
-  assets: () => request<ListResponse<Asset>>("/assets"),
+  assets: (options?: ListOptions) =>
+    request<ListPage<Asset>>(`/assets${listQuery(options)}`),
   createAsset: (value: {
     site_id: string;
     tag: string;
@@ -131,7 +132,8 @@ export const api = {
       source_of_truth: "OWNED_BY_SKAWLD",
       components: []
     }),
-  incidents: () => request<ListResponse<Incident>>("/incidents"),
+  incidents: (options?: ListOptions) =>
+    request<ListPage<Incident>>(`/incidents${listQuery(options)}`),
   createIncident: (value: {
     site_id: string;
     asset_id: string;
@@ -173,9 +175,9 @@ export const api = {
       verification_status: "UNVERIFIED",
       observed_at: new Date().toISOString()
     }),
-  documents: (siteID?: string) =>
-    request<ListResponse<KnowledgeDocument>>(
-      `/documents${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+  documents: (siteID?: string, options?: ListOptions) =>
+    request<ListPage<KnowledgeDocument>>(
+      `/documents${listQuery({ site_id: siteID, ...(options ?? {}) })}`
     ),
   createDocument: (siteID: string, title: string, documentType: string) =>
     command<KnowledgeDocument>("/documents", {
@@ -282,9 +284,9 @@ export const api = {
       shift_end: end.toISOString()
     });
   },
-  demonstrations: (siteID?: string) =>
-    request<ListResponse<Demonstration>>(
-      `/demonstrations${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+  demonstrations: (siteID?: string, options?: ListOptions) =>
+    request<ListPage<Demonstration>>(
+      `/demonstrations${listQuery({ site_id: siteID, ...(options ?? {}) })}`
     ),
   demonstration: (id: string) =>
     request<Demonstration>(`/demonstrations/${id}`),
@@ -320,7 +322,8 @@ export const api = {
       action: "MASK",
       reason
     }),
-  workflows: () => request<ListResponse<WorkflowVersion>>("/workflows"),
+  workflows: (options?: ListOptions) =>
+    request<ListPage<WorkflowVersion>>(`/workflows${listQuery(options)}`),
   workflow: (workflowID: string, version: number) =>
     request<WorkflowVersion>(
       `/workflows/${workflowID}/versions/${version}`
@@ -386,7 +389,8 @@ export const api = {
   approveAssetCriticality: (assetID: string) =>
     command<unknown>(`/assets/${assetID}/criticality-approvals`, {}),
   incident: (id: string) => request<Incident>(`/incidents/${id}`),
-  listExecutions: () => request<ListResponse<Execution>>("/executions"),
+  listExecutions: (options?: ListOptions) =>
+    request<ListPage<Execution>>(`/executions${listQuery(options)}`),
   resolveIncident: (incidentID: string) =>
     command<Incident>(`/incidents/${incidentID}/resolution`, {}),
   generateRecommendation: (incidentID: string) =>
