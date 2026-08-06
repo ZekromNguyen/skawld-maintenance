@@ -105,7 +105,6 @@ export function WorkflowLearningPanel(props: {
         ) : null}
         <button
           className="primary-button"
-          style={{ marginLeft: 16 }}
           disabled={props.busy || selectedDemonstrations.length < 2}
           onClick={compile}
         >
@@ -232,10 +231,10 @@ export function WorkflowLearningPanel(props: {
               </article>
             </div>
 
-            <div className="panel" style={{ margin: "0 16px" }}>
+            <div className="panel governance-panel">
               <div className="panel-heading"><h2>{t("workflow.governanceTrail")}</h2></div>
               {(selected.reviews?.length ?? 0) > 0 ? (
-                <div className="readable-list" style={{ margin: 12 }}>
+                <div className="readable-list">
                   {selected.reviews!.map((review, index) => (
                     <div key={index} className="readable-row">
                       <div className="readable-key-value">

@@ -133,12 +133,16 @@ tr:last-child td { border-bottom: 0; }
 /* ---------- Workbench / queue ---------- */
 .workbench { display: grid; grid-template-columns: minmax(290px, 34%) minmax(0, 1fr); gap: 14px; align-items: start; }
 .queue-list { max-height: calc(100vh - 210px); overflow: auto; }
-.queue-item { display: grid; grid-template-columns: 4px 1fr; gap: 11px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); padding: 13px 14px; text-align: left; color: inherit; }
+.queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 11px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); padding: 13px 14px; text-align: left; color: inherit; }
 .queue-item:hover { background: var(--raised); }
 .queue-item.selected { background: var(--raised); box-shadow: inset 3px 0 var(--brand); }
-.queue-item > span:last-child { min-width: 0; }
+.queue-item > span:first-child { min-width: 0; }
 .queue-item strong { display: block; font-size: 12px; line-height: 1.45; margin: 6px 0 4px; color: var(--ink); }
 .queue-item small { color: var(--ink-muted); font-size: 10px; }
+.queue-panel > .muted { margin: 8px 16px 4px; }
+.queue-panel > .primary-button { margin: 4px 16px 14px; }
+.governance-panel { margin: 0 16px 16px; }
+.governance-panel .readable-list { margin: 12px; }
 .queue-meta { display: flex; justify-content: space-between; color: var(--ink-muted); font-size: 9px; }
 .severity-bar { width: 3px; height: 100%; min-height: 44px; background: #0f1a15; }
 .severity-bar.critical { background: var(--red); }
