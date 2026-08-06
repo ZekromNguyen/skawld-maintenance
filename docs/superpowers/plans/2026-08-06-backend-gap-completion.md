@@ -33,7 +33,7 @@ Pattern (replicated per endpoint, modeled on handovers at
 
 The per-endpoint sort column `col` is the endpoint's existing natural order column (below). Cursor ID must be a UUID (enforced by `keyset.Decode`).
 
-### Task A1: Paginate GET /api/v1/assets
+### Task 1: Paginate GET /api/v1/assets
 
 **Files:**
 - Modify: `internal/asset/application/service.go` (Filter struct at `:93`, `List` at `:162`, `Asset` struct at `:46`)
@@ -299,7 +299,7 @@ git add internal/asset internal/platform/httpserver/assets.go internal/platform/
 git commit -m "feat: paginate the asset list endpoint"
 ```
 
-### Task A2: Paginate GET /api/v1/incidents
+### Task 2: Paginate GET /api/v1/incidents
 
 **Files:**
 - Modify: `internal/incident/application/service.go` (Filter at `:58`, `List` at `:103`)
@@ -322,7 +322,7 @@ Expected: FAIL (no envelope, signature mismatch).
 
 - [ ] **Step 3: Update the application service**
 
-Add `PageSize int` and `Cursor string` to `incidentapp.Filter`. Change `Service.List` to the same shape as A1 Step 3 with the `([]Incident, string, error)` return (permission `PermissionIncidentRead`, page defaults, `keyset.Decode` → `timestamp|id`, store call returning `([]Incident, bool, error)`, `hasMore && len(items) > 0` → `keyset.Encode(last.DetectedAt, last.ID)`). Add `"time"` and the `keyset` import.
+Add `PageSize int` and `Cursor string` to `incidentapp.Filter`. Change `Service.List` to the same shape as Task 1 Step 3 with the `([]Incident, string, error)` return (permission `PermissionIncidentRead`, page defaults, `keyset.Decode` → `timestamp|id`, store call returning `([]Incident, bool, error)`, `hasMore && len(items) > 0` → `keyset.Encode(last.DetectedAt, last.ID)`). Add `"time"` and the `keyset` import.
 
 - [ ] **Step 4: Update the store query**
 
@@ -345,7 +345,7 @@ Convert the query string to the `query += fmt.Sprintf(...)` style used by the ha
 
 - [ ] **Step 5: Update the handler**
 
-Same shape as A1 Step 5, using `filter := incidentapp.Filter{SiteID: r.URL.Query().Get("site_id"), AssetID: r.URL.Query().Get("asset_id"), State: r.URL.Query().Get("state"), PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and `writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound, incidentapp.ErrInvalid)`.
+Same shape as Task 1 Step 5, using `filter := incidentapp.Filter{SiteID: r.URL.Query().Get("site_id"), AssetID: r.URL.Query().Get("asset_id"), State: r.URL.Query().Get("state"), PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and `writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound, incidentapp.ErrInvalid)`.
 
 - [ ] **Step 6: Update OpenAPI for GET /incidents**
 
@@ -363,7 +363,7 @@ git add internal/incident internal/platform/httpserver/incidents.go internal/pla
 git commit -m "feat: paginate the incident list endpoint"
 ```
 
-### Task A3: Paginate GET /api/v1/executions
+### Task 3: Paginate GET /api/v1/executions
 
 **Files:**
 - Modify: `internal/execution/application/service.go` (Filter at `:107`, `List` at `:245`, `Execution` struct at `:188`)
@@ -409,7 +409,7 @@ Truncate `ids` to `filter.PageSize` when more than that many were fetched, then 
 
 - [ ] **Step 5: Update the handler**
 
-Same shape as A1 Step 5 with `filter := executionapp.Filter{SiteID: ..., State: r.URL.Query().Get("state"), AssignedTo: r.URL.Query().Get("assigned_to"), PageSize: pageSize, Cursor: ...}` and `writeDomainError(w, err, executionapp.ErrForbidden, executionapp.ErrNotFound, executionapp.ErrInvalid)`.
+Same shape as Task 1 Step 5 with `filter := executionapp.Filter{SiteID: ..., State: r.URL.Query().Get("state"), AssignedTo: r.URL.Query().Get("assigned_to"), PageSize: pageSize, Cursor: ...}` and `writeDomainError(w, err, executionapp.ErrForbidden, executionapp.ErrNotFound, executionapp.ErrInvalid)`.
 
 - [ ] **Step 6: Update OpenAPI for GET /executions**
 
@@ -427,7 +427,7 @@ git add internal/execution internal/platform/httpserver/executions.go internal/p
 git commit -m "feat: paginate the execution list endpoint"
 ```
 
-### Task A4: Paginate GET /api/v1/documents
+### Task 4: Paginate GET /api/v1/documents
 
 **Files:**
 - Modify: `internal/knowledge/application/service.go` (Filter at `:50`, `ListDocuments` at `:225`)
@@ -481,7 +481,7 @@ Fetch `pageSize+1` IDs, set `hasMore` before truncating to `filter.PageSize`, th
 
 - [ ] **Step 5: Update the handler**
 
-Same shape as A1 Step 5 with `filter := knowledgeapp.Filter{SiteID: r.URL.Query().Get("site_id"), PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and the existing `writeKnowledgeError` (or `writeDomainError` — use whatever `listDocuments` already calls).
+Same shape as Task 1 Step 5 with `filter := knowledgeapp.Filter{SiteID: r.URL.Query().Get("site_id"), PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and the existing `writeKnowledgeError` (or `writeDomainError` — use whatever `listDocuments` already calls).
 
 - [ ] **Step 6: Update OpenAPI for GET /documents**
 
@@ -499,7 +499,7 @@ git add internal/knowledge internal/platform/httpserver/knowledge.go internal/pl
 git commit -m "feat: paginate the document list endpoint"
 ```
 
-### Task A5: Paginate GET /api/v1/demonstrations
+### Task 5: Paginate GET /api/v1/demonstrations
 
 **Files:**
 - Modify: `internal/demonstration/application/service.go` (`List` at `:173`, `Gateway` interface at `:126`)
@@ -555,7 +555,7 @@ Truncate `ids` to `filter.PageSize` (keeping `hasMore` computed before truncatio
 
 - [ ] **Step 5: Update the handler**
 
-Same shape as A1 Step 5 with `filter := demonstrationapp.ListFilter{PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and the existing site_id param handling kept.
+Same shape as Task 1 Step 5 with `filter := demonstrationapp.ListFilter{PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}` and the existing site_id param handling kept.
 
 - [ ] **Step 6: Update the integration test call sites**
 
@@ -577,7 +577,7 @@ git add internal/demonstration internal/skawld internal/platform/httpserver/demo
 git commit -m "feat: paginate the demonstration list endpoint"
 ```
 
-### Task A6: Paginate GET /api/v1/workflows
+### Task 6: Paginate GET /api/v1/workflows
 
 **Files:**
 - Modify: `internal/workflow/application/service.go` (`List` at `:191`, `Gateway` interface, `Version` struct at `:107`)
@@ -634,7 +634,7 @@ The service decodes the base64 cursor and passes it to the gateway as `created_a
 
 - [ ] **Step 5: Update the handler**
 
-Same shape as A1 Step 5 with `filter := workflowapp.ListFilter{PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}`.
+Same shape as Task 1 Step 5 with `filter := workflowapp.ListFilter{PageSize: pageSize, Cursor: strings.TrimSpace(r.URL.Query().Get("cursor"))}`.
 
 - [ ] **Step 6: Update the integration test call sites**
 
@@ -660,12 +660,12 @@ git commit -m "feat: paginate the workflow list endpoint"
 
 ## Part B — EAM/CMMS connector operation (CLI + API)
 
-### Task B1: PostgreSQL external-asset projection sink
+### Task 7: PostgreSQL external-asset projection sink
 
 **Files:**
 - Create: `internal/integration/adapter/postgres/sink.go`
 - Create: `internal/integration/adapter/postgres/sink_integration_test.go`
-- Modify: `cmd/api/main.go` (wire the sink — later in Task B3; this task only creates the type)
+- Modify: `cmd/api/main.go` (wire the sink — later in Task 9; this task only creates the type)
 
 **Interfaces:**
 - Consumes: `integrationdomain.ExternalRecord` (`Kind`, `OrganizationID`, `SiteID`, `ExternalSystem`, `ExternalID`, `ExternalVersion`, `ObservedAt`, `Attributes map[string]any`); `integrationapp.ProjectionSink` (`Apply(ctx, principal, records) error`); `id.Generator`, `clock.Clock`, `audit.Sink`, `database.InTx`.
@@ -883,7 +883,7 @@ git add internal/integration/adapter/postgres
 git commit -m "feat: add external asset projection sink for connector imports"
 ```
 
-### Task B2: cmd/import CLI
+### Task 8: cmd/import CLI
 
 **Files:**
 - Create: `cmd/import/main.go`
@@ -892,7 +892,7 @@ git commit -m "feat: add external asset projection sink for connector imports"
 - Modify: `ReadMe.md` (usage section) and `docs/runbooks/demo-data.md` (import usage)
 
 **Interfaces:**
-- Consumes: `ndjson.New(path, allowedRoot, identity) (Connector, error)`; `integrationapp.Importer{Connector, Sink}`; `postgres.Sink` (Task B1); `identitydomain.PermissionsForRole(RoleAdministrator)`; `database.Open`.
+- Consumes: `ndjson.New(path, allowedRoot, identity) (Connector, error)`; `integrationapp.Importer{Connector, Sink}`; `postgres.Sink` (Task 7); `identitydomain.PermissionsForRole(RoleAdministrator)`; `database.Open`.
 - Produces: runnable `go run ./cmd/import -snapshot <file> -site-id <uuid>` binary.
 
 - [ ] **Step 1: Create the fixture**
@@ -1106,7 +1106,7 @@ git add cmd/import test/fixtures/import-p302.ndjson ReadMe.md docs/runbooks/demo
 git commit -m "feat: add EAM/CMMS snapshot import CLI"
 ```
 
-### Task B3: POST /api/v1/integrations/imports route
+### Task 9: POST /api/v1/integrations/imports route
 
 **Files:**
 - Modify: `internal/platform/httpserver/router.go` (Dependencies struct, `mountIntegrationRoutes`)
@@ -1116,7 +1116,7 @@ git commit -m "feat: add EAM/CMMS snapshot import CLI"
 - Modify: `api/openapi.yaml` (new path)
 
 **Interfaces:**
-- Consumes: `integrationpostgres.Sink` (Task B1), `ndjson.New`, `integrationapp.Importer`, `integrationdomain` constants, `principalFromRequest`.
+- Consumes: `integrationpostgres.Sink` (Task 7), `ndjson.New`, `integrationapp.Importer`, `integrationdomain` constants, `principalFromRequest`.
 - Produces: `httpserver.Dependencies.IntegrationSink integrationapp.ProjectionSink`; route `POST /api/v1/integrations/imports`.
 
 - [ ] **Step 1: Write the failing handler test**
@@ -1282,13 +1282,13 @@ git commit -m "feat: add admin API route for EAM/CMMS snapshot imports"
 
 ---
 
-### Task B4: Extend CI with the import CLI end-to-end step
+### Task 10: Extend CI with the import CLI end-to-end step
 
 **Files:**
 - Modify: `.github/workflows/ci.yml` (the "Test" step block at `:44-49`)
 
 **Interfaces:**
-- Consumes: `cmd/import` (Task B2) and the test DB/site seeded by the existing migration step.
+- Consumes: `cmd/import` (Task 8) and the test DB/site seeded by the existing migration step.
 
 - [ ] **Step 1: Add the CI step**
 
@@ -1323,7 +1323,7 @@ git commit -m "ci: run the EAM/CMMS import CLI end-to-end"
 
 ## Part C — Env-selectable AI provider adapters
 
-### Task C1: AI config section and validation
+### Task 11: AI config section and validation
 
 **Files:**
 - Modify: `internal/platform/config/config.go` (`Config` struct at `:22`, `Load` at `:95`, validation at `:215`)
@@ -1503,7 +1503,7 @@ git add internal/platform/config
 git commit -m "feat: add env-selectable AI provider configuration"
 ```
 
-### Task C2: OpenAI-compatible structured provider
+### Task 12: OpenAI-compatible structured provider
 
 **Files:**
 - Create: `internal/skawld/http_structured_provider.go`
@@ -1681,7 +1681,7 @@ git add internal/skawld/http_structured_provider.go internal/skawld/http_structu
 git commit -m "feat: add OpenAI-compatible structured output provider"
 ```
 
-### Task C3: OpenAI-compatible embedding provider
+### Task 13: OpenAI-compatible embedding provider
 
 **Files:**
 - Create: `internal/skawld/http_embedding_provider.go`
@@ -1724,7 +1724,7 @@ git add internal/skawld/http_embedding_provider.go internal/skawld/http_embeddin
 git commit -m "feat: add OpenAI-compatible embedding provider"
 ```
 
-### Task C4: Anthropic structured provider
+### Task 14: Anthropic structured provider
 
 **Files:**
 - Create: `internal/skawld/anthropic_structured_provider.go`
@@ -1794,7 +1794,7 @@ git add internal/skawld/anthropic_structured_provider.go internal/skawld/anthrop
 git commit -m "feat: add Anthropic structured output provider"
 ```
 
-### Task C5: Env-driven composition helper and wiring
+### Task 15: Env-driven composition helper and wiring
 
 **Files:**
 - Create: `internal/skawld/providers.go`
@@ -1804,7 +1804,7 @@ git commit -m "feat: add Anthropic structured output provider"
 - Modify: `cmd/seed/main.go:92,327-330` (embedding provider + router)
 
 **Interfaces:**
-- Consumes: `config.AI` (Task C1), `HTTPStructuredProvider`, `HTTPEmbeddingProvider`, `AnthropicStructuredProvider`, `DeterministicProvider`, `DeterministicEmbeddingProvider`.
+- Consumes: `config.AI` (Task 11), `HTTPStructuredProvider`, `HTTPEmbeddingProvider`, `AnthropicStructuredProvider`, `DeterministicProvider`, `DeterministicEmbeddingProvider`.
 - Produces: `AIConfig{StructuredProvider, EmbeddingProvider, StructuredEndpoint, StructuredAPIKey, StructuredModel, StructuredModelVersion, AnthropicAPIKey, AnthropicModel, EmbeddingEndpoint, EmbeddingModel, EmbeddingModelVersion string}`; `BuildProviders(cfg AIConfig, client *http.Client) (map[Capability]StructuredProvider, EmbeddingProvider, error)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -1924,7 +1924,7 @@ func buildEmbeddingProvider(cfg AIConfig, client *http.Client) (EmbeddingProvide
 }
 ```
 
-`AnthropicStructuredConfig{APIKey, Model, ModelVersion string}` (Task C4) aligns with `AIConfig.AnthropicModelVersion`; `HTTPStructuredConfig{Endpoint, APIKey, Provider, Model, ModelVersion string}` and `HTTPEmbeddingConfig{Endpoint, APIKey, Provider, Model, ModelVersion string}` align with the fields used above.
+`AnthropicStructuredConfig{APIKey, Model, ModelVersion string}` (Task 14) aligns with `AIConfig.AnthropicModelVersion`; `HTTPStructuredConfig{Endpoint, APIKey, Provider, Model, ModelVersion string}` and `HTTPEmbeddingConfig{Endpoint, APIKey, Provider, Model, ModelVersion string}` align with the fields used above.
 
 - [ ] **Step 4: Wire cmd/api/main.go**
 

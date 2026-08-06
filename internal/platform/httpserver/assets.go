@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	"strings"
 
 	assetapp "github.com/ZekromNguyen/skawld-maintenance/internal/asset/application"
 	"github.com/go-chi/chi/v5"
@@ -20,16 +21,30 @@ func listAssets(service assetapp.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := service.List(r.Context(), principal, assetapp.Filter{
-			SiteID: r.URL.Query().Get("site_id"),
-			Query:  r.URL.Query().Get("q"),
-		})
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := assetapp.Filter{
+			SiteID:   r.URL.Query().Get("site_id"),
+			Query:    r.URL.Query().Get("q"),
+			PageSize: pageSize,
+			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		if filter.SiteID != "" && !validUUIDParam(w, filter.SiteID, "site ID") {
+			return
+		}
+		items, next, err := service.List(r.Context(), principal, filter)
 		if err != nil {
 			writeDomainError(w, err, assetapp.ErrForbidden, assetapp.ErrNotFound,
 				assetapp.ErrInvalid, assetapp.ErrVersionConflict)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"items": result})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	assetdomain "github.com/ZekromNguyen/skawld-maintenance/internal/asset/domain"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	integrationdomain "github.com/ZekromNguyen/skawld-maintenance/internal/integration/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
 
 var (
@@ -57,6 +58,7 @@ type Asset struct {
 	SourceOfTruth     string             `json:"source_of_truth"`
 	ExternalReference *ExternalReference `json:"external_reference,omitempty"`
 	Version           int64              `json:"version"`
+	CreatedAt         time.Time          `json:"created_at"`
 	Components        []Component        `json:"components"`
 	Criticality       *Criticality       `json:"criticality,omitempty"`
 }
@@ -91,8 +93,10 @@ type ApproveCriticality struct {
 }
 
 type Filter struct {
-	SiteID string
-	Query  string
+	SiteID   string
+	Query    string
+	PageSize int
+	Cursor   string
 }
 
 type Store interface {
@@ -103,7 +107,7 @@ type Store interface {
 		command CreateAsset,
 	) (Asset, bool, error)
 	Get(ctx context.Context, principal identitydomain.Principal, id string) (Asset, error)
-	List(ctx context.Context, principal identitydomain.Principal, filter Filter) ([]Asset, error)
+	List(ctx context.Context, principal identitydomain.Principal, filter Filter) ([]Asset, bool, error)
 	ApproveCriticality(
 		ctx context.Context,
 		principal identitydomain.Principal,
@@ -163,14 +167,35 @@ func (s Service) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter Filter,
-) ([]Asset, error) {
+) ([]Asset, string, error) {
 	if !principal.Has(identitydomain.PermissionAssetRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if filter.SiteID != "" && !principal.CanAccessSite(principal.OrganizationID, filter.SiteID) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
-	return s.Store.List(ctx, principal, filter)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.List(ctx, principal, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, keyset.Encode(last.CreatedAt, last.ID), nil
 }
 
 func (s Service) ApproveCriticality(
