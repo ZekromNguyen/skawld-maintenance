@@ -73,6 +73,9 @@ export function WorkflowsPage() {
   }
 
   const busy = compile.pending || review.pending || publish.pending || retire.pending;
+  const perms = principal?.permissions ?? [];
+  const canReview = perms.includes("workflow:review");
+  const canPublish = perms.includes("workflow:publish");
 
   return (
     <PageTrailProvider trail={[]}>
@@ -83,6 +86,8 @@ export function WorkflowsPage() {
           demonstrations={demonstrations.data ?? []}
           selected={selected}
           busy={busy}
+          canReview={canReview}
+          canPublish={canPublish}
           onSelect={(value) => setSelected(value)}
           onCompile={(ids) => {
             const source = demonstrations.data?.find((demo) => demo.id === ids[0]);

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider";
 import { PromptDialog } from "../feedback/PromptDialog";
 import { StatusBadge, type Tone } from "../ui/StatusBadge";
+import { GatedButton } from "../ui/GatedButton";
 import type { Demonstration, WorkflowVersion } from "../../types";
 
 interface PromptSpec {
@@ -26,6 +27,8 @@ export function WorkflowLearningPanel(props: {
   demonstrations: Demonstration[];
   selected?: WorkflowVersion;
   busy: boolean;
+  canReview: boolean;
+  canPublish: boolean;
   onSelect: (value: WorkflowVersion) => void;
   onCompile: (demonstrationIDs: string[]) => void;
   onReview: (
@@ -37,6 +40,7 @@ export function WorkflowLearningPanel(props: {
   onRetire: (value: WorkflowVersion, reason: string) => void;
 }) {
   const { t } = useI18n();
+  const permissionReason = t("action.permissionRequired");
   const [selectedDemonstrations, setSelectedDemonstrations] = useState<string[]>([]);
   const [compileError, setCompileError] = useState<string | undefined>(undefined);
   const [prompt, setPrompt] = useState<PromptSpec | null>(null);
@@ -264,7 +268,9 @@ export function WorkflowLearningPanel(props: {
               </span>
               {(selected.status === "CANDIDATE" || selected.status === "REVIEW_REQUIRED") && (
                 <>
-                  <button
+                  <GatedButton
+                    allowed={props.canReview}
+                    reason={permissionReason}
                     className="secondary-button"
                     disabled={props.busy}
                     onClick={() =>
@@ -278,8 +284,10 @@ export function WorkflowLearningPanel(props: {
                     }
                   >
                     {t("workflow.requireReview")}
-                  </button>
-                  <button
+                  </GatedButton>
+                  <GatedButton
+                    allowed={props.canReview}
+                    reason={permissionReason}
                     className="secondary-button"
                     disabled={props.busy}
                     onClick={() =>
@@ -293,8 +301,10 @@ export function WorkflowLearningPanel(props: {
                     }
                   >
                     {t("workflow.reject")}
-                  </button>
-                  <button
+                  </GatedButton>
+                  <GatedButton
+                    allowed={props.canReview}
+                    reason={permissionReason}
                     className="primary-button"
                     disabled={props.busy}
                     onClick={() =>
@@ -308,11 +318,13 @@ export function WorkflowLearningPanel(props: {
                     }
                   >
                     {t("workflow.approveCandidate")}
-                  </button>
+                  </GatedButton>
                 </>
               )}
               {selected.status === "APPROVED" && (
-                <button
+                <GatedButton
+                  allowed={props.canPublish}
+                  reason={permissionReason}
                   className="primary-button"
                   disabled={props.busy}
                   onClick={() =>
@@ -326,10 +338,12 @@ export function WorkflowLearningPanel(props: {
                   }
                 >
                   {t("workflow.evaluatePublish")}
-                </button>
+                </GatedButton>
               )}
               {selected.status === "PUBLISHED" && (
-                <button
+                <GatedButton
+                  allowed={props.canPublish}
+                  reason={permissionReason}
                   className="secondary-button"
                   disabled={props.busy}
                   onClick={() =>
@@ -343,7 +357,7 @@ export function WorkflowLearningPanel(props: {
                   }
                 >
                   {t("workflow.retireVersion")}
-                </button>
+                </GatedButton>
               )}
             </div>
           </>

@@ -52,7 +52,7 @@ const fixtures = vi.hoisted(() => ({
 
 vi.mock("../../api", () => ({
   api: {
-    principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }),
+    principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["workflow:review", "workflow:publish"] }),
     workflows: vi.fn().mockResolvedValue({ items: [fixtures.workflow] }),
     demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.approvedDemo] }),
     assets: vi.fn().mockResolvedValue({ items: [] }),
@@ -67,7 +67,7 @@ function renderPage() {
   return render(
     <I18nProvider>
       <PrincipalProvider>
-        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }}>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["workflow:review", "workflow:publish"] }}>
           <ToastProvider>
             <MemoryRouter>
               <WorkflowsPage />
@@ -102,5 +102,22 @@ describe("WorkflowsPage", () => {
     );
     expect(promptSpy).not.toHaveBeenCalled();
     promptSpy.mockRestore();
+  });
+
+  it("disables review actions with a reason without workflow:review", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Technician",
+      organization_id: "o1",
+      site_ids: ["s1"],
+      permissions: ["execution:write"]
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /high vibration pump inspection/i }));
+    const approve = screen.getByRole("button", { name: "Approve candidate" }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
+    const reject = screen.getByRole("button", { name: "Reject" }) as HTMLButtonElement;
+    expect(reject.disabled).toBe(true);
   });
 });

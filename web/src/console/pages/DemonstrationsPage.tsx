@@ -41,6 +41,9 @@ export function DemonstrationsPage() {
   const values = demonstrations.data ?? [];
   const selectedValue = values.find((value) => value.id === selected);
   const busy = complete.pending || redact.pending || review.pending;
+  const perms = principal?.permissions ?? [];
+  const canReview = perms.includes("demonstration:review");
+  const canCapture = perms.includes("demonstration:capture");
 
   return (
     <PageTrailProvider trail={[]}>
@@ -50,6 +53,8 @@ export function DemonstrationsPage() {
           values={values}
           selected={selectedValue}
           busy={busy}
+          canReview={canReview}
+          canCapture={canCapture}
           onSelect={(value) => setSelected(value.id)}
           onComplete={(value, outcome) => void complete.run(value.id, outcome)}
           onRedact={(value, eventID, path, reason) => void redact.run(value.id, eventID, path, reason)}
