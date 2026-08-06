@@ -7,6 +7,7 @@ import (
 	"time"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
 
 var (
@@ -56,15 +57,17 @@ type Incident struct {
 }
 
 type Filter struct {
-	SiteID  string
-	AssetID string
-	State   string
+	SiteID   string
+	AssetID  string
+	State    string
+	PageSize int
+	Cursor   string
 }
 
 type Store interface {
 	Create(context.Context, identitydomain.Principal, string, CreateIncident) (Incident, bool, error)
 	Get(context.Context, identitydomain.Principal, string) (Incident, error)
-	List(context.Context, identitydomain.Principal, Filter) ([]Incident, error)
+	List(context.Context, identitydomain.Principal, Filter) ([]Incident, bool, error)
 	Resolve(context.Context, identitydomain.Principal, string, string, ResolveIncident) (Incident, bool, error)
 }
 
@@ -104,14 +107,35 @@ func (s Service) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter Filter,
-) ([]Incident, error) {
+) ([]Incident, string, error) {
 	if !principal.Has(identitydomain.PermissionIncidentRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if filter.SiteID != "" && !principal.CanAccessSite(principal.OrganizationID, filter.SiteID) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
-	return s.Store.List(ctx, principal, filter)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.List(ctx, principal, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, keyset.Encode(last.DetectedAt, last.ID), nil
 }
 
 func (s Service) Resolve(

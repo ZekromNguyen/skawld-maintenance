@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	"strings"
 
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
@@ -26,17 +27,31 @@ func listIncidents(service incidentapp.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := service.List(r.Context(), principal, incidentapp.Filter{
-			SiteID:  r.URL.Query().Get("site_id"),
-			AssetID: r.URL.Query().Get("asset_id"),
-			State:   r.URL.Query().Get("state"),
-		})
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := incidentapp.Filter{
+			SiteID:   r.URL.Query().Get("site_id"),
+			AssetID:  r.URL.Query().Get("asset_id"),
+			State:    r.URL.Query().Get("state"),
+			PageSize: pageSize,
+			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		if filter.SiteID != "" && !validUUIDParam(w, filter.SiteID, "site ID") {
+			return
+		}
+		items, next, err := service.List(r.Context(), principal, filter)
 		if err != nil {
 			writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound,
 				incidentapp.ErrInvalid, incidentapp.ErrVersionConflict)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"items": result})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

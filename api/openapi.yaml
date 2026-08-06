@@ -301,6 +301,8 @@ paths:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
         - {in: query, name: asset_id, schema: {type: string, format: uuid}}
         - {in: query, name: state, schema: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED]}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Incidents in the authorized scope.
@@ -308,8 +310,12 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/Incident"}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
     post:
       summary: Create an incident
       tags: [Incidents]

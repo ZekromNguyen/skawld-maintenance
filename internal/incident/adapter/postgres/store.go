@@ -152,29 +152,49 @@ func (s Store) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter incidentapp.Filter,
-) ([]incidentapp.Incident, error) {
-	rows, err := s.Pool.Query(ctx, incidentSelect+`
+) ([]incidentapp.Incident, bool, error) {
+	query := incidentSelect + `
 		WHERE i.organization_id = $1::uuid
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR i.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR i.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR i.asset_id = $4::uuid)
-		  AND (nullif($5, '') IS NULL OR i.state = $5)
-		ORDER BY i.detected_at DESC
-		LIMIT 200
-	`, principal.OrganizationID, principal.SiteIDs, filter.SiteID, filter.AssetID, filter.State)
+		  AND (nullif($5, '') IS NULL OR i.state = $5)`
+	args := []any{
+		principal.OrganizationID, principal.SiteIDs,
+		filter.SiteID, filter.AssetID, filter.State,
+	}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, incidentapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (i.detected_at, i.id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY i.detected_at DESC, i.id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
-	var result []incidentapp.Incident
+	result := make([]incidentapp.Incident, 0, filter.PageSize+1)
 	for rows.Next() {
 		value, err := scanIncident(rows)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, value)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(result) > filter.PageSize
+	if hasMore {
+		result = result[:filter.PageSize]
+	}
+	return result, hasMore, nil
 }
 
 func (s Store) Resolve(
