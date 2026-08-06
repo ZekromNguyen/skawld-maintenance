@@ -44,8 +44,18 @@ paired with re-ingestion:
 DELETE FROM embeddings;
 ```
 
-then re-run document ingestion (the ingest worker reprocesses revisions in
-`ingestion_state = 'READY'` from the beginning, or re-upload the revisions).
+then requeue the document revisions so the ingest worker reprocesses them:
+upload a new attachment to each revision (attaching an attachment resets
+`ingestion_state` to `QUEUED`), or reset the state directly, e.g.
+
+```sql
+UPDATE document_revisions
+SET ingestion_state = 'QUEUED', ingestion_error = NULL
+WHERE organization_id = '<org-uuid>';
+```
+
+Revisions already in `ingestion_state = 'READY'` are claimed but not
+re-embedded by the worker, so `DELETE FROM embeddings` alone is not enough.
 Do not mix providers in one database.
 
 ## Running the contract tests
