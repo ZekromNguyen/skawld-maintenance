@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	demonstrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/demonstration/application"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -60,12 +61,24 @@ func listDemonstrations(service demonstrationapp.Service) http.HandlerFunc {
 		if siteID != "" && !validUUIDParam(w, siteID, "site ID") {
 			return
 		}
-		values, err := service.List(r.Context(), principal, siteID)
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := demonstrationapp.ListFilter{
+			PageSize: pageSize,
+			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		items, next, err := service.List(r.Context(), principal, siteID, filter)
 		if err != nil {
 			writeDemonstrationError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"items": values})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

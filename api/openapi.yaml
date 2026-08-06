@@ -1159,6 +1159,8 @@ paths:
       security: [{sessionCookie: []}, {bearerAuth: []}]
       parameters:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Demonstrations in the authorized organization/site scope.
@@ -1166,11 +1168,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items:
                     type: array
                     items: {$ref: "#/components/schemas/Demonstration"}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "403": {$ref: "#/components/responses/Problem"}
     post:
       summary: Start semantic demonstration capture

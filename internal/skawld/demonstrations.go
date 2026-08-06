@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -167,40 +168,61 @@ func (g DemonstrationGateway) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	siteID string,
-) ([]demonstrationapp.Demonstration, error) {
-	rows, err := g.Pool.Query(ctx, `
+	filter demonstrationapp.ListFilter,
+) ([]demonstrationapp.Demonstration, bool, error) {
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	query := `
 		SELECT id::text
 		FROM demonstrations
 		WHERE organization_id = $1::uuid
 		  AND ($2 = '' OR site_id::text = $2)
-		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
-		ORDER BY started_at DESC
-		LIMIT 200
-	`, principal.OrganizationID, siteID, principal.SiteIDs)
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))`
+	args := []any{principal.OrganizationID, siteID, principal.SiteIDs}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, demonstrationapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (started_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY started_at DESC, id DESC LIMIT $%d", len(args))
+
+	rows, err := g.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 	var ids []string
 	for rows.Next() {
 		var value string
 		if err := rows.Scan(&value); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		ids = append(ids, value)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	hasMore := len(ids) > filter.PageSize
+	if hasMore {
+		ids = ids[:filter.PageSize]
 	}
 	output := make([]demonstrationapp.Demonstration, 0, len(ids))
 	for _, value := range ids {
 		demo, err := g.Get(ctx, principal, value)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		output = append(output, demo)
 	}
-	return output, nil
+	return output, hasMore, nil
 }
 
 func (g DemonstrationGateway) Complete(
