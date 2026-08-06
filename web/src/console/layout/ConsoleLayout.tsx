@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { CommandPalette } from "../components/CommandPalette";
 import { usePrincipal } from "../usePrincipal";
 import { SiteProvider } from "../state/SiteContext";
 
@@ -21,6 +22,7 @@ export function ConsoleLayout() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette principal={principal} />
     </SiteProvider>
   );
 }

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { useCommand } from "../useCommand";
@@ -37,6 +37,10 @@ export function IncidentsPage() {
   const [severity, setSeverity] = useState("ALL");
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [params] = useSearchParams();
+  useEffect(() => {
+    if (params.get("create") === "1") setShowForm(true);
+  }, [params]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
 
   const create = useCommand(

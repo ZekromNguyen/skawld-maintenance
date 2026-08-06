@@ -76,6 +76,14 @@ describe("ReportDetailPage", () => {
     expect(screen.getByText("Report submitted")).toBeTruthy();
   });
 
+  it("prints via the report action", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Print" }));
+    expect(printSpy).toHaveBeenCalled();
+    printSpy.mockRestore();
+  });
+
   it("confirms before approving a submitted report", async () => {
     (api.report as ReturnType<typeof vi.fn>).mockResolvedValue({ ...fixtures.report, state: "SUBMITTED" });
     renderDetail();

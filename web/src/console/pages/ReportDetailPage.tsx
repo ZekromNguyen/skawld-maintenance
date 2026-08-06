@@ -82,6 +82,9 @@ export function ReportDetailPage() {
           principal={principal}
           actions={
             <>
+              <button className="secondary-button" onClick={() => window.print()}>
+                {t("report.print")}
+              </button>
               {value.state === "DRAFT" && canWrite && (
                 <button className="primary-button" disabled={submit.pending} onClick={() => void submit.run(value.id)}>
                   {t("report.submit")}

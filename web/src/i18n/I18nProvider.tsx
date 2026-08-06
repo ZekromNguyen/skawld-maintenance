@@ -2,6 +2,7 @@ import {
   createContext,
   ReactNode,
   useContext,
+  useEffect,
   useMemo,
   useState
 } from "react";
@@ -29,6 +30,10 @@ function detectLocale(): Locale {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectLocale);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "vi" ? "vi" : "en";
+  }, [locale]);
 
   const value = useMemo<I18nValue>(
     () => ({
