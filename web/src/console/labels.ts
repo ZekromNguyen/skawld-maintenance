@@ -167,3 +167,15 @@ export function approvalLabelKey(status: string): MessageKey | null {
       return null;
   }
 }
+
+/** Shift handover state tone. */
+export function handoverStateTone(state: string): Tone {
+  switch (state) {
+    case "ACKNOWLEDGED":
+      return "success";
+    case "SUBMITTED":
+      return "medium";
+    default:
+      return "info";
+  }
+}

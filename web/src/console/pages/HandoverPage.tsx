@@ -1,107 +1,124 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { useCommand } from "../useCommand";
+import { usePrincipal } from "../usePrincipal";
+import { useSite } from "../state/SiteContext";
 import { useI18n } from "../../i18n/I18nProvider";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
 import { HandoverPanel } from "../components/HandoverPanel";
 
 /**
- * HandoverPage: shift handover capture, transitions, and review.
- * DRAFT -> Submit (handover:write); SUBMITTED -> Accept (handover:accept);
- * ACCEPTED -> Acknowledge (handover:accept).
+ * HandoverPage: shift handover capture, transitions, and review. The latest
+ * handover per site scope, sorted by shift start; prior handovers as history.
  */
 export function HandoverPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const siteID = principal?.site_ids[0];
-  const handovers = useApi(() => api.handovers());
-  const [busy, setBusy] = useState(false);
+  const { siteId } = useSite();
+  const handovers = useQuery(() => api.handovers().then((list) => list.items));
 
-  const latest = handovers.data?.items[0];
+  const items = useMemo(() => {
+    const all = handovers.data ?? [];
+    const scoped = siteId ? all.filter((handover) => handover.site_id === siteId) : all;
+    return [...scoped].sort((a, b) => b.shift_start.localeCompare(a.shift_start));
+  }, [handovers.data, siteId]);
+  const latest = items[0];
+  const history = items.slice(1);
   const perms = principal?.permissions ?? [];
 
-  const mutate = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await action();
-      await handovers.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const submit = useCommand(
+    (id: string) => api.submitHandover(id),
+    { successMessage: t("handover.submitSuccess"), onSuccess: () => void handovers.refetch() },
+  );
+  const accept = useCommand(
+    (id: string) => api.acceptHandover(id),
+    { successMessage: t("handover.acceptSuccess"), onSuccess: () => void handovers.refetch() },
+  );
+  const acknowledge = useCommand(
+    (id: string) => api.acknowledgeHandover(id),
+    { successMessage: t("handover.acknowledgeSuccess"), onSuccess: () => void handovers.refetch() },
+  );
+  const prepare = useCommand(
+    (site: string) => api.prepareHandover(site),
+    { successMessage: t("handover.prepareSuccess"), onSuccess: () => void handovers.refetch() },
+  );
+  const capture = useCommand(
+    (id: string) => api.startDemonstration("HANDOVER", id),
+    { successMessage: t("handover.captureStarted"), onSuccess: () => navigate("/demonstrations") },
+  );
 
-  const transitions: Array<{ label: string; run: () => void }> = [];
+  const transitions: Array<{ key: string; label: string; pending: boolean; run: () => void }> = [];
   if (latest) {
     if (latest.state === "DRAFT" && perms.includes("handover:write")) {
-      transitions.push({
-        label: t("handover.submit"),
-        run: () => void mutate(() => api.submitHandover(latest.id))
-      });
+      transitions.push({ key: "submit", label: t("handover.submit"), pending: submit.pending, run: () => void submit.run(latest.id) });
     }
     if (latest.state === "SUBMITTED" && perms.includes("handover:accept")) {
-      transitions.push({
-        label: t("handover.accept"),
-        run: () => void mutate(() => api.acceptHandover(latest.id))
-      });
+      transitions.push({ key: "accept", label: t("handover.accept"), pending: accept.pending, run: () => void accept.run(latest.id) });
     }
     if (latest.state === "ACCEPTED" && perms.includes("handover:accept")) {
-      transitions.push({
-        label: t("handover.acknowledge"),
-        run: () => void mutate(() => api.acknowledgeHandover(latest.id))
-      });
+      transitions.push({ key: "acknowledge", label: t("handover.acknowledge"), pending: acknowledge.pending, run: () => void acknowledge.run(latest.id) });
     }
   }
 
   return (
-    <section>
-      <Topbar title={t("nav.handover")} principal={principal} />
-      {handovers.error && (
-        <div className="toast-error" role="alert">{handovers.error}</div>
-      )}
-      {handovers.loading && !handovers.data ? (
-        <div className="skeleton" style={{ height: 300 }} />
-      ) : (
-        <>
-          {transitions.length > 0 && (
-            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader title={t("nav.handover")} principal={principal} />
+        {handovers.error ? (
+          <div className="error-state" role="alert" style={{ marginBottom: 16 }}>
+            <strong>Something went wrong</strong>
+            <p>{handovers.error}</p>
+            <div className="error-actions">
+              <button className="secondary-button" onClick={() => void handovers.refetch()}>Retry</button>
+            </div>
+          </div>
+        ) : null}
+        {handovers.loading && !handovers.data ? (
+          <div className="skeleton" style={{ height: 300 }} />
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
               {transitions.map((transition) => (
-                <button
-                  key={transition.label}
-                  className="primary-button"
-                  disabled={busy}
-                  onClick={transition.run}
-                >
+                <button key={transition.key} className="primary-button" disabled={transition.pending} onClick={transition.run}>
                   {transition.label}
                 </button>
               ))}
             </div>
-          )}
-          <HandoverPanel
-            siteID={siteID}
-            handover={latest}
-            busy={busy}
-            onPrepare={() =>
-              siteID
-                ? mutate(async () => {
-                    await api.prepareHandover(siteID);
-                  })
-                : Promise.resolve()
-            }
-            onCapture={() =>
-              latest
-                ? mutate(async () => {
-                    await api.startDemonstration("HANDOVER", latest.id);
-                    navigate("/demonstrations");
-                  })
-                : Promise.resolve()
-            }
-          />
-        </>
-      )}
-    </section>
+            <HandoverPanel
+              handover={latest}
+              pending={capture.pending}
+              canPrepare={perms.includes("handover:write") && Boolean(siteId)}
+              canCapture={Boolean(latest) && perms.includes("handover:write")}
+              onPrepare={() => {
+                if (siteId) void prepare.run(siteId);
+              }}
+              onCapture={() => {
+                if (latest) void capture.run(latest.id);
+              }}
+            />
+            <section className="panel" style={{ marginTop: 16 }}>
+              <div className="panel-heading"><h2>{t("handover.history")}</h2></div>
+              {history.length > 0 ? (
+                <div>
+                  {history.map((handover) => (
+                    <div key={handover.id} className="handover-history-row">
+                      <span className="mono">{handover.shift_start.slice(0, 10)}</span>
+                      <span className="state-badge">{handover.state.replace("_", " ")}</span>
+                      <span className="muted">{handover.structured_content.summary.slice(0, 80)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty">{t("handover.noHistory")}</div>
+              )}
+            </section>
+          </>
+        )}
+      </section>
+    </PageTrailProvider>
   );
 }
-
