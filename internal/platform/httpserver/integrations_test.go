@@ -13,8 +13,8 @@ import (
 	"time"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
-	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	integrationpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/integration/adapter/postgres"
+	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	integrationdomain "github.com/ZekromNguyen/skawld-maintenance/internal/integration/domain"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/audit"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/clock"
