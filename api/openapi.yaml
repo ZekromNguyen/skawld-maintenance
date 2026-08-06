@@ -1586,6 +1586,43 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/EvaluationSummary"}
         "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/integrations/imports:
+    post:
+      summary: Import an EAM/CMMS NDJSON asset snapshot
+      tags: [Integration]
+      operationId: runIntegrationImport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [snapshot, system, instance, version]
+              properties:
+                snapshot:
+                  type: string
+                  format: binary
+                  description: NDJSON asset export, at most 10 MiB.
+                system: {type: string, minLength: 1}
+                instance: {type: string, minLength: 1}
+                version: {type: string, minLength: 1}
+      responses:
+        "200":
+          description: External asset projection summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [imported, next_cursor, complete]
+                properties:
+                  imported: {type: integer}
+                  next_cursor: {type: [string, "null"]}
+                  complete: {type: boolean}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     sessionCookie:

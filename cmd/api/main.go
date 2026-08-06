@@ -27,6 +27,7 @@ import (
 	identityapp "github.com/ZekromNguyen/skawld-maintenance/internal/identity/application"
 	incidentpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/incident/adapter/postgres"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
+	integrationpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/integration/adapter/postgres"
 	knowledgepostgres "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/adapter/postgres"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/audit"
@@ -214,6 +215,9 @@ func main() {
 		Evaluations: evaluationapp.Service{
 			Store: evaluationpostgres.Store{Pool: pool},
 			Now:   systemClock.Now,
+		},
+		IntegrationSink: integrationpostgres.Sink{
+			Pool: pool, IDs: idGenerator, Clock: systemClock, Audit: audit.Sink{},
 		},
 	})
 	server := &http.Server{

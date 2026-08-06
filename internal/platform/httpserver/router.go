@@ -21,6 +21,7 @@ import (
 	identityapp "github.com/ZekromNguyen/skawld-maintenance/internal/identity/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
+	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/buildinfo"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/idempotency"
@@ -41,24 +42,25 @@ type Authenticator interface {
 }
 
 type Dependencies struct {
-	Logger         *slog.Logger
-	Database       *pgxpool.Pool
-	Auth           Authenticator
-	OpenAPI        []byte
-	Organizations  identityapp.OrganizationService
-	Sites          identityapp.SiteService
-	Assets         assetapp.Service
-	Incidents      incidentapp.Service
-	Executions     executionapp.Service
-	Attachments    attachmentapp.Service
-	Knowledge      knowledgeapp.Service
-	Copilot        copilotapp.Service
-	Reports        reportapp.Service
-	Handovers      handoverapp.Service
-	Transcriptions transcriptionapp.Service
-	Demonstrations demonstrationapp.Service
-	Workflows      workflowapp.Service
-	Evaluations    evaluationapp.Service
+	Logger          *slog.Logger
+	Database        *pgxpool.Pool
+	Auth            Authenticator
+	OpenAPI         []byte
+	Organizations   identityapp.OrganizationService
+	Sites           identityapp.SiteService
+	Assets          assetapp.Service
+	Incidents       incidentapp.Service
+	Executions      executionapp.Service
+	Attachments     attachmentapp.Service
+	Knowledge       knowledgeapp.Service
+	Copilot         copilotapp.Service
+	Reports         reportapp.Service
+	Handovers       handoverapp.Service
+	Transcriptions  transcriptionapp.Service
+	Demonstrations  demonstrationapp.Service
+	Workflows       workflowapp.Service
+	Evaluations     evaluationapp.Service
+	IntegrationSink integrationapp.ProjectionSink
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -104,6 +106,7 @@ func New(dependencies Dependencies) http.Handler {
 		mountDemonstrationRoutes(api, dependencies.Demonstrations)
 		mountWorkflowRoutes(api, dependencies.Workflows)
 		mountEvaluationRoutes(api, dependencies.Evaluations)
+		mountIntegrationRoutes(api, dependencies.IntegrationSink)
 	})
 	return router
 }
