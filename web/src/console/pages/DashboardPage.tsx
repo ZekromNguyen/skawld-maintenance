@@ -16,7 +16,7 @@ export function DashboardPage() {
   const incidents = useQuery(() => api.incidents().then((list) => list.items));
   const assets = useQuery(() => api.assets().then((list) => list.items));
   const executions = useQuery(() => api.listExecutions().then((list) => list.items));
-  const handovers = useQuery(() => api.handovers());
+  const handovers = useQuery(() => api.pendingHandovers());
 
   const loading =
     incidents.loading || assets.loading || executions.loading || handovers.loading;
@@ -28,8 +28,7 @@ export function DashboardPage() {
     void executions.refetch();
     void handovers.refetch();
   };
-  const pendingHandovers =
-    handovers.data?.items.filter((handover) => handover.state !== "ACKNOWLEDGED").length ?? 0;
+  const pendingHandovers = handovers.data?.length ?? 0;
 
   return (
     <PageTrailProvider trail={[]}>

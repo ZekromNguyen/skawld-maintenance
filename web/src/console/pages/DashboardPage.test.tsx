@@ -74,21 +74,19 @@ vi.mock("../../api", () => ({
         }
       ]
     }),
-    handovers: vi.fn().mockResolvedValue({
-      items: [
-        {
-          id: "h1",
-          site_id: "s1",
-          shift_start: new Date().toISOString(),
-          shift_end: new Date().toISOString(),
-          state: "SUBMITTED",
-          version: 1,
-          structured_content: {},
-          evidence: [],
-          provider: "skawld-copilot"
-        }
-      ]
-    })
+    pendingHandovers: vi.fn().mockResolvedValue([
+      {
+        id: "h1",
+        site_id: "s1",
+        shift_start: new Date().toISOString(),
+        shift_end: new Date().toISOString(),
+        state: "SUBMITTED",
+        version: 1,
+        structured_content: {},
+        evidence: [],
+        provider: "skawld-copilot"
+      }
+    ])
   }
 }));
 
@@ -130,5 +128,11 @@ describe("DashboardPage", () => {
     expect(incidentsLink.getAttribute("href")).toBe("/incidents");
     const executionsLink = screen.getByRole("link", { name: /executions in progress/i });
     expect(executionsLink.getAttribute("href")).toBe("/executions");
+  });
+
+  it("counts pending handovers from the paginated list", async () => {
+    renderDashboard();
+    const pendingLink = await screen.findByRole("link", { name: /pending handovers/i });
+    expect(pendingLink.textContent).toContain("1");
   });
 });
