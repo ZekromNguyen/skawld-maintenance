@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -33,16 +34,30 @@ func listExecutions(service executionapp.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := service.List(r.Context(), principal, executionapp.Filter{
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := executionapp.Filter{
 			SiteID:     r.URL.Query().Get("site_id"),
 			State:      r.URL.Query().Get("state"),
 			AssignedTo: r.URL.Query().Get("assigned_to"),
-		})
+			PageSize:   pageSize,
+			Cursor:     strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		if filter.SiteID != "" && !validUUIDParam(w, filter.SiteID, "site ID") {
+			return
+		}
+		items, next, err := service.List(r.Context(), principal, filter)
 		if err != nil {
 			writeExecutionError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"items": result})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

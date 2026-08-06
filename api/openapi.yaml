@@ -409,6 +409,8 @@ paths:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
         - {in: query, name: state, schema: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}}
         - {in: query, name: assigned_to, schema: {type: string, description: "Use me for the current mobile principal."}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Executions visible to the principal; field roles are constrained to their own assignments.
@@ -416,8 +418,12 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/Execution"}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
   /api/v1/executions/{executionID}:

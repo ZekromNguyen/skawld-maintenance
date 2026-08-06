@@ -291,7 +291,7 @@ func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := executionStore.List(ctx, orgAdmin, executionapp.Filter{})
+	items, _, err := executionStore.List(ctx, orgAdmin, executionapp.Filter{})
 	if err != nil {
 		t.Fatal(err)
 	}
