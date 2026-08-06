@@ -63,7 +63,7 @@ func TestHTTPEmbeddingProviderEmbed(t *testing.T) {
 	}
 	model := provider.Model()
 	if model.Provider != "openai" || model.Model != "text-embedding-3-small" ||
-		model.Metric != "COSINE" {
+		model.Metric != "COSINE" || model.Dimensions != 3 {
 		t.Fatalf("model = %+v", model)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type HTTPEmbeddingConfig struct {
@@ -25,6 +26,9 @@ type HTTPEmbeddingProvider struct {
 	apiKey   string
 	metadata ProviderMetadata
 	client   *http.Client
+
+	mu         sync.Mutex
+	dimensions int
 }
 
 func NewHTTPEmbeddingProvider(
@@ -53,13 +57,16 @@ func NewHTTPEmbeddingProvider(
 	}, nil
 }
 
-// Model reports the configured embedding identity. Dimensions are unknown
-// until the first response, so they are left at zero; callers use the
-// returned vectors, not Model().Dimensions.
+// Model reports the configured embedding identity. Dimensions are populated
+// from the first successful response; the knowledge ingest reads them after a
+// successful Embed call.
 func (p *HTTPEmbeddingProvider) Model() EmbeddingModel {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	return EmbeddingModel{
 		Provider: p.metadata.Provider, Model: p.metadata.Model,
 		ModelVersion: p.metadata.ModelVersion, Metric: "COSINE",
+		Dimensions: p.dimensions,
 	}
 }
 
@@ -119,5 +126,10 @@ func (p *HTTPEmbeddingProvider) Embed(
 		}
 		result = append(result, item.Embedding)
 	}
+	p.mu.Lock()
+	if p.dimensions == 0 {
+		p.dimensions = len(result[0])
+	}
+	p.mu.Unlock()
 	return result, nil
 }
