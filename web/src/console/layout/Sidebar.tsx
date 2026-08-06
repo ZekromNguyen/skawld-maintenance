@@ -17,8 +17,9 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { useTheme } from "../../theme/ThemeProvider";
 import type { Locale, MessageKey } from "../../i18n/messages";
 import type { Principal } from "../../types";
+import { can, type PermissionKey } from "../permissions";
 
-type NavItem = { to: string; key: MessageKey; icon: Icon; permission?: string };
+type NavItem = { to: string; key: MessageKey; icon: Icon; permission?: PermissionKey };
 
 const SECTIONS: Array<{ heading: MessageKey; items: NavItem[] }> = [
   {
@@ -64,8 +65,6 @@ export function Sidebar({ principal }: { principal?: Principal }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const has = (permission?: string) =>
-    permission ? (principal?.permissions.includes(permission) ?? false) : true;
 
   return (
     <aside className="sidebar">
@@ -78,7 +77,7 @@ export function Sidebar({ principal }: { principal?: Principal }) {
       </div>
       <nav aria-label={t("nav.mainNavigation")}>
         {SECTIONS.map((section) => {
-          const visible = section.items.filter((item) => has(item.permission));
+          const visible = section.items.filter((item) => can(principal, item.permission));
           if (visible.length === 0) return null;
           return (
             <div key={section.heading}>

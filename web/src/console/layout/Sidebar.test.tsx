@@ -21,6 +21,29 @@ function renderSidebar(entry: string) {
   );
 }
 
+function renderSidebarWithPermissions(permissions: string[]) {
+  return render(
+    <ThemeProvider>
+      <I18nProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="*" element={<div>page</div>} />
+          </Routes>
+          <Sidebar
+            principal={{
+              id: "p1",
+              display_name: "T",
+              organization_id: "o1",
+              site_ids: ["s1"],
+              permissions,
+            }}
+          />
+        </MemoryRouter>
+      </I18nProvider>
+    </ThemeProvider>,
+  );
+}
+
 describe("Sidebar", () => {
   it("renders brand and grouped navigation", () => {
     renderSidebar("/");
@@ -39,5 +62,15 @@ describe("Sidebar", () => {
     renderSidebar("/incidents");
     expect(screen.getByRole("link", { name: "Incident execution" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "Executions" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("shows Reports for a technician (report:write)", () => {
+    renderSidebarWithPermissions(["report:write", "execution:write"]);
+    expect(screen.getByRole("link", { name: "Reports" })).toBeTruthy();
+  });
+
+  it("hides Reports for a manager (no report:write)", () => {
+    renderSidebarWithPermissions(["handover:accept", "recommendation:review"]);
+    expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
   });
 });
