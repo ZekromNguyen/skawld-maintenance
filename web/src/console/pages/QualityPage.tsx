@@ -1,43 +1,48 @@
-import { useState } from "react";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
+import { ErrorState } from "../ui/ErrorState";
+import { Skeleton } from "../ui/Skeleton";
 import { QualityPanel } from "../components/QualityPanel";
 
 /**
- * QualityPage: AI quality and safety evaluation summary.
+ * QualityPage: AI quality and safety evaluation summary with real refresh.
  */
 export function QualityPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
-  const quality = useApi(() => api.evaluationSummary());
-  const [busy, setBusy] = useState(false);
-
-  const refresh = async () => {
-    setBusy(true);
-    try {
-      await quality.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const quality = useQuery(() => api.evaluationSummary());
 
   return (
-    <section>
-      <Topbar title={t("nav.quality")} principal={principal} />
-      {quality.error && (
-        <div className="toast-error" role="alert">{quality.error}</div>
-      )}
-      {quality.loading && !quality.data ? (
-        <div style={{ display: "grid", gap: 12 }}>
-          <div className="skeleton" style={{ height: 108 }} />
-          <div className="skeleton" style={{ height: 220 }} />
-        </div>
-      ) : (
-        <QualityPanel value={quality.data} busy={busy} onRefresh={refresh} />
-      )}
-    </section>
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader
+          title={t("nav.quality")}
+          principal={principal}
+          actions={
+            <button
+              className="secondary-button"
+              disabled={quality.loading}
+              onClick={() => void quality.refetch()}
+            >
+              {t("quality.refresh")}
+            </button>
+          }
+        />
+        {quality.error ? (
+          <ErrorState message={quality.error} onRetry={() => void quality.refetch()} />
+        ) : quality.loading && !quality.data ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            <Skeleton height={108} />
+            <Skeleton height={220} />
+          </div>
+        ) : (
+          <QualityPanel value={quality.data} />
+        )}
+      </section>
+    </PageTrailProvider>
   );
 }
