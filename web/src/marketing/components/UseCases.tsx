@@ -2,61 +2,70 @@ import { useState } from "react";
 import { Check } from "@phosphor-icons/react";
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 
 /**
  * UseCases: accessible tabs. Keyboard-driven (roving tabindex + arrow keys
  * would be ideal; buttons with aria-selected + role=tablist are the base).
  */
-const USE_CASES = [
+const USE_CASES: Array<{
+  id: string;
+  labelKey: MessageKey;
+  titleKey: MessageKey;
+  bodyKey: MessageKey;
+  pointKeys: MessageKey[];
+}> = [
   {
     id: "reliability",
-    label: "Reliability teams",
-    title: "Keep the knowledge when the expert leaves",
-    body: "Senior technicians retire and take decades of judgment with them. Skawld captures that judgment as reviewed workflows the whole team can follow, with the safety gates intact.",
-    points: [
-      "Turn tacit expertise into published, reviewable workflows",
-      "Evidence-backed assistance reduces guesswork on unfamiliar equipment",
-      "Corrections are captured, so the guidance gets better over time",
+    labelKey: "landing.useCases.reliability.label",
+    titleKey: "landing.useCases.reliability.title",
+    bodyKey: "landing.useCases.reliability.body",
+    pointKeys: [
+      "landing.useCases.reliability.point1",
+      "landing.useCases.reliability.point2",
+      "landing.useCases.reliability.point3",
     ],
   },
   {
     id: "operations",
-    label: "Plant operations",
-    title: "Consistent execution, shift after shift",
-    body: "Every shift inherits a different level of experience. Skawld gives technicians the same evidence-backed steps, measurements, and handover structure regardless of who is on the floor.",
-    points: [
-      "Structured handovers surface open incidents and safety concerns",
-      "LOTO gates and supervisor sign-off stay in the workflow",
-      "Reports record what actually happened, not what was assumed",
+    labelKey: "landing.useCases.operations.label",
+    titleKey: "landing.useCases.operations.title",
+    bodyKey: "landing.useCases.operations.body",
+    pointKeys: [
+      "landing.useCases.operations.point1",
+      "landing.useCases.operations.point2",
+      "landing.useCases.operations.point3",
     ],
   },
   {
     id: "enterprise",
-    label: "Enterprise rollout",
-    title: "Self-hosted, auditable, standards-based",
-    body: "Your data plane, your identity provider, your evidence store. Skawld runs inside your infrastructure and integrates with the systems you already operate.",
-    points: [
-      "OIDC SSO, role-scoped permissions, and full audit trails",
-      "S3-compatible object storage and PostgreSQL, self-hosted",
-      "SDK contract and OpenAPI surface for internal integration",
+    labelKey: "landing.useCases.enterprise.label",
+    titleKey: "landing.useCases.enterprise.title",
+    bodyKey: "landing.useCases.enterprise.body",
+    pointKeys: [
+      "landing.useCases.enterprise.point1",
+      "landing.useCases.enterprise.point2",
+      "landing.useCases.enterprise.point3",
     ],
   },
 ];
 
 export function UseCases() {
+  const { t } = useI18n();
   const [active, setActive] = useState(0);
   const current = USE_CASES[active];
 
   return (
     <Section
       id="use-cases"
-      eyebrow="Use cases"
-      title="One platform, three operating realities"
+      eyebrow={t("landing.useCases.eyebrow")}
+      title={t("landing.useCases.title")}
     >
       <div style={{ marginTop: 40 }}>
         <div
           role="tablist"
-          aria-label="Use cases"
+          aria-label={t("landing.useCases.tablistAria")}
           style={{
             display: "flex",
             gap: 8,
@@ -89,7 +98,7 @@ export function UseCases() {
                 marginBottom: -1,
               }}
             >
-              {useCase.label}
+              {t(useCase.labelKey)}
             </button>
           ))}
         </div>
@@ -107,7 +116,7 @@ export function UseCases() {
           >
             <div>
               <h3 style={{ fontSize: 24, fontWeight: 700, color: "var(--ink)", margin: 0 }}>
-                {current.title}
+                {t(current.titleKey)}
               </h3>
               <p
                 style={{
@@ -118,7 +127,7 @@ export function UseCases() {
                   maxWidth: "58ch",
                 }}
               >
-                {current.body}
+                {t(current.bodyKey)}
               </p>
             </div>
             <ul
@@ -130,9 +139,9 @@ export function UseCases() {
                 gap: 12,
               }}
             >
-              {current.points.map((point) => (
+              {current.pointKeys.map((pointKey) => (
                 <li
-                  key={point}
+                  key={pointKey}
                   style={{
                     display: "flex",
                     gap: 12,
@@ -158,7 +167,7 @@ export function UseCases() {
                   >
                     <Check size={12} weight="bold" />
                   </span>
-                  {point}
+                  {t(pointKey)}
                 </li>
               ))}
             </ul>

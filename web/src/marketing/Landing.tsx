@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/I18nProvider";
 import { SiteHeader } from "./components/SiteHeader";
 import { Hero } from "./components/Hero";
 import { LogoWall } from "./components/LogoWall";
@@ -16,6 +17,7 @@ import { SiteFooter } from "./components/SiteFooter";
  * Built against docs/contributing/web-ui-design-system.md.
  */
 export function Landing() {
+  const { t } = useI18n();
   return (
     <div className="landing">
       <a
@@ -38,7 +40,7 @@ export function Landing() {
           e.currentTarget.style.left = "-9999px";
         }}
       >
-        Skip to content
+        {t("landing.skipToContent")}
       </a>
       <SiteHeader />
       <main id="main-content">

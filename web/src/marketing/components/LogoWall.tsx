@@ -1,4 +1,5 @@
 import { Reveal } from "./shared/Reveal";
+import { useI18n } from "../../i18n/I18nProvider";
 
 /**
  * LogoWall: logo-only strip under the hero. Real SVG marks where they exist
@@ -14,6 +15,7 @@ const CUSTOMERS = [
 ];
 
 export function LogoWall() {
+  const { t } = useI18n();
   return (
     <section
       style={{
@@ -35,7 +37,7 @@ export function LogoWall() {
               marginBottom: 26,
             }}
           >
-            Pilot evaluation with industrial operations teams
+            {t("landing.logoWall.label")}
           </p>
           <div
             style={{

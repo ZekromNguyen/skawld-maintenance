@@ -1,6 +1,7 @@
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
 import { MonoStat } from "./shared/MonoStat";
+import { useI18n } from "../../i18n/I18nProvider";
 
 /**
  * SecurityReliability: 2-col stat cards with display numbers.
@@ -8,44 +9,45 @@ import { MonoStat } from "./shared/MonoStat";
  * audit events, offline-first). No invented precision.
  */
 export function SecurityReliability() {
+  const { t } = useI18n();
   return (
     <Section
       id="security"
-      eyebrow="Security"
-      title="Built for plants, not for demos"
-      lead="Industrial assistance has to earn trust. Skawld is designed around evidence integrity, human authority, and auditability from day one."
+      eyebrow={t("landing.security.eyebrow")}
+      title={t("landing.security.title")}
+      lead={t("landing.security.lead")}
     >
       <Reveal>
         <div className="card-grid">
           <MonoStat
             value="OIDC"
-            label="Standards-based identity"
-            detail="Keycloak or any OIDC provider. Per-role permissions scoped to organizations and sites."
+            label={t("landing.security.oidc.label")}
+            detail={t("landing.security.oidc.detail")}
           />
           <MonoStat
             value="SHA-256"
-            label="Evidence integrity"
-            detail="Attachments, revisions, and retrieved content are checksum-verified end to end."
+            label={t("landing.security.sha.label")}
+            detail={t("landing.security.sha.detail")}
           />
           <MonoStat
             value="Advisory"
-            label="Human in control"
-            detail="Every recommendation requires human confirmation. The system advises; your people decide."
+            label={t("landing.security.advisory.label")}
+            detail={t("landing.security.advisory.detail")}
           />
           <MonoStat
             value="Audit"
-            label="Corrections and provenance"
-            detail="Every decision, correction, and demonstration carries provenance you can follow back to the source."
+            label={t("landing.security.audit.label")}
+            detail={t("landing.security.audit.detail")}
           />
           <MonoStat
             value="Offline"
-            label="Works in the field"
-            detail="The technician client is offline-first with local persistence; connectivity returns, data reconciles."
+            label={t("landing.security.offline.label")}
+            detail={t("landing.security.offline.detail")}
           />
           <MonoStat
             value="Self-host"
-            label="Your data plane"
-            detail="PostgreSQL, S3-compatible storage, and your chosen models run inside your infrastructure."
+            label={t("landing.security.selfhost.label")}
+            detail={t("landing.security.selfhost.detail")}
           />
         </div>
       </Reveal>

@@ -1,39 +1,45 @@
 import { Logo } from "./shared/Logo";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 
 /**
  * SiteFooter: docs, GitHub, contact, legal. Functional links, no decoration.
  */
-const COLUMNS = [
+const COLUMNS: Array<{
+  headingKey: MessageKey;
+  links: Array<{ labelKey: MessageKey; href: string }>;
+}> = [
   {
-    heading: "Product",
+    headingKey: "landing.footer.product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "How it works", href: "#workflow" },
-      { label: "Security", href: "#security" },
-      { label: "Use cases", href: "#use-cases" },
-      { label: "FAQ", href: "#faq" },
+      { labelKey: "landing.nav.features", href: "#features" },
+      { labelKey: "landing.nav.howItWorks", href: "#workflow" },
+      { labelKey: "landing.nav.security", href: "#security" },
+      { labelKey: "landing.nav.useCases", href: "#use-cases" },
+      { labelKey: "landing.nav.faq", href: "#faq" },
     ],
   },
   {
-    heading: "Documentation",
+    headingKey: "landing.footer.documentation",
     links: [
-      { label: "Specification", href: "/spec" },
-      { label: "OpenAPI contract", href: "/openapi.yaml" },
-      { label: "Runbooks", href: "/docs" },
-      { label: "SDK", href: "https://github.com/ZekromNguyen/skawld-sdk-go" },
+      { labelKey: "landing.footer.specification", href: "/spec" },
+      { labelKey: "landing.footer.openapi", href: "/openapi.yaml" },
+      { labelKey: "landing.footer.runbooks", href: "/docs" },
+      { labelKey: "landing.footer.sdk", href: "https://github.com/ZekromNguyen/skawld-sdk-go" },
     ],
   },
   {
-    heading: "Contact",
+    headingKey: "landing.footer.contact",
     links: [
-      { label: "GitHub", href: "https://github.com/ZekromNguyen/skawld-maintenance" },
-      { label: "Contact us", href: "mailto:hello@skawld.dev" },
-      { label: "Status", href: "/health/live" },
+      { labelKey: "landing.footer.github", href: "https://github.com/ZekromNguyen/skawld-maintenance" },
+      { labelKey: "landing.footer.contactUs", href: "mailto:hello@skawld.dev" },
+      { labelKey: "landing.footer.status", href: "/health/live" },
     ],
   },
 ];
 
 export function SiteFooter() {
+  const { t } = useI18n();
   return (
     <footer
       style={{
@@ -55,13 +61,12 @@ export function SiteFooter() {
                 maxWidth: "36ch",
               }}
             >
-              The maintenance intelligence layer that captures expertise,
-              preserves safety, and keeps human authority in control.
+              {t("landing.footer.description")}
             </p>
           </div>
           <div className="footer-links">
             {COLUMNS.map((column) => (
-              <nav key={column.heading} aria-label={column.heading}>
+              <nav key={column.headingKey} aria-label={t(column.headingKey)}>
                 <h3
                   style={{
                     margin: "0 0 14px",
@@ -72,11 +77,11 @@ export function SiteFooter() {
                     color: "var(--ink-muted)",
                   }}
                 >
-                  {column.heading}
+                  {t(column.headingKey)}
                 </h3>
                 <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
                   {column.links.map((link) => (
-                    <li key={link.label}>
+                    <li key={link.href}>
                       <a
                         href={link.href}
                         style={{
@@ -85,7 +90,7 @@ export function SiteFooter() {
                           textDecoration: "none",
                         }}
                       >
-                        {link.label}
+                        {t(link.labelKey)}
                       </a>
                     </li>
                   ))}
@@ -107,16 +112,16 @@ export function SiteFooter() {
             fontSize: 12.5,
           }}
         >
-          <span>© {new Date().getFullYear()} Skawld. All rights reserved.</span>
+          <span>{t("landing.footer.rights", { year: new Date().getFullYear() })}</span>
           <div style={{ display: "flex", gap: 18 }}>
             <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
-              Privacy
+              {t("landing.footer.privacy")}
             </a>
             <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
-              Terms
+              {t("landing.footer.terms")}
             </a>
             <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
-              Security
+              {t("landing.footer.security")}
             </a>
           </div>
         </div>

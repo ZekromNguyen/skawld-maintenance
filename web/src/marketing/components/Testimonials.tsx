@@ -1,34 +1,34 @@
 import { Reveal } from "./shared/Reveal";
 import { Section } from "./shared/Section";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 
 /**
  * Testimonials: quote cards, max 3 lines each, real attribution
  * (name + role). Sample content, clearly marked, no em-dashes.
  */
-const TESTIMONIALS = [
+const TESTIMONIALS: Array<{ quoteKey: MessageKey; name: string; roleKey: MessageKey }> = [
   {
-    quote:
-      "Our senior techs were skeptical. After one pilot shift they saw their own LOTO practice reflected back, with the safety gates intact.",
+    quoteKey: "landing.testimonials.1.quote",
     name: "Minh Tran",
-    role: "Reliability Manager, chemical processing plant",
+    roleKey: "landing.testimonials.1.role",
   },
   {
-    quote:
-      "The evidence trail is what sold our safety committee. Every recommendation cites its sources, and nothing proceeds without human confirmation.",
+    quoteKey: "landing.testimonials.2.quote",
     name: "Elena Vasquez",
-    role: "Maintenance Director, regional energy operator",
+    roleKey: "landing.testimonials.2.role",
   },
   {
-    quote:
-      "We captured two reviewed workflows in the first month. The handover reports alone have changed how our shifts pass the baton.",
+    quoteKey: "landing.testimonials.3.quote",
     name: "James Okafor",
-    role: "Plant Engineering Lead, food processing",
+    roleKey: "landing.testimonials.3.role",
   },
 ];
 
 export function Testimonials() {
+  const { t } = useI18n();
   return (
-    <Section id="testimonials" title="What operations teams say">
+    <Section id="testimonials" title={t("landing.testimonials.title")}>
       {/* sample-marked per design system: realistic placeholder quotes */}
       <Reveal>
         <div
@@ -61,7 +61,7 @@ export function Testimonials() {
                   color: "var(--ink)",
                 }}
               >
-                &ldquo;{testimonial.quote}&rdquo;
+                &ldquo;{t(testimonial.quoteKey)}&rdquo;
               </blockquote>
               <figcaption
                 style={{
@@ -75,7 +75,7 @@ export function Testimonials() {
                   {testimonial.name}
                 </span>
                 {" · "}
-                {testimonial.role}
+                {t(testimonial.roleKey)}
               </figcaption>
             </figure>
           ))}
