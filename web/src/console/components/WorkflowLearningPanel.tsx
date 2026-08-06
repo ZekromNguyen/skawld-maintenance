@@ -70,7 +70,7 @@ export function WorkflowLearningPanel(props: {
   }
 
   const lastRejected = selected?.reviews?.find((review) => review.decision === "REJECTED");
-  const sequenceConsistency = selected?.analysis.sequence_consistency;
+  const sequenceConsistency = selected?.analysis?.sequence_consistency;
 
   return (
     <div className="workbench workflow-workbench">
@@ -154,7 +154,7 @@ export function WorkflowLearningPanel(props: {
                   {selected.workflow_key} · v{selected.version}
                 </small>
               </div>
-              <StatusBadge tone={STATUS_TONE[selected.status] ?? "info"} label={selected.status.replace("_", " ")} />
+              <StatusBadge tone={STATUS_TONE[selected.status] ?? "info"} label={(selected.status ?? "").replace("_", " ")} />
             </div>
             {lastRejected ? (
               <div className="notice" role="alert">{t("workflow.rejectedNotice")}</div>
@@ -170,21 +170,21 @@ export function WorkflowLearningPanel(props: {
                 {sequenceConsistency == null ? t("workflow.noAnalysis") : t("workflow.sequenceConsistency")}
               </span>
               <span>
-                <strong>{selected.analysis.conflicts?.length ?? 0}</strong>
+                <strong>{selected?.analysis?.conflicts?.length ?? 0}</strong>
                 {t("workflow.ambiguousTransitions")}
               </span>
               <span>
-                <strong>{selected.source_demonstration_ids.length}</strong>
+                <strong>{(selected.source_demonstration_ids ?? []).length}</strong>
                 {t("workflow.sourceDemos")}
               </span>
               <span>
-                <strong>{selected.improvement_candidates.length}</strong>
+                <strong>{(selected.improvement_candidates ?? []).length}</strong>
                 {t("workflow.correctionCandidates")}
               </span>
             </div>
 
             <div className="workflow-steps">
-              {selected.steps.map((step, index) => (
+              {(selected.steps ?? []).map((step, index) => (
                 <article className="workflow-step" key={step.id}>
                   <span className="timeline-ordinal">{index + 1}</span>
                   <div>
@@ -235,7 +235,7 @@ export function WorkflowLearningPanel(props: {
               <div className="panel-heading"><h2>{t("workflow.governanceTrail")}</h2></div>
               {(selected.reviews?.length ?? 0) > 0 ? (
                 <div className="readable-list">
-                  {selected.reviews!.map((review, index) => (
+                  {(selected.reviews ?? []).map((review, index) => (
                     <div key={index} className="readable-row">
                       <div className="readable-key-value">
                         <span className="mono muted">decision</span>
@@ -253,7 +253,7 @@ export function WorkflowLearningPanel(props: {
               )}
             </div>
 
-            {selected.improvement_candidates.length > 0 && (
+            {(selected.improvement_candidates ?? []).length > 0 && (
               <div className="notice">{t("workflow.improvementNotice")}</div>
             )}
 
