@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -250,6 +251,81 @@ func (s Store) Get(
 
 type rowQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (s Store) List(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	filter handoverapp.HandoverFilter,
+) ([]handoverapp.Handover, bool, error) {
+	query := `
+		SELECT id::text, organization_id::text, site_id::text,
+		       shift_start, shift_end, state, structured_content,
+		       evidence_snapshot, provider, model, model_version,
+		       prompt_version, input_sha256, output_sha256, version,
+		       created_by::text, coalesce(submitted_by::text, ''), submitted_at,
+		       coalesce(accepted_by::text, ''), accepted_at,
+		       coalesce(acknowledged_by::text, ''), acknowledged_at,
+		       created_at, updated_at
+		FROM shift_handovers
+		WHERE organization_id = $1::uuid
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR site_id = ANY($2::uuid[]))`
+	args := []any{principal.OrganizationID, principal.SiteIDs}
+	if filter.SiteID != "" {
+		args = append(args, filter.SiteID)
+		query += fmt.Sprintf(" AND site_id = $%d::uuid", len(args))
+	}
+	if len(filter.States) > 0 {
+		args = append(args, filter.States)
+		query += fmt.Sprintf(" AND state = ANY($%d::text[])", len(args))
+	}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, handoverapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (shift_start, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY shift_start DESC, id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+
+	items := make([]handoverapp.Handover, 0, filter.PageSize+1)
+	for rows.Next() {
+		var value handoverapp.Handover
+		var content, evidence []byte
+		if err := rows.Scan(
+			&value.ID, &value.OrganizationID, &value.SiteID,
+			&value.ShiftStart, &value.ShiftEnd, &value.State, &content, &evidence,
+			&value.Provider, &value.Model, &value.ModelVersion, &value.PromptVersion,
+			&value.InputSHA256, &value.OutputSHA256, &value.Version, &value.CreatedBy,
+			&value.SubmittedBy, &value.SubmittedAt, &value.AcceptedBy, &value.AcceptedAt,
+			&value.AcknowledgedBy, &value.AcknowledgedAt, &value.CreatedAt, &value.UpdatedAt,
+		); err != nil {
+			return nil, false, err
+		}
+		if err := json.Unmarshal(content, &value.Content); err != nil {
+			return nil, false, err
+		}
+		if err := json.Unmarshal(evidence, &value.Evidence); err != nil {
+			return nil, false, err
+		}
+		items = append(items, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(items) > filter.PageSize
+	if hasMore {
+		items = items[:filter.PageSize]
+	}
+	return items, hasMore, nil
 }
 
 func get(
