@@ -40,7 +40,7 @@ const fixtures = vi.hoisted(() => ({
 vi.mock("../../api", () => ({
   api: {
     principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["handover:write"] }),
-    handovers: vi.fn().mockResolvedValue({ items: [fixtures.older, fixtures.latest] }),
+    handovers: vi.fn().mockResolvedValue({ items: [fixtures.latest, fixtures.older], next_cursor: null, has_more: false }),
     submitHandover: vi.fn().mockResolvedValue({}),
     prepareHandover: vi.fn().mockResolvedValue({}),
     startDemonstration: vi.fn().mockResolvedValue({})
@@ -85,5 +85,24 @@ describe("HandoverPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: /prepare from current records/i }));
     await waitFor(() => expect(api.prepareHandover as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("s1"));
     expect(screen.getByText("Draft prepared")).toBeTruthy();
+  });
+
+  it("loads more history when present", async () => {
+    const firstPage = { items: [fixtures.latest], next_cursor: "c1", has_more: true };
+    const secondPage = { items: [fixtures.older], next_cursor: null, has_more: false };
+    vi.mocked(api.handovers).mockImplementation((options?: { cursor?: string }) =>
+      options?.cursor ? Promise.resolve(secondPage) : Promise.resolve(firstPage),
+    );
+    renderPage();
+    const button = await screen.findByRole("button", { name: /load more/i });
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(api.handovers).toHaveBeenLastCalledWith({
+        site_id: "s1",
+        page_size: 25,
+        cursor: "c1",
+      });
+    });
+    expect(await screen.findByText("Morning shift summary")).toBeTruthy();
   });
 });

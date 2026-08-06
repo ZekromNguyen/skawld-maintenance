@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
@@ -9,6 +9,7 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { HandoverPanel } from "../components/HandoverPanel";
+import type { ShiftHandover } from "../../types";
 
 /**
  * HandoverPage: shift handover capture, transitions, and review. The latest
@@ -19,32 +20,54 @@ export function HandoverPage() {
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
   const { siteId } = useSite();
-  const handovers = useQuery(() => api.handovers().then((list) => list.items));
+  const firstPage = useQuery(
+    () =>
+      api.handovers(
+        siteId ? { site_id: siteId, page_size: 25 } : { page_size: 25 },
+      ),
+    [siteId],
+  );
+  const [history, setHistory] = useState<ShiftHandover[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const items = useMemo(() => {
-    const all = handovers.data ?? [];
-    const scoped = siteId ? all.filter((handover) => handover.site_id === siteId) : all;
-    return [...scoped].sort((a, b) => b.shift_start.localeCompare(a.shift_start));
-  }, [handovers.data, siteId]);
+  useEffect(() => {
+    setHistory([]);
+    setNextCursor(firstPage.data?.next_cursor ?? null);
+  }, [firstPage.data, siteId]);
+
+  const items = useMemo(
+    () => [...(firstPage.data?.items ?? []), ...history],
+    [firstPage.data, history],
+  );
   const latest = items[0];
-  const history = items.slice(1);
+  const historyList = items.slice(1);
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    const page = await api.handovers(
+      siteId
+        ? { site_id: siteId, cursor: nextCursor, page_size: 25 }
+        : { cursor: nextCursor, page_size: 25 },
+    );
+    setHistory((prev) => [...prev, ...page.items]);
+    setNextCursor(page.next_cursor);
+  };
   const perms = principal?.permissions ?? [];
 
   const submit = useCommand(
     (id: string) => api.submitHandover(id),
-    { successMessage: t("handover.submitSuccess"), onSuccess: () => void handovers.refetch() },
+    { successMessage: t("handover.submitSuccess"), onSuccess: () => void firstPage.refetch() },
   );
   const accept = useCommand(
     (id: string) => api.acceptHandover(id),
-    { successMessage: t("handover.acceptSuccess"), onSuccess: () => void handovers.refetch() },
+    { successMessage: t("handover.acceptSuccess"), onSuccess: () => void firstPage.refetch() },
   );
   const acknowledge = useCommand(
     (id: string) => api.acknowledgeHandover(id),
-    { successMessage: t("handover.acknowledgeSuccess"), onSuccess: () => void handovers.refetch() },
+    { successMessage: t("handover.acknowledgeSuccess"), onSuccess: () => void firstPage.refetch() },
   );
   const prepare = useCommand(
     (site: string) => api.prepareHandover(site),
-    { successMessage: t("handover.prepareSuccess"), onSuccess: () => void handovers.refetch() },
+    { successMessage: t("handover.prepareSuccess"), onSuccess: () => void firstPage.refetch() },
   );
   const capture = useCommand(
     (id: string) => api.startDemonstration("HANDOVER", id),
@@ -68,16 +91,16 @@ export function HandoverPage() {
     <PageTrailProvider trail={[]}>
       <section>
         <PageHeader title={t("nav.handover")} principal={principal} />
-        {handovers.error ? (
+        {firstPage.error ? (
           <div className="error-state" role="alert" style={{ marginBottom: 16 }}>
             <strong>Something went wrong</strong>
-            <p>{handovers.error}</p>
+            <p>{firstPage.error}</p>
             <div className="error-actions">
-              <button className="secondary-button" onClick={() => void handovers.refetch()}>Retry</button>
+              <button className="secondary-button" onClick={() => void firstPage.refetch()}>Retry</button>
             </div>
           </div>
         ) : null}
-        {handovers.loading && !handovers.data ? (
+        {firstPage.loading && !firstPage.data ? (
           <div className="skeleton" style={{ height: 300 }} />
         ) : (
           <>
@@ -102,9 +125,9 @@ export function HandoverPage() {
             />
             <section className="panel" style={{ marginTop: 16 }}>
               <div className="panel-heading"><h2>{t("handover.history")}</h2></div>
-              {history.length > 0 ? (
+              {historyList.length > 0 ? (
                 <div>
-                  {history.map((handover) => (
+                  {historyList.map((handover) => (
                     <div key={handover.id} className="handover-history-row">
                       <span className="mono">{handover.shift_start.slice(0, 10)}</span>
                       <span className="state-badge">{handover.state.replace("_", " ")}</span>
@@ -116,6 +139,16 @@ export function HandoverPage() {
                 <div className="empty">{t("handover.noHistory")}</div>
               )}
             </section>
+            {nextCursor ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void loadMore()}
+                style={{ marginTop: 12 }}
+              >
+                {t("common.loadMore")}
+              </button>
+            ) : null}
           </>
         )}
       </section>
