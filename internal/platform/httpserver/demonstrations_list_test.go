@@ -87,3 +87,66 @@ func TestListDemonstrationsEnvelope(t *testing.T) {
 		t.Fatalf("unexpected envelope: %+v", body)
 	}
 }
+
+func TestListDemonstrationsRejectsInvalidPageSize(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionDemonstrationRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:         slog.New(slog.DiscardHandler),
+		Auth:           fakeAuth{principal: principal},
+		Demonstrations: demonstrationapp.Service{Gateway: &listDemonstrationGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/demonstrations?page_size=0", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListDemonstrationsRejectsMalformedCursor(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionDemonstrationRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:         slog.New(slog.DiscardHandler),
+		Auth:           fakeAuth{principal: principal},
+		Demonstrations: demonstrationapp.Service{Gateway: &listDemonstrationGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/demonstrations?cursor=bm90LWEtY3Vyc29y", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListDemonstrationsForbiddenWithoutPermission(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:         slog.New(slog.DiscardHandler),
+		Auth:           fakeAuth{principal: principal},
+		Demonstrations: demonstrationapp.Service{Gateway: &listDemonstrationGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/demonstrations", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", recorder.Code)
+	}
+}

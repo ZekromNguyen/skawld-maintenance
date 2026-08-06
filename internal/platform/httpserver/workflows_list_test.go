@@ -93,3 +93,66 @@ func TestListWorkflowsEnvelope(t *testing.T) {
 		t.Fatalf("unexpected envelope: %+v", body)
 	}
 }
+
+func TestListWorkflowsRejectsInvalidPageSize(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionWorkflowRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Workflows: workflowapp.Service{Gateway: &listWorkflowGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/workflows?page_size=0", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListWorkflowsRejectsMalformedCursor(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionWorkflowRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Workflows: workflowapp.Service{Gateway: &listWorkflowGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/workflows?cursor=bm90LWEtY3Vyc29y", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListWorkflowsForbiddenWithoutPermission(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Workflows: workflowapp.Service{Gateway: &listWorkflowGateway{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/workflows", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", recorder.Code)
+	}
+}

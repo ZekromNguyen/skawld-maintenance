@@ -68,3 +68,66 @@ func TestListIncidentsEnvelope(t *testing.T) {
 		t.Fatalf("unexpected envelope: %+v", body)
 	}
 }
+
+func TestListIncidentsRejectsInvalidPageSize(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?page_size=0", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListIncidentsRejectsMalformedCursor(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?cursor=bm90LWEtY3Vyc29y", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListIncidentsForbiddenWithoutPermission(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionAssetRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:    slog.New(slog.DiscardHandler),
+		Auth:      fakeAuth{principal: principal},
+		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", recorder.Code)
+	}
+}

@@ -103,3 +103,66 @@ func TestListExecutionsEnvelope(t *testing.T) {
 		t.Fatalf("unexpected envelope: %+v", body)
 	}
 }
+
+func TestListExecutionsRejectsInvalidPageSize(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionExecutionRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:     slog.New(slog.DiscardHandler),
+		Auth:       fakeAuth{principal: principal},
+		Executions: executionapp.Service{Store: &listExecutionStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/executions?page_size=0", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListExecutionsRejectsMalformedCursor(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionExecutionRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:     slog.New(slog.DiscardHandler),
+		Auth:       fakeAuth{principal: principal},
+		Executions: executionapp.Service{Store: &listExecutionStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/executions?cursor=bm90LWEtY3Vyc29y", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
+
+func TestListExecutionsForbiddenWithoutPermission(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:     slog.New(slog.DiscardHandler),
+		Auth:       fakeAuth{principal: principal},
+		Executions: executionapp.Service{Store: &listExecutionStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/executions", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", recorder.Code)
+	}
+}
