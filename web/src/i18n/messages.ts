@@ -28,6 +28,8 @@ const en = {
   "sidebar.learning": "Learning",
   "sidebar.quality": "Quality",
   "lang.label": "Language / Ngôn ngữ",
+  "theme.switchToDark": "Switch to dark theme",
+  "theme.switchToLight": "Switch to light theme",
 
   "placeholder.underConstruction": "This page is under construction.",
 
@@ -663,6 +665,8 @@ const vi: Record<MessageKey, string> = {
   "sidebar.learning": "Học hỏi",
   "sidebar.quality": "Chất lượng",
   "lang.label": "Ngôn ngữ",
+  "theme.switchToDark": "Chuyển sang giao diện tối",
+  "theme.switchToLight": "Chuyển sang giao diện sáng",
 
   "placeholder.underConstruction": "Trang này đang được xây dựng.",
 

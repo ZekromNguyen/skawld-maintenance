@@ -7,6 +7,29 @@
  * ------------------------------------------------------------------ */
 
 .landing {
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --raised: #eef2ef;
+  --sunken: #e7ece9;
+  --line: #d7dfda;
+  --line-soft: #b9c6be;
+  --ink: #14201a;
+  --ink-soft: #46584e;
+  --ink-muted: #6c7f74;
+  --brand: #12734a;
+  --brand-strong: #0e5c3c;
+  --brand-dim: #bfe6d0;
+  --btn-ink: #f4f7f5;
+  --amber: #96610f;
+  --red: #b3372c;
+  --blue: #2a6fb0;
+  --grid-line: color-mix(in srgb, var(--brand) 7%, transparent);
+  --callout-line: var(--line-soft);
+}
+
+/* Dark mode is scoped to the landing surface and driven by the same global
+ * data-theme toggle as the console. */
+:root[data-theme="dark"] .landing {
   --bg: #0c120f;
   --surface: #101816;
   --raised: #15201b;
@@ -23,32 +46,6 @@
   --amber: #f0b35a;
   --red: #e0665a;
   --blue: #7fb3e0;
-  --grid-line: color-mix(in srgb, var(--brand) 7%, transparent);
-  --callout-line: var(--line-soft);
-}
-
-/* Light mode is scoped to the landing surface (.landing): the console is
- * dark-first by default and must never inherit light tokens from this
- * media query either. */
-@media (prefers-color-scheme: light) {
-  .landing {
-    --bg: #f4f7f5;
-    --surface: #ffffff;
-    --raised: #eef2ef;
-    --sunken: #e7ece9;
-    --line: #d7dfda;
-    --line-soft: #b9c6be;
-    --ink: #14201a;
-    --ink-soft: #46584e;
-    --ink-muted: #6c7f74;
-    --brand: #12734a;
-    --brand-strong: #0e5c3c;
-    --brand-dim: #bfe6d0;
-    --btn-ink: #f4f7f5;
-    --amber: #96610f;
-    --red: #b3372c;
-    --blue: #2a6fb0;
-  }
 }
 
 .landing {

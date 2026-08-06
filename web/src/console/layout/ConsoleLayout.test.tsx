@@ -3,10 +3,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ConsoleLayout } from "./ConsoleLayout";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { ThemeProvider } from "../../theme/ThemeProvider";
 
 describe("ConsoleLayout", () => {
   it("renders sidebar brand and outlet content", () => {
     render(
+      <ThemeProvider>
       <I18nProvider>
         <MemoryRouter initialEntries={["/incidents"]}>
           <Routes>
@@ -15,7 +17,8 @@ describe("ConsoleLayout", () => {
             </Route>
           </Routes>
         </MemoryRouter>
-      </I18nProvider>,
+      </I18nProvider>
+      </ThemeProvider>,
     );
     expect(screen.getByText("Skawld")).toBeTruthy();
     expect(screen.getByText("incident page body")).toBeTruthy();

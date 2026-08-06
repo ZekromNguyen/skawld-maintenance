@@ -3,10 +3,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../../i18n/I18nProvider";
+import { ThemeProvider } from "../../theme/ThemeProvider";
 
 function renderSidebar(entry: string) {
   return render(
-    <I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route path="/incidents/:incidentId" element={<div>detail</div>} />
@@ -14,7 +16,8 @@ function renderSidebar(entry: string) {
         </Routes>
         <Sidebar principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }} />
       </MemoryRouter>
-    </I18nProvider>,
+      </I18nProvider>
+    </ThemeProvider>,
   );
 }
 

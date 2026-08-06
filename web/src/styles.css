@@ -1,27 +1,30 @@
 @import "tailwindcss";
 
+/* Light theme is the default; the toggle in the console sidebar sets
+ * data-theme="dark" on <html> (persisted in localStorage). */
 :root {
-  color-scheme: light dark;
-  color: #e8efe9;
-  background: #0c120f;
+  color-scheme: light;
+  color: #14201a;
+  background: #f4f7f5;
   font-family: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --bg: #0c120f;
-  --surface: #101816;
-  --raised: #15201b;
-  --sunken: #0a0f0d;
-  --line: #223129;
-  --line-soft: #2d3f35;
-  --ink: #e8efe9;
-  --ink-soft: #9fb0a4;
-  --ink-muted: #667a6e;
-  --brand: #68d391;
-  --brand-dim: #2f6b4f;
-  --amber: #f0b35a;
-  --red: #e0665a;
-  --blue: #7fb3e0;
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --raised: #eef2ef;
+  --sunken: #e7ece9;
+  --line: #d7dfda;
+  --line-soft: #b9c6be;
+  --ink: #14201a;
+  --ink-soft: #46584e;
+  --ink-muted: #6c7f74;
+  --brand: #12734a;
+  --brand-strong: #0e5c3c;
+  --brand-dim: #bfe6d0;
+  --amber: #96610f;
+  --red: #b3372c;
+  --blue: #2a6fb0;
   --radius-card: 12px;
   --radius-input: 10px;
   --radius-button: 8px;
@@ -45,33 +48,33 @@
   --tone-success-fg: #b3e8cd;
   --tone-success-bg: #143024;
   --tone-success-line: #22503c;
-  --sidebar-bg: #0e1512;
-  --primary-fg: #d7f6e5;
+  --sidebar-bg: #eef2ef;
+  --primary-fg: #0c120f;
 }
 
-/* Light theme: green-tinted neutrals, deepened emerald for AA. The console
- * mirrors the marketing light palette; the sidebar and tone chips keep their
- * dark instrument identity. */
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f4f7f5;
-    --surface: #ffffff;
-    --raised: #eef2ef;
-    --sunken: #e7ece9;
-    --line: #d7dfda;
-    --line-soft: #b9c6be;
-    --ink: #14201a;
-    --ink-soft: #46584e;
-    --ink-muted: #6c7f74;
-    --brand: #12734a;
-    --brand-strong: #0e5c3c;
-    --brand-dim: #bfe6d0;
-    --amber: #96610f;
-    --red: #b3372c;
-    --blue: #2a6fb0;
-    --sidebar-bg: #eef2ef;
-    --primary-fg: #0c120f;
-  }
+/* Dark theme: the console's original instrument identity, applied by the
+ * theme toggle. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e8efe9;
+  background: #0c120f;
+
+  --bg: #0c120f;
+  --surface: #101816;
+  --raised: #15201b;
+  --sunken: #0a0f0d;
+  --line: #223129;
+  --line-soft: #2d3f35;
+  --ink: #e8efe9;
+  --ink-soft: #9fb0a4;
+  --ink-muted: #667a6e;
+  --brand: #68d391;
+  --brand-dim: #2f6b4f;
+  --amber: #f0b35a;
+  --red: #e0665a;
+  --blue: #7fb3e0;
+  --sidebar-bg: #0e1512;
+  --primary-fg: #d7f6e5;
 }
 
 * { box-sizing: border-box; }
@@ -541,3 +544,8 @@ tr[onclick]:hover td { background: var(--raised); }
   details { display: block !important; }
   body { background: #fff; color: #000; }
 }
+
+/* ---------- Theme toggle ---------- */
+.theme-toggle { width: 100%; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line-soft); background: transparent; color: var(--ink-soft); padding: 9px 10px; font-size: 12px; text-align: left; border-radius: var(--radius-button); cursor: pointer; }
+.theme-toggle:hover { background: var(--raised); color: var(--ink); }
+.theme-toggle svg { flex-shrink: 0; }
