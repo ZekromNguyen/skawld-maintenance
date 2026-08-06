@@ -3,6 +3,7 @@ package skawld
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -349,4 +350,70 @@ func (f fixedWorkflowAuthorities) ForSubject(
 	string,
 ) ([]identitydomain.ApprovalAuthority, error) {
 	return f.values, nil
+}
+
+func TestWorkflowLearningListPagesAcrossVersions(t *testing.T) {
+	pool, ctx := demonstrationTestPool(t)
+	fixture := seedDemonstrationFixture(t, ctx, pool)
+	demonstrationGateway := DemonstrationGateway{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.System{}, Audit: audit.Sink{},
+	}
+	first := captureReviewedPumpDemonstration(
+		t, ctx, pool, fixture, demonstrationGateway, "list-first",
+	)
+	second := captureReviewedPumpDemonstration(
+		t, ctx, pool, fixture, demonstrationGateway, "list-second",
+	)
+	principal := fixture.principal()
+	principal.Roles = []identitydomain.Role{identitydomain.RoleAdministrator}
+	principal.Permissions = make(map[identitydomain.Permission]struct{})
+	for _, permission := range identitydomain.PermissionsForRole(
+		identitydomain.RoleAdministrator,
+	) {
+		principal.Permissions[permission] = struct{}{}
+	}
+	gateway := WorkflowLearningGateway{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.System{}, Audit: audit.Sink{},
+	}
+	service := workflowapp.Service{Gateway: gateway, Now: time.Now}
+	for index := 0; index < 3; index++ {
+		if _, err := service.Compile(ctx, principal, workflowapp.Compile{
+			Name:             fmt.Sprintf("Pump workflow list fixture %d", index),
+			Description:      "pagination fixture",
+			DemonstrationIDs: []string{first.ID, second.ID},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page1, cursor1, err := service.List(
+		ctx, principal, workflowapp.ListFilter{PageSize: 2},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1) != 2 {
+		t.Fatalf("page 1 size = %d, want 2", len(page1))
+	}
+	if cursor1 == "" {
+		t.Fatal("page 1 has no next cursor")
+	}
+	page2, cursor2, err := service.List(
+		ctx, principal, workflowapp.ListFilter{PageSize: 2, Cursor: cursor1},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2) != 1 {
+		t.Fatalf("page 2 size = %d, want 1", len(page2))
+	}
+	if cursor2 != "" {
+		t.Fatalf("page 2 has next cursor %q, want empty", cursor2)
+	}
+	seen := make(map[string]bool)
+	for _, value := range append(append([]workflowapp.Version{}, page1...), page2...) {
+		seen[fmt.Sprintf("%s:%d", value.WorkflowID, value.Version)] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("distinct versions across pages = %d, want 3", len(seen))
+	}
 }
