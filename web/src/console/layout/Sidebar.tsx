@@ -82,7 +82,9 @@ export function Sidebar({ principal }: { principal?: Principal }) {
               <span className="nav-section">{t(section.heading)}</span>
               {visible.map((item) => {
                 const IconComponent = item.icon;
-                const active = location.pathname === item.to;
+                const active =
+                  location.pathname === item.to ||
+                  location.pathname.startsWith(item.to === "/" ? "/" : `${item.to}/`);
                 return (
                   <Link
                     key={item.to}
@@ -90,8 +92,7 @@ export function Sidebar({ principal }: { principal?: Principal }) {
                     className={`nav-item${active ? " active" : ""}`}
                     aria-current={active ? "page" : undefined}
                   >
-                    <span className="nav-indicator" />
-                    <IconComponent size={15} weight={active ? "fill" : "regular"} aria-hidden="true" />
+                    <IconComponent className="nav-icon" size={15} aria-hidden="true" />
                     {t(item.key)}
                   </Link>
                 );
@@ -100,21 +101,23 @@ export function Sidebar({ principal }: { principal?: Principal }) {
           );
         })}
       </nav>
-      <label className="lang-switch">
-        <span className="eyebrow">{t("lang.label")}</span>
-        <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-          <option value="en">English</option>
-          <option value="vi">Tiếng Việt</option>
-        </select>
-      </label>
-      <div className="safety-boundary">
-        <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
-        <strong>{t("sidebar.advisoryOnly")}</strong>
-        <p>{t("sidebar.noControl")}</p>
+      <div className="sidebar-footer">
+        <label className="lang-switch">
+          <span className="eyebrow">{t("lang.label")}</span>
+          <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+            <option value="en">English</option>
+            <option value="vi">Tiếng Việt</option>
+          </select>
+        </label>
+        <div className="safety-boundary">
+          <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
+          <strong>{t("sidebar.advisoryOnly")}</strong>
+          <p>{t("sidebar.noControl")}</p>
+        </div>
+        <button className="logout-button" onClick={() => signOut()}>
+          {t("nav.signOut")}
+        </button>
       </div>
-      <button className="logout-button" onClick={() => signOut()}>
-        {t("nav.signOut")}
-      </button>
     </aside>
   );
 }
