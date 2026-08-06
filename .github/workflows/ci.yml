@@ -47,6 +47,30 @@ jobs:
           TEST_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
           TEST_S3_ENDPOINT: http://localhost:9090
         run: go test -race -count=1 ./...
+      - name: Import fixture snapshot through the CLI
+        env:
+          TEST_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
+        run: |
+          SITE_ID=$(docker compose exec -T postgres psql -U skawld_app -d skawld -Atc "
+            WITH o AS (
+              INSERT INTO organizations (id, name, source_of_truth, version, created_at, updated_at)
+              VALUES (gen_random_uuid(), 'CI Import Organization', 'OWNED_BY_SKAWLD', 1, now(), now())
+              RETURNING id
+            ), s AS (
+              INSERT INTO sites (id, organization_id, code, name, timezone, status, version, created_at, updated_at)
+              SELECT gen_random_uuid(), id, 'CI', 'CI Import Site', 'UTC', 'ACTIVE', 1, now(), now() FROM o
+              RETURNING id, organization_id
+            ), p AS (
+              INSERT INTO principals (id, external_subject, display_name, status, created_at, updated_at)
+              VALUES (gen_random_uuid(), 'ci-import', 'CI Import Admin', 'ACTIVE', now(), now())
+              RETURNING id
+            )
+            INSERT INTO memberships (id, principal_id, organization_id, site_id, role, created_at)
+            SELECT gen_random_uuid(), p.id, s.organization_id, s.id, 'Administrator', now() FROM s, p
+            RETURNING site_id")
+          go run ./cmd/import -snapshot test/fixtures/import-p302.ndjson \
+            -site-id "$SITE_ID" -database-url "$TEST_DATABASE_URL" \
+            -external-subject ci-import
       - name: Run frozen pilot safety evaluation
         run: go run ./cmd/eval -dataset test/evaldata/pilot-v1.json -output dist/evaluation/pilot-v1.json
       - name: Check API/worker PostgreSQL contention budget
