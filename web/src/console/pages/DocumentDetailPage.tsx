@@ -11,6 +11,7 @@ import { ConfirmDialog } from "../feedback/ConfirmDialog";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
+import { GatedButton } from "../ui/GatedButton";
 import { approvalTone, approvalLabelKey } from "../labels";
 import type { DocumentRevision } from "../../types";
 
@@ -30,6 +31,7 @@ export function DocumentDetailPage() {
   const perms = principal?.permissions ?? [];
   const canApprove = perms.includes("knowledge:approve");
   const canWrite = perms.includes("knowledge:write");
+  const permissionReason = t("action.permissionRequired");
 
   const approve = useCommand(
     (id: string) => api.approveDocumentRevision(id),
@@ -77,8 +79,7 @@ export function DocumentDetailPage() {
   }
 
   const value = document.data;
-  const canRetire = (revision: DocumentRevision) =>
-    canWrite &&
+  const revisionStateAllowsRetire = (revision: DocumentRevision) =>
     revision.approval_status !== "RETIRED" &&
     (revision.approval_status === "APPROVED" || revision.approval_status === "SUPERSEDED");
 
@@ -140,16 +141,17 @@ export function DocumentDetailPage() {
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {(revision.approval_status === "DRAFT" || revision.approval_status === "REVIEW_REQUIRED") &&
-                    canApprove && (
-                      <button
-                        className="primary-button"
-                        disabled={approve.pending || retire.pending}
-                        onClick={() => setPending({ kind: "approve", revision })}
-                      >
-                        {t("document.approve")}
-                      </button>
-                    )}
+                  {(revision.approval_status === "DRAFT" || revision.approval_status === "REVIEW_REQUIRED") && (
+                    <GatedButton
+                      allowed={canApprove}
+                      reason={permissionReason}
+                      className="primary-button"
+                      disabled={approve.pending || retire.pending}
+                      onClick={() => setPending({ kind: "approve", revision })}
+                    >
+                      {t("document.approve")}
+                    </GatedButton>
+                  )}
                   {revision.ingestion_state === "AWAITING_UPLOAD" && canWrite && (
                     <button
                       className="secondary-button"
@@ -159,14 +161,16 @@ export function DocumentDetailPage() {
                       {t("document.requestIngestion")}
                     </button>
                   )}
-                  {canRetire(revision) && (
-                    <button
+                  {revisionStateAllowsRetire(revision) && (
+                    <GatedButton
+                      allowed={canWrite}
+                      reason={permissionReason}
                       className="secondary-button"
                       disabled={approve.pending || retire.pending}
                       onClick={() => setPending({ kind: "retire", revision })}
                     >
                       {t("document.retire")}
-                    </button>
+                    </GatedButton>
                   )}
                 </div>
               </div>

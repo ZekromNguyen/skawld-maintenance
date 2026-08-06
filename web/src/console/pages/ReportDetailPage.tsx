@@ -12,6 +12,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
+import { GatedButton } from "../ui/GatedButton";
 import { EvidenceLinks } from "../components/EvidenceLinks";
 import { reportStateTone, reportStateLabelKey } from "../labels";
 
@@ -30,6 +31,7 @@ export function ReportDetailPage() {
   const perms = principal?.permissions ?? [];
   const canWrite = perms.includes("report:write");
   const canApprove = perms.includes("report:approve");
+  const permissionReason = t("action.permissionRequired");
 
   const submit = useCommand(
     (id: string) => api.submitReport(id),
@@ -85,15 +87,26 @@ export function ReportDetailPage() {
               <button className="secondary-button" onClick={() => window.print()}>
                 {t("report.print")}
               </button>
-              {value.state === "DRAFT" && canWrite && (
-                <button className="primary-button" disabled={submit.pending} onClick={() => void submit.run(value.id)}>
+              {value.state === "DRAFT" && (
+                <GatedButton
+                  allowed={canWrite}
+                  reason={permissionReason}
+                  className="primary-button"
+                  disabled={submit.pending}
+                  onClick={() => void submit.run(value.id)}
+                >
                   {t("report.submit")}
-                </button>
+                </GatedButton>
               )}
-              {value.state === "SUBMITTED" && canApprove && (
-                <button className="primary-button" onClick={() => setConfirmApprove(true)}>
+              {value.state === "SUBMITTED" && (
+                <GatedButton
+                  allowed={canApprove}
+                  reason={permissionReason}
+                  className="primary-button"
+                  onClick={() => setConfirmApprove(true)}
+                >
                   {t("report.approve")}
-                </button>
+                </GatedButton>
               )}
             </>
           }

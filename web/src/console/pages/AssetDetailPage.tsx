@@ -11,6 +11,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
+import { GatedButton } from "../ui/GatedButton";
 import {
   severityTone,
   severityLabelKey,
@@ -78,14 +79,16 @@ export function AssetDetailPage() {
           title={value.tag}
           principal={principal}
           actions={
-            canApprove && value.criticality ? (
-              <button
+            value.criticality ? (
+              <GatedButton
+                allowed={canApprove}
+                reason={t("action.permissionRequired")}
                 className="primary-button"
                 disabled={approve.pending}
                 onClick={() => void approve.run(value.id)}
               >
                 {t("asset.approveCriticality")}
-              </button>
+              </GatedButton>
             ) : undefined
           }
         />

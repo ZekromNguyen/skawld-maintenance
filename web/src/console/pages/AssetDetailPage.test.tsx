@@ -74,7 +74,7 @@ describe("AssetDetailPage", () => {
     expect(screen.getByText("Criticality approved")).toBeTruthy();
   });
 
-  it("hides approve without permission", async () => {
+  it("disables approve criticality with a reason without permission", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",
       display_name: "T",
@@ -83,6 +83,8 @@ describe("AssetDetailPage", () => {
     });
     renderDetail();
     await screen.findByText("Process Pump");
-    expect(screen.queryByRole("button", { name: /approve criticality/i })).toBeNull();
+    const approve = screen.getByRole("button", { name: /approve criticality/i }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
   });
 });

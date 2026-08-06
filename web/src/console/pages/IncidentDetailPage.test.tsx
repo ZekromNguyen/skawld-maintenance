@@ -14,7 +14,7 @@ vi.mock("../../api", () => ({
       id: "p1",
       display_name: "Supervisor",
       site_ids: ["s1"],
-      permissions: ["execution:write", "incident:read", "incident:resolve"]
+      permissions: ["execution:write", "incident:read", "incident:resolve", "recommendation:run"]
     }),
     incident: vi.fn().mockResolvedValue({
       id: "inc1",
@@ -29,7 +29,8 @@ vi.mock("../../api", () => ({
       version: 1
     }),
     listExecutions: vi.fn().mockResolvedValue({ items: [] }),
-    resolveIncident: vi.fn().mockResolvedValue({})
+    resolveIncident: vi.fn().mockResolvedValue({}),
+    generateRecommendation: vi.fn().mockResolvedValue({})
   }
 }));
 
@@ -58,6 +59,7 @@ describe("IncidentDetailPage", () => {
     expect(screen.getByText("High")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create execution" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Resolve incident" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate evidence-backed recommendation" })).toBeTruthy();
   });
 
   it("requires confirmation before resolving", async () => {
@@ -72,7 +74,7 @@ describe("IncidentDetailPage", () => {
     expect(screen.getByText("Incident resolved")).toBeTruthy();
   });
 
-  it("hides resolve for unauthorized principals", async () => {
+  it("disables resolve with a reason for unauthorized principals", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",
       display_name: "Tech",
@@ -81,6 +83,37 @@ describe("IncidentDetailPage", () => {
     });
     renderDetail();
     await screen.findByText("High vibration on pump");
-    expect(screen.queryByRole("button", { name: "Resolve incident" })).toBeNull();
+    const resolve = screen.getByRole("button", { name: "Resolve incident" }) as HTMLButtonElement;
+    expect(resolve.disabled).toBe(true);
+    expect(resolve.title).toBe("Required permission not granted");
+  });
+
+  it("generates a recommendation when permitted", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "p1",
+      display_name: "Supervisor",
+      site_ids: ["s1"],
+      permissions: ["execution:write", "incident:read", "incident:resolve", "recommendation:run"]
+    });
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Generate evidence-backed recommendation" }));
+    await waitFor(() =>
+      expect(api.generateRecommendation as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("inc1"),
+    );
+    expect(screen.getByText("Recommendation generated")).toBeTruthy();
+  });
+
+  it("disables recommendation generation without recommendation:run", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p3",
+      display_name: "Tech",
+      site_ids: ["s1"],
+      permissions: ["execution:write", "incident:resolve"]
+    });
+    renderDetail();
+    await screen.findByText("High vibration on pump");
+    const button = screen.getByRole("button", { name: "Generate evidence-backed recommendation" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe("Required permission not granted");
   });
 });

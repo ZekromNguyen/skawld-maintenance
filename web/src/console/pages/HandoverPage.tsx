@@ -8,6 +8,7 @@ import { useSite } from "../state/SiteContext";
 import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
+import { GatedButton } from "../ui/GatedButton";
 import { HandoverPanel } from "../components/HandoverPanel";
 import type { ShiftHandover } from "../../types";
 
@@ -74,16 +75,34 @@ export function HandoverPage() {
     { successMessage: t("handover.captureStarted"), onSuccess: () => navigate("/demonstrations") },
   );
 
-  const transitions: Array<{ key: string; label: string; pending: boolean; run: () => void }> = [];
+  const transitions: Array<{ key: string; label: string; pending: boolean; allowed: boolean; run: () => void }> = [];
   if (latest) {
-    if (latest.state === "DRAFT" && perms.includes("handover:write")) {
-      transitions.push({ key: "submit", label: t("handover.submit"), pending: submit.pending, run: () => void submit.run(latest.id) });
+    if (latest.state === "DRAFT") {
+      transitions.push({
+        key: "submit",
+        label: t("handover.submit"),
+        pending: submit.pending,
+        allowed: perms.includes("handover:write"),
+        run: () => void submit.run(latest.id),
+      });
     }
-    if (latest.state === "SUBMITTED" && perms.includes("handover:accept")) {
-      transitions.push({ key: "accept", label: t("handover.accept"), pending: accept.pending, run: () => void accept.run(latest.id) });
+    if (latest.state === "SUBMITTED") {
+      transitions.push({
+        key: "accept",
+        label: t("handover.accept"),
+        pending: accept.pending,
+        allowed: perms.includes("handover:accept"),
+        run: () => void accept.run(latest.id),
+      });
     }
-    if (latest.state === "ACCEPTED" && perms.includes("handover:accept")) {
-      transitions.push({ key: "acknowledge", label: t("handover.acknowledge"), pending: acknowledge.pending, run: () => void acknowledge.run(latest.id) });
+    if (latest.state === "ACCEPTED") {
+      transitions.push({
+        key: "acknowledge",
+        label: t("handover.acknowledge"),
+        pending: acknowledge.pending,
+        allowed: perms.includes("handover:accept"),
+        run: () => void acknowledge.run(latest.id),
+      });
     }
   }
 
@@ -106,9 +125,16 @@ export function HandoverPage() {
           <>
             <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
               {transitions.map((transition) => (
-                <button key={transition.key} className="primary-button" disabled={transition.pending} onClick={transition.run}>
+                <GatedButton
+                  key={transition.key}
+                  allowed={transition.allowed}
+                  reason={t("action.permissionRequired")}
+                  className="primary-button"
+                  disabled={transition.pending}
+                  onClick={transition.run}
+                >
                   {transition.label}
-                </button>
+                </GatedButton>
               ))}
             </div>
             <HandoverPanel

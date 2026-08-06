@@ -94,4 +94,34 @@ describe("ReportDetailPage", () => {
     await waitFor(() => expect(api.approveReport as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("r1"));
     expect(screen.getByText("Report approved")).toBeTruthy();
   });
+
+  it("disables submit with a reason without report:write", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Manager",
+      site_ids: ["s1"],
+      permissions: ["report:approve", "handover:accept"]
+    });
+    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue(fixtures.report);
+    renderDetail();
+    await screen.findByText("Pump inspection R1");
+    const submit = screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    expect(submit.title).toBe("Required permission not granted");
+  });
+
+  it("disables approve with a reason without report:approve", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "p3",
+      display_name: "Technician",
+      site_ids: ["s1"],
+      permissions: ["report:write", "execution:write"]
+    });
+    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue({ ...fixtures.report, state: "SUBMITTED" });
+    renderDetail();
+    await screen.findByText("Pump inspection R1");
+    const approve = screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
+  });
 });

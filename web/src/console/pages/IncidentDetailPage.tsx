@@ -13,6 +13,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
+import { GatedButton } from "../ui/GatedButton";
 import {
   severityTone,
   severityLabelKey,
@@ -37,6 +38,8 @@ export function IncidentDetailPage() {
   const perms = principal?.permissions ?? [];
   const canCreateExecution = perms.includes("execution:write");
   const canResolve = perms.includes("incident:resolve");
+  const canRecommend = perms.includes("recommendation:run");
+  const permissionReason = t("action.permissionRequired");
 
   const resolve = useCommand(
     (id: string) => api.resolveIncident(id),
@@ -54,6 +57,14 @@ export function IncidentDetailPage() {
     {
       successMessage: t("incident.execution.created"),
       onSuccess: (execution) => navigate(`/executions/${execution.id}`),
+    },
+  );
+
+  const generateRecommendation = useCommand(
+    (id: string) => api.generateRecommendation(id),
+    {
+      successMessage: t("execution.recommendationGenerated"),
+      onSuccess: () => void incident.refetch(),
     },
   );
 
@@ -104,10 +115,26 @@ export function IncidentDetailPage() {
                   {t("incident.createExecution")}
                 </button>
               )}
-              {canResolve && value.state !== "RESOLVED" && (
-                <button className="secondary-button" onClick={() => setConfirmResolve(true)}>
+              {value.state !== "RESOLVED" && (
+                <GatedButton
+                  allowed={canResolve}
+                  reason={permissionReason}
+                  className="secondary-button"
+                  onClick={() => setConfirmResolve(true)}
+                >
                   {t("incident.resolve")}
-                </button>
+                </GatedButton>
+              )}
+              {value.state !== "RESOLVED" && (
+                <GatedButton
+                  allowed={canRecommend}
+                  reason={permissionReason}
+                  className="secondary-button"
+                  disabled={generateRecommendation.pending}
+                  onClick={() => void generateRecommendation.run(value.id)}
+                >
+                  {t("execution.generateRecommendation")}
+                </GatedButton>
               )}
             </>
           }
