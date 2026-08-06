@@ -136,7 +136,7 @@ h2 { font-size: 15px; margin: 4px 0 0; font-weight: 650; }
 .panel { background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
 .panel-heading { min-height: 64px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); gap: 10px; }
 .heading-actions, .form-actions { display: flex; align-items: center; gap: 8px; }
-.count { color: var(--ink-muted); font: 600 11px ui-monospace, monospace; border: 1px solid var(--line); padding: 5px 8px; }
+.count { color: var(--ink-soft); font: 600 11px ui-monospace, monospace; border: 1px solid var(--line); padding: 5px 8px; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th { color: var(--ink-soft); background: var(--raised); text-align: left; text-transform: uppercase; letter-spacing: .08em; font-size: 9px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
@@ -465,10 +465,10 @@ tr[onclick]:hover td { background: var(--raised); }
 /* ---------- Incident queue toolbar ---------- */
 .incident-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .incident-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex: 1; }
-.tab { appearance: none; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-muted); padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.tab { appearance: none; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-soft); padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .tab:hover { color: var(--ink); }
 .tab.active { color: var(--ink); border-bottom-color: var(--brand); }
-.tab .count { font: 600 10px ui-monospace, monospace; color: var(--ink-muted); border: 1px solid var(--line); padding: 2px 6px; border-radius: 8px; }
+.tab .count { font: 600 10px ui-monospace, monospace; color: var(--ink-soft); border: 1px solid var(--line); padding: 2px 6px; border-radius: 8px; }
 .tab.active .count { color: var(--brand); border-color: var(--brand-dim); }
 .incident-search { min-width: 220px; padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: var(--radius-input); background: var(--sunken); color: var(--ink); font-size: 12px; }
 .incident-search:focus { outline: 1px solid var(--brand); border-color: var(--brand-dim); }
