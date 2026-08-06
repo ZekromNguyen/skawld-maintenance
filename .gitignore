@@ -25,3 +25,6 @@ mobile/.flutter-plugins-dependencies
 
 # Local review scratch artifacts
 /.review_diff.txt
+
+# Isolated worktrees for plan execution
+/.worktrees/
