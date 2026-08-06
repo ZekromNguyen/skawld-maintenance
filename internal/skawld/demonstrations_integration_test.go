@@ -405,3 +405,44 @@ func appendFixtureEvent(
 		t.Fatal(err)
 	}
 }
+
+func TestDemonstrationListCursorPagination(t *testing.T) {
+	pool, ctx := demonstrationTestPool(t)
+	fixture := seedDemonstrationFixture(t, ctx, pool)
+	gateway := DemonstrationGateway{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.System{}, Audit: audit.Sink{},
+	}
+	for index := 0; index < 3; index++ {
+		captureReviewedPumpDemonstration(
+			t, ctx, pool, fixture, gateway,
+			"page-"+string(rune('0'+index)),
+		)
+	}
+	page1, hasMore, err := gateway.List(
+		ctx, fixture.principal(), "", demonstrationapp.ListFilter{PageSize: 2},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1) != 2 || !hasMore {
+		t.Fatalf("page 1 = %d items, hasMore %v; want 2, true", len(page1), hasMore)
+	}
+	last := page1[len(page1)-1]
+	cursor := last.StartedAt.UTC().Format(time.RFC3339Nano) + "|" + last.ID
+	page2, hasMore2, err := gateway.List(
+		ctx, fixture.principal(), "", demonstrationapp.ListFilter{PageSize: 2, Cursor: cursor},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2) != 1 || hasMore2 {
+		t.Fatalf("page 2 = %d items, hasMore %v; want 1, false", len(page2), hasMore2)
+	}
+	seen := map[string]bool{}
+	for _, item := range append(page1, page2...) {
+		seen[item.ID] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("distinct demonstrations across pages = %d, want 3", len(seen))
+	}
+}
