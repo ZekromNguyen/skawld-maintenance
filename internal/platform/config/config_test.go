@@ -69,3 +69,54 @@ func validConfig(role Role) Config {
 		},
 	}
 }
+
+func TestValidateRejectsUnknownStructuredProvider(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "bogus"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected structured provider validation error")
+	}
+}
+
+func TestValidateRejectsUnknownEmbeddingProvider(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.EmbeddingProvider = "bogus"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected embedding provider validation error")
+	}
+}
+
+func TestValidateRequiresOpenAIModel(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "openai"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing AI_MODEL error")
+	}
+}
+
+func TestValidateRequiresAnthropicKeyAndModel(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "anthropic"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing ANTHROPIC_API_KEY error")
+	}
+}
+
+func TestLoadDefaultsStructuredProviderToDeterministic(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test")
+	t.Setenv("S3_BUCKET", "test-bucket")
+	cfg, err := Load(RoleWorker)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.AI.StructuredProvider != "deterministic" {
+		t.Fatalf("StructuredProvider = %q, want deterministic", cfg.AI.StructuredProvider)
+	}
+	if cfg.AI.EmbeddingProvider != "deterministic" {
+		t.Fatalf("EmbeddingProvider = %q, want deterministic", cfg.AI.EmbeddingProvider)
+	}
+}

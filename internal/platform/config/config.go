@@ -29,6 +29,7 @@ type Config struct {
 	ObjectStore   ObjectStore
 	Documents     Documents
 	Transcription Transcription
+	AI            AI
 }
 
 type HTTP struct {
@@ -91,6 +92,25 @@ type Transcription struct {
 	ModelVersion string
 }
 
+// AI selects the structured-output and embedding providers. The deterministic
+// providers are the development default so tests and demos run without AI
+// credentials; deployment adapters are chosen with STRUCTURED_PROVIDER and
+// EMBEDDING_PROVIDER.
+type AI struct {
+	StructuredProvider    string
+	EmbeddingProvider     string
+	Endpoint              string
+	APIKey                string
+	Model                 string
+	ModelVersion          string
+	AnthropicAPIKey       string
+	AnthropicModel        string
+	AnthropicModelVersion string
+	EmbeddingEndpoint     string
+	EmbeddingModel        string
+	EmbeddingModelVersion string
+}
+
 func Load(role Role) (Config, error) {
 	cfg := Config{
 		Environment: env("APP_ENV", "development"),
@@ -142,6 +162,20 @@ func Load(role Role) (Config, error) {
 			Provider:     env("TRANSCRIPTION_PROVIDER", "unavailable"),
 			Model:        env("TRANSCRIPTION_MODEL", "unavailable"),
 			ModelVersion: env("TRANSCRIPTION_MODEL_VERSION", "none"),
+		},
+		AI: AI{
+			StructuredProvider:    strings.ToLower(strings.TrimSpace(env("STRUCTURED_PROVIDER", "deterministic"))),
+			EmbeddingProvider:     strings.ToLower(strings.TrimSpace(env("EMBEDDING_PROVIDER", "deterministic"))),
+			Endpoint:              env("AI_ENDPOINT", ""),
+			APIKey:                env("AI_API_KEY", ""),
+			Model:                 env("AI_MODEL", ""),
+			ModelVersion:          env("AI_MODEL_VERSION", ""),
+			AnthropicAPIKey:       env("ANTHROPIC_API_KEY", ""),
+			AnthropicModel:        env("ANTHROPIC_MODEL", ""),
+			AnthropicModelVersion: env("ANTHROPIC_MODEL_VERSION", ""),
+			EmbeddingEndpoint:     env("EMBEDDING_ENDPOINT", ""),
+			EmbeddingModel:        env("EMBEDDING_MODEL", ""),
+			EmbeddingModelVersion: env("EMBEDDING_MODEL_VERSION", ""),
 		},
 	}
 	return cfg, errors.Join(cfg.Validate(), validateEnvironmentValues())
@@ -227,6 +261,47 @@ func (c Config) Validate() error {
 			strings.TrimSpace(c.Transcription.Model) == "" ||
 			strings.TrimSpace(c.Transcription.ModelVersion) == "" {
 			errs = append(errs, errors.New("transcription model metadata is required"))
+		}
+	}
+	if c.AI.StructuredProvider != "deterministic" &&
+		c.AI.StructuredProvider != "openai" &&
+		c.AI.StructuredProvider != "anthropic" {
+		errs = append(errs, errors.New("STRUCTURED_PROVIDER must be deterministic, openai, or anthropic"))
+	}
+	if c.AI.EmbeddingProvider != "deterministic" &&
+		c.AI.EmbeddingProvider != "openai" {
+		errs = append(errs, errors.New("EMBEDDING_PROVIDER must be deterministic or openai"))
+	}
+	if c.AI.StructuredProvider == "openai" {
+		if strings.TrimSpace(c.AI.Model) == "" {
+			errs = append(errs, errors.New("AI_MODEL is required when STRUCTURED_PROVIDER is openai"))
+		}
+		if c.AI.Endpoint != "" {
+			endpoint, err := url.Parse(c.AI.Endpoint)
+			if err != nil || !endpoint.IsAbs() ||
+				(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+				errs = append(errs, errors.New("AI_ENDPOINT must be an absolute HTTP(S) URL"))
+			}
+		}
+	}
+	if c.AI.StructuredProvider == "anthropic" {
+		if strings.TrimSpace(c.AI.AnthropicAPIKey) == "" {
+			errs = append(errs, errors.New("ANTHROPIC_API_KEY is required when STRUCTURED_PROVIDER is anthropic"))
+		}
+		if strings.TrimSpace(c.AI.AnthropicModel) == "" {
+			errs = append(errs, errors.New("ANTHROPIC_MODEL is required when STRUCTURED_PROVIDER is anthropic"))
+		}
+	}
+	if c.AI.EmbeddingProvider == "openai" {
+		if strings.TrimSpace(c.AI.EmbeddingModel) == "" {
+			errs = append(errs, errors.New("EMBEDDING_MODEL is required when EMBEDDING_PROVIDER is openai"))
+		}
+		if c.AI.EmbeddingEndpoint != "" {
+			endpoint, err := url.Parse(c.AI.EmbeddingEndpoint)
+			if err != nil || !endpoint.IsAbs() ||
+				(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+				errs = append(errs, errors.New("EMBEDDING_ENDPOINT must be an absolute HTTP(S) URL"))
+			}
 		}
 	}
 	for name, value := range map[string]int{
