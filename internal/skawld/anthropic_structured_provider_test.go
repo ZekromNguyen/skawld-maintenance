@@ -26,7 +26,6 @@ func newTestAnthropicProvider(t *testing.T, handler http.HandlerFunc) *Anthropic
 }
 
 func TestAnthropicStructuredProviderGenerate(t *testing.T) {
-	t.Parallel()
 	provider := newTestAnthropicProvider(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-api-key") != "secret" {
 			t.Error("missing provider api key")
@@ -83,7 +82,6 @@ func TestAnthropicStructuredProviderGenerate(t *testing.T) {
 }
 
 func TestAnthropicStructuredProviderRejectsEmptyContent(t *testing.T) {
-	t.Parallel()
 	provider := newTestAnthropicProvider(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"content": [{"type": "text", "text": ""}]}`))
@@ -96,7 +94,6 @@ func TestAnthropicStructuredProviderRejectsEmptyContent(t *testing.T) {
 }
 
 func TestAnthropicStructuredProviderRejectsNonJSON(t *testing.T) {
-	t.Parallel()
 	provider := newTestAnthropicProvider(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"content": [{"type": "text", "text": "not json"}]}`))
@@ -109,7 +106,6 @@ func TestAnthropicStructuredProviderRejectsNonJSON(t *testing.T) {
 }
 
 func TestAnthropicStructuredProviderRejectsNon2xx(t *testing.T) {
-	t.Parallel()
 	provider := newTestAnthropicProvider(t, func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "upstream failure", http.StatusTooManyRequests)
 	})
@@ -122,7 +118,6 @@ func TestAnthropicStructuredProviderRejectsNon2xx(t *testing.T) {
 }
 
 func TestAnthropicStructuredProviderConfigValidation(t *testing.T) {
-	t.Parallel()
 	cases := []AnthropicStructuredConfig{
 		{APIKey: "", Model: "m", ModelVersion: "v"},
 		{APIKey: "k", Model: "", ModelVersion: "v"},
