@@ -174,7 +174,13 @@ jobs:
         if: runner.os == 'macOS'
         run: ../scripts/configure-flutter-macos.sh
       - run: flutter pub get
-      - run: dart run build_runner build
+      - name: Format, analyze, and test on the native runner
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          dart run build_runner build
+          flutter analyze
+          flutter test
       - name: Build Windows application
         if: runner.os == 'Windows'
         run: flutter build windows --release
