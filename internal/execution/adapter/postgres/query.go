@@ -30,6 +30,12 @@ func (s Store) List(
 	principal identitydomain.Principal,
 	filter executionapp.Filter,
 ) ([]executionapp.Execution, bool, error) {
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
 	query := `
 		SELECT e.id::text
 		FROM maintenance_executions e
