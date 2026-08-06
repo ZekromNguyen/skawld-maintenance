@@ -1839,7 +1839,7 @@ components:
               type: {type: string}
     Asset:
       type: object
-      required: [id, organization_id, site_id, tag, name, class, status, source_of_truth, version, components]
+      required: [id, organization_id, site_id, tag, name, class, status, source_of_truth, version, components, created_at]
       properties:
         id: {type: string, format: uuid}
         organization_id: {type: string, format: uuid}
@@ -1855,6 +1855,7 @@ components:
           type: string
           enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
         version: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
         components: {type: array, items: {type: object}}
         criticality: {$ref: "#/components/schemas/Criticality"}
     Criticality:
@@ -1918,7 +1919,7 @@ components:
         version: {type: integer, format: int64}
     Execution:
       type: object
-      required: [id, organization_id, site_id, asset_id, purpose, state, version, steps, prerequisites, measurements, observations, actions, decisions]
+      required: [id, organization_id, site_id, asset_id, purpose, state, version, steps, prerequisites, measurements, observations, actions, decisions, updated_at]
       properties:
         id: {type: string, format: uuid}
         organization_id: {type: string, format: uuid}
@@ -1929,6 +1930,7 @@ components:
         purpose: {type: string}
         state: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}
         version: {type: integer, format: int64}
+        updated_at: {type: string, format: date-time}
         steps:
           type: array
           items: {$ref: "#/components/schemas/ExecutionStep"}
