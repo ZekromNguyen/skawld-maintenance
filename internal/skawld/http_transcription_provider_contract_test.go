@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -39,8 +40,13 @@ func TestTranscriptionProviderContract(t *testing.T) {
 		if strings.TrimSpace(transcript.Text) != "" {
 			t.Fatalf("transcript with error: %q, %v", transcript.Text, err)
 		}
-		// An explicit provider error is contract-valid for synthetic audio;
-		// it must not be a client-validation sentinel.
+		// An explicit provider error is contract-valid for synthetic audio,
+		// but it must not be the client-side validation sentinel: a
+		// silently-degraded endpoint that returns 200 with empty text would
+		// otherwise pass.
+		if errors.Is(err, ErrInvalidOutput) {
+			t.Fatalf("provider returned the client-validation sentinel: %v", err)
+		}
 		return
 	}
 	if strings.TrimSpace(transcript.Text) == "" {

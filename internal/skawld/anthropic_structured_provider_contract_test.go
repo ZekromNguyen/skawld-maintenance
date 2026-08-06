@@ -52,10 +52,15 @@ func TestAnthropicStructuredProviderContract(t *testing.T) {
 	if output.Status == "" || output.Confidence < 0 || output.Confidence > 1 {
 		t.Fatalf("malformed recommendation output: %+v", output)
 	}
+	seen := make(map[string]bool)
 	for _, id := range output.EvidenceIDs {
 		if id != evidenceID {
 			t.Fatalf("evidence id %q not in the request evidence set", id)
 		}
+		if seen[id] {
+			t.Fatalf("duplicate evidence id %q", id)
+		}
+		seen[id] = true
 	}
 	if output.RiskLevel != "INFORMATIONAL" && output.RiskLevel != "ADVISORY" {
 		t.Fatalf("risk_level %q outside the closed set accepted by the copilot decoder", output.RiskLevel)
