@@ -127,13 +127,28 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	embeddingProvider := skawld.DeterministicEmbeddingProvider{Dimensions: 64}
-	structuredProvider := skawld.DeterministicProvider{}
-	modelRouter := skawld.Router{Providers: map[skawld.Capability]skawld.StructuredProvider{
-		skawld.CapabilityRecommendation: structuredProvider,
-		skawld.CapabilityReportDraft:    structuredProvider,
-		skawld.CapabilityShiftHandover:  structuredProvider,
-	}}
+	structuredProviders, embeddingProvider, err := skawld.BuildProviders(
+		skawld.AIConfig{
+			StructuredProvider:     cfg.AI.StructuredProvider,
+			EmbeddingProvider:      cfg.AI.EmbeddingProvider,
+			StructuredEndpoint:     cfg.AI.Endpoint,
+			StructuredAPIKey:       cfg.AI.APIKey,
+			StructuredModel:        cfg.AI.Model,
+			StructuredModelVersion: cfg.AI.ModelVersion,
+			AnthropicAPIKey:        cfg.AI.AnthropicAPIKey,
+			AnthropicModel:         cfg.AI.AnthropicModel,
+			AnthropicModelVersion:  cfg.AI.AnthropicModelVersion,
+			EmbeddingEndpoint:      cfg.AI.EmbeddingEndpoint,
+			EmbeddingModel:         cfg.AI.EmbeddingModel,
+			EmbeddingModelVersion:  cfg.AI.EmbeddingModelVersion,
+		},
+		&http.Client{Timeout: 30 * time.Second},
+	)
+	if err != nil {
+		logger.Error("AI provider startup failed", "error", err)
+		os.Exit(1)
+	}
+	modelRouter := skawld.Router{Providers: structuredProviders}
 	authorityReader := identitypostgres.AuthorityReader{Pool: pool}
 	knowledgeStore := knowledgepostgres.Store{
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
