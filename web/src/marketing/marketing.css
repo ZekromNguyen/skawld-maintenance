@@ -1,9 +1,12 @@
 /* ------------------------------------------------------------------ *
  * Skawld marketing page tokens (see docs/contributing/web-ui-design-system.md)
  * Dark-first brand identity, dual-mode via prefers-color-scheme.
+ * All tokens are scoped to the landing surface (.landing): the console
+ * defines its own tokens in styles.css and must never inherit marketing
+ * tokens (either mode) from a global :root.
  * ------------------------------------------------------------------ */
 
-:root {
+.landing {
   --bg: #0c120f;
   --surface: #101816;
   --raised: #15201b;
@@ -25,7 +28,8 @@
 }
 
 /* Light mode is scoped to the landing surface (.landing): the console is
- * dark-first and must never inherit light tokens from this media query. */
+ * dark-first by default and must never inherit light tokens from this
+ * media query either. */
 @media (prefers-color-scheme: light) {
   .landing {
     --bg: #f4f7f5;
