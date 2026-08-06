@@ -219,17 +219,38 @@ func (g WorkflowLearningGateway) Get(
 func (g WorkflowLearningGateway) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
-) ([]workflowapp.Version, error) {
-	rows, err := g.Pool.Query(ctx, `
+	filter workflowapp.ListFilter,
+) ([]workflowapp.Version, bool, error) {
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	query := `
 		SELECT v.workflow_id::text, v.version
 		FROM workflow_versions v
 		WHERE v.organization_id = $1::uuid
-		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR v.site_id = ANY($2::uuid[]))
-		ORDER BY v.updated_at DESC
-		LIMIT 200
-	`, principal.OrganizationID, principal.SiteIDs)
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR v.site_id = ANY($2::uuid[]))`
+	args := []any{principal.OrganizationID, principal.SiteIDs}
+	if filter.Cursor != "" {
+		parts := strings.SplitN(filter.Cursor, "|", 3)
+		if len(parts) != 3 {
+			return nil, false, workflowapp.ErrInvalid
+		}
+		args = append(args, parts[0], parts[1], parts[2])
+		query += fmt.Sprintf(
+			" AND (v.created_at, v.workflow_id, v.version) < ($%d, $%d::uuid, $%d)",
+			len(args)-2, len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(
+		" ORDER BY v.created_at DESC, v.workflow_id DESC, v.version DESC LIMIT $%d",
+		len(args))
+
+	rows, err := g.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 	type identity struct {
@@ -240,22 +261,26 @@ func (g WorkflowLearningGateway) List(
 	for rows.Next() {
 		var value identity
 		if err := rows.Scan(&value.workflowID, &value.version); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		identities = append(identities, value)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	hasMore := len(identities) > filter.PageSize
+	if hasMore {
+		identities = identities[:filter.PageSize]
 	}
 	result := make([]workflowapp.Version, 0, len(identities))
 	for _, identity := range identities {
 		value, err := g.Get(ctx, principal, identity.workflowID, identity.version)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, value)
 	}
-	return result, nil
+	return result, hasMore, nil
 }
 
 func (g WorkflowLearningGateway) Review(

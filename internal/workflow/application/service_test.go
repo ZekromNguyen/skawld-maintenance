@@ -145,8 +145,9 @@ func (s workflowGatewayStub) Get(
 func (s workflowGatewayStub) List(
 	context.Context,
 	identitydomain.Principal,
-) ([]Version, error) {
-	return []Version{s.current}, nil
+	ListFilter,
+) ([]Version, bool, error) {
+	return []Version{s.current}, false, nil
 }
 
 func (s workflowGatewayStub) Review(
