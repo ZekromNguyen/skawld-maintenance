@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "@phosphor-icons/react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
@@ -11,7 +10,6 @@ import { PageTrailProvider } from "../layout/PageTrail";
 import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
-import { MetricCard } from "../ui/MetricCard";
 import { RelativeTime } from "../ui/RelativeTime";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
 import {
@@ -88,19 +86,12 @@ export function IncidentsPage() {
           principal={principal}
           actions={
             canCreate ? (
-              <button className="primary-button action-button" onClick={() => setShowForm(true)}>
-                <Plus size={15} weight="bold" aria-hidden="true" />
+              <button className="primary-button" onClick={() => setShowForm(true)}>
                 {t("form.createIncident")}
               </button>
             ) : undefined
           }
         />
-        <div className="metrics incident-kpis">
-          <MetricCard label={t("incident.state.open")} value={String(counts.OPEN)} tone="info" onClick={() => setTab("OPEN")} />
-          <MetricCard label={t("incident.state.inProgress")} value={String(counts.IN_PROGRESS)} tone="medium" onClick={() => setTab("IN_PROGRESS")} />
-          <MetricCard label={t("incident.state.resolved")} value={String(counts.RESOLVED)} tone="success" onClick={() => setTab("RESOLVED")} />
-          <MetricCard label={t("incidents.tabs.all")} value={String(counts.ALL)} tone="info" onClick={() => setTab("ALL")} />
-        </div>
         <div className="incident-toolbar">
           <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
             {STATE_TABS.map((state) => (
@@ -116,27 +107,25 @@ export function IncidentsPage() {
               </button>
             ))}
           </div>
-          <div className="incident-filters">
-            <input
-              aria-label={t("incidents.filter.search")}
-              placeholder={t("incidents.filter.search")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="incident-search"
-            />
-            <select
-              aria-label={t("incidents.filter.severity")}
-              value={severity}
-              onChange={(event) => setSeverity(event.target.value)}
-              className="incident-severity-filter"
-            >
-              <option value="ALL">{t("incidents.tabs.all")}</option>
-              <option value="LOW">{t(severityLabelKey("LOW"))}</option>
-              <option value="MEDIUM">{t(severityLabelKey("MEDIUM"))}</option>
-              <option value="HIGH">{t(severityLabelKey("HIGH"))}</option>
-              <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
-            </select>
-          </div>
+          <input
+            aria-label={t("incidents.filter.search")}
+            placeholder={t("incidents.filter.search")}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="incident-search"
+          />
+          <select
+            aria-label={t("incidents.filter.severity")}
+            value={severity}
+            onChange={(event) => setSeverity(event.target.value)}
+            className="incident-severity-filter"
+          >
+            <option value="ALL">{t("incidents.tabs.all")}</option>
+            <option value="LOW">{t(severityLabelKey("LOW"))}</option>
+            <option value="MEDIUM">{t(severityLabelKey("MEDIUM"))}</option>
+            <option value="HIGH">{t(severityLabelKey("HIGH"))}</option>
+            <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
+          </select>
         </div>
         <DataTable<Incident>
           columns={[
@@ -144,7 +133,7 @@ export function IncidentsPage() {
               key: "number",
               header: t("dashboard.table.incident"),
               render: (incident) => (
-                <Link to={`/incidents/${incident.id}`} className="strong incident-number" title={incident.number}>
+                <Link to={`/incidents/${incident.id}`} className="strong">
                   {incident.number}
                 </Link>
               ),
@@ -158,24 +147,13 @@ export function IncidentsPage() {
             {
               key: "asset",
               header: t("dashboard.table.asset"),
-              render: (incident) =>
-                incident.asset_id ? (
-                  <Link
-                    to={`/assets/${incident.asset_id}`}
-                    className="asset-link"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {incident.asset_tag ?? incident.asset_id}
-                  </Link>
-                ) : (
-                  "—"
-                ),
+              render: (incident) => incident.asset_tag ?? "—",
             },
             {
               key: "severity",
               header: t("dashboard.table.severity"),
               render: (incident) => (
-                <StatusBadge dot tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />
+                <StatusBadge tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />
               ),
               sortValue: (i) => i.severity,
             },
@@ -183,7 +161,7 @@ export function IncidentsPage() {
               key: "state",
               header: t("dashboard.table.state"),
               render: (incident) => (
-                <StatusBadge dot tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />
+                <StatusBadge tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />
               ),
               sortValue: (i) => i.state,
             },
@@ -197,14 +175,6 @@ export function IncidentsPage() {
           rowKey={(incident) => incident.id}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
           emptyTitle={t("incidents.noResults")}
-          emptyAction={
-            canCreate ? (
-              <button className="primary-button" onClick={() => setShowForm(true)}>
-                <Plus size={14} weight="bold" aria-hidden="true" />
-                {t("form.createIncident")}
-              </button>
-            ) : undefined
-          }
           loading={incidents.loading}
           error={incidents.error}
           onRetry={() => void incidents.refetch()}

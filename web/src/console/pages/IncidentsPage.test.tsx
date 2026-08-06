@@ -102,20 +102,6 @@ describe("IncidentsPage", () => {
     expect(screen.getByText("Resolved noise")).toBeTruthy();
   });
 
-  it("filters via the KPI cards", async () => {
-    renderPage();
-    await screen.findByText("Pump vibration");
-    fireEvent.click(screen.getByRole("button", { name: /resolved/i }));
-    await waitFor(() => expect(screen.queryByText("Pump vibration")).toBeNull());
-    expect(screen.getByText("Resolved noise")).toBeTruthy();
-  });
-
-  it("links the asset column to the asset page", async () => {
-    renderPage();
-    const assetLink = await screen.findByRole("link", { name: /P-302/i });
-    expect(assetLink.getAttribute("href")).toBe("/assets/a1");
-  });
-
   it("hides create for unauthorized principals", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",

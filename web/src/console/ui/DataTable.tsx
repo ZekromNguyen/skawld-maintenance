@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { EmptyState } from "./EmptyState";
-import type { ReactNode } from "react";
 import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
 
@@ -17,7 +16,6 @@ export function DataTable<T>({
   rowKey,
   emptyTitle,
   emptyBody,
-  emptyAction,
   loading = false,
   error,
   onRetry,
@@ -28,7 +26,6 @@ export function DataTable<T>({
   rowKey: (row: T) => string;
   emptyTitle: string;
   emptyBody?: string;
-  emptyAction?: ReactNode;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
@@ -56,7 +53,7 @@ export function DataTable<T>({
     return <Skeleton height={180} />;
   }
   if (sorted.length === 0) {
-    return <EmptyState title={emptyTitle} body={emptyBody} action={emptyAction} />;
+    return <EmptyState title={emptyTitle} body={emptyBody} />;
   }
   return (
     <div className="table-wrap">
