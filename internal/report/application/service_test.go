@@ -126,7 +126,6 @@ func TestListReportsComputesCursor(t *testing.T) {
 	}
 }
 
-
 func TestHumanEditCannotIntroduceEvidence(t *testing.T) {
 	t.Parallel()
 	store := &editStore{}
