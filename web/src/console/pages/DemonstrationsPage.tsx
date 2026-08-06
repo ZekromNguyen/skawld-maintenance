@@ -1,75 +1,61 @@
 import { useState } from "react";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { useCommand } from "../useCommand";
+import { usePrincipal } from "../usePrincipal";
+import { useSite } from "../state/SiteContext";
 import { useI18n } from "../../i18n/I18nProvider";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
 import { DemonstrationPanel } from "../components/DemonstrationPanel";
 
 /**
- * DemonstrationsPage: expert demonstration capture and review.
+ * DemonstrationsPage: expert demonstration capture and review. Site-scoped
+ * fetch (no mount race), dialog-based inputs, toast feedback on actions.
  */
 export function DemonstrationsPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
-  const siteID = principal?.site_ids[0];
-  const demonstrations = useApi(() => api.demonstrations(siteID));
+  const { siteId } = useSite();
+  const demonstrations = useQuery(
+    () => api.demonstrations(siteId).then((list) => list.items),
+    [siteId],
+  );
   const [selected, setSelected] = useState<string | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
 
-  const mutate = async (action: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await action();
-      await demonstrations.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const complete = useCommand(
+    (id: string, outcome: string) => api.completeDemonstration(id, outcome),
+    { successMessage: t("demo.completeSuccess"), onSuccess: () => void demonstrations.refetch() },
+  );
+  const redact = useCommand(
+    (id: string, eventID: string, path: string, reason: string) =>
+      api.redactDemonstrationEvent(id, eventID, path, reason),
+    { successMessage: t("demo.redactSuccess"), onSuccess: () => void demonstrations.refetch() },
+  );
+  const review = useCommand(
+    (id: string, decision: "APPROVED" | "REJECTED" | "REDACTION_REQUIRED", reason: string) =>
+      api.reviewDemonstration(id, decision, reason),
+    { successMessage: t("demo.reviewSuccess"), onSuccess: () => void demonstrations.refetch() },
+  );
 
-  const values = demonstrations.data?.items ?? [];
+  const values = demonstrations.data ?? [];
   const selectedValue = values.find((value) => value.id === selected);
+  const busy = complete.pending || redact.pending || review.pending;
 
   return (
-    <section>
-      <Topbar title={t("nav.demonstrations")} principal={principal} />
-      {demonstrations.error && (
-        <div className="toast-error" role="alert">{demonstrations.error}</div>
-      )}
-      {demonstrations.loading && !demonstrations.data ? (
-        <div className="skeleton" style={{ height: 300 }} />
-      ) : (
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader title={t("nav.demonstrations")} principal={principal} />
         <DemonstrationPanel
           values={values}
           selected={selectedValue}
           busy={busy}
-          onSelect={(value) =>
-            mutate(async () => {
-              const detail = await api.demonstration(value.id);
-              setSelected(detail.id);
-              demonstrations.refetch();
-            })
-          }
-          onComplete={(value, outcome) =>
-            mutate(async () => {
-              const detail = await api.completeDemonstration(value.id, outcome);
-              setSelected(detail.id);
-            })
-          }
-          onRedact={(value, eventID, path, reason) =>
-            mutate(async () => {
-              await api.redactDemonstrationEvent(value.id, eventID, path, reason);
-              setSelected(value.id);
-            })
-          }
-          onReview={(value, decision, reason) =>
-            mutate(async () => {
-              await api.reviewDemonstration(value.id, decision, reason);
-              setSelected(value.id);
-            })
-          }
+          onSelect={(value) => setSelected(value.id)}
+          onComplete={(value, outcome) => void complete.run(value.id, outcome)}
+          onRedact={(value, eventID, path, reason) => void redact.run(value.id, eventID, path, reason)}
+          onReview={(value, decision, reason) => void review.run(value.id, decision, reason)}
         />
-      )}
-    </section>
+      </section>
+    </PageTrailProvider>
   );
 }

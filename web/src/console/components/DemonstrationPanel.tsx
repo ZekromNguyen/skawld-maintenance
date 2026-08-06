@@ -1,66 +1,45 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n/I18nProvider";
-import { relativeTime } from "../../presentation";
+import { PromptDialog } from "../feedback/PromptDialog";
+import { Dialog } from "../feedback/Dialog";
+import { FormField } from "../ui/FormField";
+import { StatusBadge } from "../ui/StatusBadge";
 import type { Demonstration } from "../../types";
 
+type PromptState =
+  | { kind: "complete" }
+  | { kind: "review"; decision: "APPROVED" | "REJECTED" | "REDACTION_REQUIRED" }
+  | { kind: "redact"; eventID: string }
+  | null;
+
+const REVIEWED: ReadonlyArray<string> = ["APPROVED", "REJECTED"];
 
 export function DemonstrationPanel(props: {
   values: Demonstration[];
   selected?: Demonstration;
   busy: boolean;
-  onSelect: (value: Demonstration) => Promise<void>;
-  onComplete: (value: Demonstration, outcome: string) => Promise<void>;
+  onSelect: (value: Demonstration) => void;
+  onComplete: (value: Demonstration, outcome: string) => void;
   onRedact: (
     value: Demonstration,
     eventID: string,
     path: string,
     reason: string
-  ) => Promise<void>;
+  ) => void;
   onReview: (
     value: Demonstration,
     decision: "APPROVED" | "REJECTED" | "REDACTION_REQUIRED",
     reason: string
-  ) => Promise<void>;
+  ) => void;
 }) {
   const { t, locale } = useI18n();
   const selected = props.selected;
+  const [prompt, setPrompt] = useState<PromptState>(null);
 
-  function complete() {
-    if (!selected) return;
-    const outcome = window.prompt(
-      t("demo.outcomePrompt"),
-      t("demo.outcomeDefault")
-    );
-    if (outcome?.trim()) void props.onComplete(selected, outcome.trim());
-  }
-
-  function review(
-    decision: "APPROVED" | "REJECTED" | "REDACTION_REQUIRED"
-  ) {
-    if (!selected) return;
-    const reason = window.prompt(
-      t("demo.reviewReasonPrompt"),
-      decision === "APPROVED"
-        ? t("demo.reviewApproveDefault")
-        : t("demo.reviewRejectDefault")
-    );
-    if (reason?.trim()) void props.onReview(selected, decision, reason.trim());
-  }
-
-  function redact(eventID: string) {
-    if (!selected) return;
-    const path = window.prompt(
-      t("demo.jsonPathPrompt"),
-      t("demo.jsonPathDefault")
-    );
-    if (!path?.trim()) return;
-    const reason = window.prompt(
-      t("demo.redactReasonPrompt"),
-      t("demo.redactReasonDefault")
-    );
-    if (reason?.trim()) {
-      void props.onRedact(selected, eventID, path.trim(), reason.trim());
-    }
-  }
+  const localeTag = locale === "vi" ? "vi-VN" : "en-US";
+  const canReview =
+    selected?.status === "completed" && !REVIEWED.includes(selected.review_status ?? "");
 
   return (
     <div className="demonstration-layout">
@@ -80,7 +59,8 @@ export function DemonstrationPanel(props: {
                 ? "demonstration-item selected"
                 : "demonstration-item"
             }
-            onClick={() => void props.onSelect(value)}
+            aria-current={selected?.id === value.id ? "true" : undefined}
+            onClick={() => props.onSelect(value)}
           >
             <span>
               <strong>{value.workflow_key}</strong>
@@ -88,15 +68,17 @@ export function DemonstrationPanel(props: {
                 {value.subject_kind} · {t("demo.semanticEvents", { count: value.events.length })}
               </small>
             </span>
-            <span className="state-badge">{value.status}</span>
+            <StatusBadge tone={value.review_status === "APPROVED" ? "success" : value.review_status === "REJECTED" ? "critical" : "info"} label={value.review_status ?? value.status} />
             <small>
-              {t("demo.review", { status: value.review_status })} · {relativeTime(value.started_at, locale)}
+              {value.status} · {new Date(value.started_at).toLocaleString(localeTag)}
             </small>
           </button>
         ))}
         {props.values.length === 0 && (
-          <div className="empty">
-            {t("demo.startCapture")}
+          <div className="empty-state">
+            <strong>{t("demo.noCaptures")}</strong>
+            <p>{t("demo.startCaptureGuidance")}</p>
+            <Link to="/handovers" className="secondary-button">{t("nav.handover")}</Link>
           </div>
         )}
       </section>
@@ -105,9 +87,7 @@ export function DemonstrationPanel(props: {
         {!selected ? (
           <div className="empty-state">
             <strong>{t("demo.select")}</strong>
-            <p>
-              {t("demo.reviewGuidance")}
-            </p>
+            <p>{t("demo.reviewGuidance")}</p>
           </div>
         ) : (
           <>
@@ -117,12 +97,12 @@ export function DemonstrationPanel(props: {
                 <h2>{selected.workflow_key}</h2>
               </div>
               <div className="heading-actions">
-                <span className="state-badge">{selected.review_status}</span>
+                <StatusBadge tone={selected.review_status === "APPROVED" ? "success" : selected.review_status === "REJECTED" ? "critical" : "info"} label={selected.review_status ?? selected.status} />
                 {selected.status === "recording" && (
                   <button
                     className="primary-button"
                     disabled={props.busy}
-                    onClick={complete}
+                    onClick={() => setPrompt({ kind: "complete" })}
                   >
                     {t("demo.completeCapture")}
                   </button>
@@ -158,9 +138,10 @@ export function DemonstrationPanel(props: {
                   <div>
                     <div className="event-heading">
                       <strong>{event.action}</strong>
-                      <span className="source-badge">
-                        {event.trust.replaceAll("_", " ")}
-                      </span>
+                      <span className="source-badge">{event.trust.replaceAll("_", " ")}</span>
+                      {event.redactions && event.redactions.length > 0 ? (
+                        <StatusBadge tone="critical" label={t("demo.redactedCount", { count: event.redactions.length })} />
+                      ) : null}
                     </div>
                     {event.intent && <p>{event.intent}</p>}
                     <small>
@@ -169,7 +150,7 @@ export function DemonstrationPanel(props: {
                     </small>
                     <small>
                       {t("demo.actor")} <span className="mono">{event.actor_id}</span> ·{" "}
-                      {new Date(event.timestamp).toLocaleString()}
+                      {new Date(event.timestamp).toLocaleString(localeTag)}
                     </small>
                     {event.correction_of && (
                       <span className="correction-link">
@@ -190,6 +171,12 @@ export function DemonstrationPanel(props: {
                           2
                         )}
                       </pre>
+                      <CopyButton payload={JSON.stringify({
+                        output: event.output,
+                        decision: event.decision,
+                        result: event.result,
+                        context: event.context
+                      })} label={t("demo.copyPayload")} copiedLabel={t("demo.copied")} />
                     </details>
                     <div className="event-provenance">
                       <span>{event.source}</span>
@@ -199,44 +186,44 @@ export function DemonstrationPanel(props: {
                           ? t("demo.domain", { id: event.domain_event_id })
                           : t("demo.manualCapture")}
                       </span>
-                      <button
-                        className="secondary-button"
-                        disabled={props.busy}
-                        onClick={() => redact(event.id)}
-                      >
-                        {t("demo.redactField")}
-                      </button>
+                      {canReview ? (
+                        <button
+                          className="secondary-button"
+                          disabled={props.busy}
+                          onClick={() => setPrompt({ kind: "redact", eventID: event.id })}
+                        >
+                          {t("demo.redactField")}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </article>
               ))}
             </div>
-            {selected.status === "completed" && (
+            {canReview && (
               <div className="review-actions">
                 <span>
                   <strong>{t("demo.humanGovernance")}</strong>
-                  <small>
-                    {t("demo.governanceNote")}
-                  </small>
+                  <small>{t("demo.governanceNote")}</small>
                 </span>
                 <button
                   className="secondary-button"
                   disabled={props.busy}
-                  onClick={() => review("REDACTION_REQUIRED")}
+                  onClick={() => setPrompt({ kind: "review", decision: "REDACTION_REQUIRED" })}
                 >
                   {t("demo.requestRedaction")}
                 </button>
                 <button
                   className="secondary-button"
                   disabled={props.busy}
-                  onClick={() => review("REJECTED")}
+                  onClick={() => setPrompt({ kind: "review", decision: "REJECTED" })}
                 >
                   {t("demo.reject")}
                 </button>
                 <button
                   className="primary-button"
                   disabled={props.busy}
-                  onClick={() => review("APPROVED")}
+                  onClick={() => setPrompt({ kind: "review", decision: "APPROVED" })}
                 >
                   {t("demo.approveTrace")}
                 </button>
@@ -245,6 +232,141 @@ export function DemonstrationPanel(props: {
           </>
         )}
       </section>
+
+      {selected && (
+        <>
+          <PromptDialog
+            open={prompt?.kind === "complete"}
+            onOpenChange={(open) => {
+              if (!open) setPrompt(null);
+            }}
+            title={t("demo.completeCapture")}
+            label={t("demo.outcomeLabel")}
+            defaultValue={t("demo.outcomeDefault")}
+            confirmLabel={t("demo.completeCapture")}
+            pending={props.busy}
+            onConfirm={(outcome) => {
+              props.onComplete(selected, outcome);
+            }}
+          />
+          <PromptDialog
+            open={prompt?.kind === "review"}
+            onOpenChange={(open) => {
+              if (!open) setPrompt(null);
+            }}
+            title={prompt?.kind === "review" && prompt.decision === "APPROVED" ? t("demo.approveTrace") : prompt?.kind === "review" && prompt.decision === "REJECTED" ? t("demo.reject") : t("demo.requestRedaction")}
+            label={t("demo.reviewReasonLabel")}
+            defaultValue={prompt?.kind === "review" && prompt.decision === "APPROVED" ? t("demo.reviewApproveDefault") : t("demo.reviewRejectDefault")}
+            confirmLabel={prompt?.kind === "review" && prompt.decision === "APPROVED" ? t("demo.approveTrace") : prompt?.kind === "review" && prompt.decision === "REJECTED" ? t("demo.reject") : t("demo.requestRedaction")}
+            pending={props.busy}
+            onConfirm={(reason) => {
+              if (prompt?.kind === "review") props.onReview(selected, prompt.decision, reason);
+            }}
+          />
+          {prompt?.kind === "redact" && (
+            <RedactDialog
+              open
+              onClose={() => setPrompt(null)}
+              pending={props.busy}
+              onRedact={(path, reason) => {
+                if (prompt.kind === "redact") props.onRedact(selected, prompt.eventID, path, reason);
+              }}
+            />
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function RedactDialog({
+  open,
+  onClose,
+  pending,
+  onRedact,
+}: {
+  open: boolean;
+  onClose: () => void;
+  pending: boolean;
+  onRedact: (path: string, reason: string) => void;
+}) {
+  const { t } = useI18n();
+  const [path, setPath] = useState(t("demo.jsonPathDefault"));
+  const [reason, setReason] = useState(t("demo.redactReasonDefault"));
+
+  useEffect(() => {
+    if (open) {
+      setPath(t("demo.jsonPathDefault"));
+      setReason(t("demo.redactReasonDefault"));
+    }
+  }, [open, t]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={t("demo.redactField")}
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose} disabled={pending}>
+            {t("demo.cancel")}
+          </button>
+          <button
+            className="primary-button"
+            disabled={pending || !path.trim() || !reason.trim()}
+            onClick={() => onRedact(path.trim(), reason.trim())}
+          >
+            {t("demo.redactField")}
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: "grid", gap: 14 }}>
+        <FormField label={t("demo.jsonPathLabel")} htmlFor="redact-path">
+          <input
+            id="redact-path"
+            className="mono"
+            value={path}
+            onChange={(event) => setPath(event.target.value)}
+          />
+        </FormField>
+        <FormField label={t("demo.redactReasonLabel")} htmlFor="redact-reason">
+          <textarea
+            id="redact-reason"
+            rows={3}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </FormField>
+      </div>
+    </Dialog>
+  );
+}
+
+function CopyButton({
+  payload,
+  label,
+  copiedLabel,
+}: {
+  payload: string;
+  label: string;
+  copiedLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="secondary-button"
+      onClick={() => {
+        void navigator.clipboard.writeText(payload).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? copiedLabel : label}
+    </button>
   );
 }
