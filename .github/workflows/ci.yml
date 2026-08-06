@@ -93,6 +93,20 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  provider-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.25.12"
+          cache: true
+      - name: Download dependencies
+        run: go mod download
+      - name: Run AI provider contract tests
+        run: go test ./internal/skawld/ -run Contract -v
+
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15
