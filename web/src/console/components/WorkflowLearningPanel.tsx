@@ -1,7 +1,25 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n/I18nProvider";
+import { PromptDialog } from "../feedback/PromptDialog";
+import { StatusBadge, type Tone } from "../ui/StatusBadge";
 import type { Demonstration, WorkflowVersion } from "../../types";
-import type { MessageKey } from "../../i18n/messages";
+
+interface PromptSpec {
+  title: string;
+  label: string;
+  defaultValue: string;
+  confirmLabel: string;
+  onConfirm: (value: string) => void;
+}
+
+const STATUS_TONE: Record<string, Tone> = {
+  CANDIDATE: "info",
+  REVIEW_REQUIRED: "medium",
+  APPROVED: "success",
+  PUBLISHED: "success",
+  REJECTED: "critical",
+  RETIRED: "low"
+};
 
 export function WorkflowLearningPanel(props: {
   values: WorkflowVersion[];
@@ -9,17 +27,20 @@ export function WorkflowLearningPanel(props: {
   selected?: WorkflowVersion;
   busy: boolean;
   onSelect: (value: WorkflowVersion) => void;
-  onCompile: (demonstrationIDs: string[]) => Promise<void>;
+  onCompile: (demonstrationIDs: string[]) => void;
   onReview: (
     value: WorkflowVersion,
     decision: "APPROVED" | "REJECTED" | "REVIEW_REQUIRED",
     reason: string
-  ) => Promise<void>;
-  onPublish: (value: WorkflowVersion, reason: string) => Promise<void>;
-  onRetire: (value: WorkflowVersion, reason: string) => Promise<void>;
+  ) => void;
+  onPublish: (value: WorkflowVersion, reason: string) => void;
+  onRetire: (value: WorkflowVersion, reason: string) => void;
 }) {
   const { t } = useI18n();
   const [selectedDemonstrations, setSelectedDemonstrations] = useState<string[]>([]);
+  const [compileError, setCompileError] = useState<string | undefined>(undefined);
+  const [prompt, setPrompt] = useState<PromptSpec | null>(null);
+
   const reviewed = props.demonstrations.filter(
     (value) => value.status === "completed" && value.review_status === "APPROVED"
   );
@@ -31,15 +52,25 @@ export function WorkflowLearningPanel(props: {
         ? current.filter((value) => value !== id)
         : [...current, id]
     );
+    setCompileError(undefined);
   }
 
-  function reason(
-    promptKey: MessageKey,
-    defaultKey: MessageKey
-  ): string | undefined {
-    const value = window.prompt(t(promptKey), t(defaultKey))?.trim();
-    return value || undefined;
+  function compile() {
+    const keys = new Set(
+      selectedDemonstrations
+        .map((id) => props.demonstrations.find((demo) => demo.id === id)?.workflow_key)
+        .filter(Boolean)
+    );
+    if (keys.size > 1) {
+      setCompileError(t("workflow.compileKeyMismatch"));
+      return;
+    }
+    setCompileError(undefined);
+    props.onCompile(selectedDemonstrations);
   }
+
+  const lastRejected = selected?.reviews?.find((review) => review.decision === "REJECTED");
+  const sequenceConsistency = selected?.analysis.sequence_consistency;
 
   return (
     <div className="workbench workflow-workbench">
@@ -51,9 +82,7 @@ export function WorkflowLearningPanel(props: {
           </div>
           <span className="count">{t("workflow.traces", { count: reviewed.length })}</span>
         </div>
-        <p className="muted">
-          {t("workflow.compileHint")}
-        </p>
+        <p className="muted">{t("workflow.compileHint")}</p>
         <div className="selection-list">
           {reviewed.map((value) => (
             <label className="selection-row" key={value.id}>
@@ -71,10 +100,14 @@ export function WorkflowLearningPanel(props: {
             </label>
           ))}
         </div>
+        {compileError ? (
+          <p className="form-error" role="alert" style={{ margin: "0 16px 8px" }}>{compileError}</p>
+        ) : null}
         <button
           className="primary-button"
+          style={{ marginLeft: 16 }}
           disabled={props.busy || selectedDemonstrations.length < 2}
-          onClick={() => void props.onCompile(selectedDemonstrations)}
+          onClick={compile}
         >
           {t("workflow.compileButton")}
         </button>
@@ -87,18 +120,19 @@ export function WorkflowLearningPanel(props: {
                   ? "queue-item selected"
                   : "queue-item"
               }
+              aria-current={
+                selected?.workflow_id === value.workflow_id && selected.version === value.version
+                  ? "true"
+                  : undefined
+              }
               key={`${value.workflow_id}:${value.version}`}
               onClick={() => props.onSelect(value)}
             >
               <span>
-                <strong>{value.name}</strong>
-                <small>
-                  v{value.version} · {value.asset_class}
-                </small>
+                <strong>{value.name || value.workflow_key}</strong>
+                <small>v{value.version} · {value.asset_class}</small>
               </span>
-              <span className="state-badge">
-                {value.status}
-              </span>
+              <StatusBadge tone={STATUS_TONE[value.status] ?? "info"} label={value.status.replace("_", " ")} />
             </button>
           ))}
         </div>
@@ -116,24 +150,25 @@ export function WorkflowLearningPanel(props: {
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">{t("workflow.humanControlled")}</span>
-                <h2>{selected.name}</h2>
+                <h2>{selected.name || selected.workflow_key}</h2>
                 <small className="mono">
                   {selected.workflow_key} · v{selected.version}
                 </small>
               </div>
-              <span className="state-badge">
-                {selected.status}
-              </span>
+              <StatusBadge tone={STATUS_TONE[selected.status] ?? "info"} label={selected.status.replace("_", " ")} />
             </div>
+            {lastRejected ? (
+              <div className="notice" role="alert">{t("workflow.rejectedNotice")}</div>
+            ) : null}
 
             <div className="workflow-facts">
               <span>
                 <strong>
-                  {Math.round(
-                    (selected.analysis.sequence_consistency ?? 0) * 100
-                  )}%
+                  {sequenceConsistency == null
+                    ? "—"
+                    : `${Math.round(sequenceConsistency * 100)}%`}
                 </strong>
-                {t("workflow.sequenceConsistency")}
+                {sequenceConsistency == null ? t("workflow.noAnalysis") : t("workflow.sequenceConsistency")}
               </span>
               <span>
                 <strong>{selected.analysis.conflicts?.length ?? 0}</strong>
@@ -197,58 +232,81 @@ export function WorkflowLearningPanel(props: {
               </article>
             </div>
 
+            <div className="panel" style={{ margin: "0 16px" }}>
+              <div className="panel-heading"><h2>{t("workflow.governanceTrail")}</h2></div>
+              {(selected.reviews?.length ?? 0) > 0 ? (
+                <div className="readable-list" style={{ margin: 12 }}>
+                  {selected.reviews!.map((review, index) => (
+                    <div key={index} className="readable-row">
+                      <div className="readable-key-value">
+                        <span className="mono muted">decision</span>
+                        <span>{review.decision}</span>
+                      </div>
+                      <div className="readable-key-value">
+                        <span className="mono muted">reason</span>
+                        <span>{review.reason}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty">{t("workflow.noReviews")}</div>
+              )}
+            </div>
+
             {selected.improvement_candidates.length > 0 && (
-              <div className="notice">
-                {t("workflow.improvementNotice")}
-              </div>
+              <div className="notice">{t("workflow.improvementNotice")}</div>
             )}
 
             <div className="review-actions">
               <span>
                 <strong>{t("workflow.governedRelease")}</strong>
-                <small>
-                  {t("workflow.governedReleaseNote")}
-                </small>
+                <small>{t("workflow.governedReleaseNote")}</small>
               </span>
-              {(selected.status === "CANDIDATE" ||
-                selected.status === "REVIEW_REQUIRED") && (
+              {(selected.status === "CANDIDATE" || selected.status === "REVIEW_REQUIRED") && (
                 <>
                   <button
                     className="secondary-button"
                     disabled={props.busy}
-                    onClick={() => {
-                      const value = reason(
-                        "workflow.reviewRequiredPrompt",
-                        "workflow.reviewRequiredDefault"
-                      );
-                      if (value) void props.onReview(selected, "REVIEW_REQUIRED", value);
-                    }}
+                    onClick={() =>
+                      setPrompt({
+                        title: t("workflow.requireReview"),
+                        label: t("workflow.reviewRequiredPrompt"),
+                        defaultValue: t("workflow.reviewRequiredDefault"),
+                        confirmLabel: t("workflow.requireReview"),
+                        onConfirm: (value) => props.onReview(selected, "REVIEW_REQUIRED", value)
+                      })
+                    }
                   >
                     {t("workflow.requireReview")}
                   </button>
                   <button
                     className="secondary-button"
                     disabled={props.busy}
-                    onClick={() => {
-                      const value = reason(
-                        "workflow.rejectPrompt",
-                        "workflow.rejectDefault"
-                      );
-                      if (value) void props.onReview(selected, "REJECTED", value);
-                    }}
+                    onClick={() =>
+                      setPrompt({
+                        title: t("workflow.reject"),
+                        label: t("workflow.rejectPrompt"),
+                        defaultValue: t("workflow.rejectDefault"),
+                        confirmLabel: t("workflow.reject"),
+                        onConfirm: (value) => props.onReview(selected, "REJECTED", value)
+                      })
+                    }
                   >
                     {t("workflow.reject")}
                   </button>
                   <button
                     className="primary-button"
                     disabled={props.busy}
-                    onClick={() => {
-                      const value = reason(
-                        "workflow.approvePrompt",
-                        "workflow.approveDefault"
-                      );
-                      if (value) void props.onReview(selected, "APPROVED", value);
-                    }}
+                    onClick={() =>
+                      setPrompt({
+                        title: t("workflow.approveCandidate"),
+                        label: t("workflow.approvePrompt"),
+                        defaultValue: t("workflow.approveDefault"),
+                        confirmLabel: t("workflow.approveCandidate"),
+                        onConfirm: (value) => props.onReview(selected, "APPROVED", value)
+                      })
+                    }
                   >
                     {t("workflow.approveCandidate")}
                   </button>
@@ -258,13 +316,15 @@ export function WorkflowLearningPanel(props: {
                 <button
                   className="primary-button"
                   disabled={props.busy}
-                  onClick={() => {
-                    const value = reason(
-                      "workflow.publishPrompt",
-                      "workflow.publishDefault"
-                    );
-                    if (value) void props.onPublish(selected, value);
-                  }}
+                  onClick={() =>
+                    setPrompt({
+                      title: t("workflow.evaluatePublish"),
+                      label: t("workflow.publishPrompt"),
+                      defaultValue: t("workflow.publishDefault"),
+                      confirmLabel: t("workflow.evaluatePublish"),
+                      onConfirm: (value) => props.onPublish(selected, value)
+                    })
+                  }
                 >
                   {t("workflow.evaluatePublish")}
                 </button>
@@ -273,13 +333,15 @@ export function WorkflowLearningPanel(props: {
                 <button
                   className="secondary-button"
                   disabled={props.busy}
-                  onClick={() => {
-                    const value = reason(
-                      "workflow.retirePrompt",
-                      "workflow.retireDefault"
-                    );
-                    if (value) void props.onRetire(selected, value);
-                  }}
+                  onClick={() =>
+                    setPrompt({
+                      title: t("workflow.retireVersion"),
+                      label: t("workflow.retirePrompt"),
+                      defaultValue: t("workflow.retireDefault"),
+                      confirmLabel: t("workflow.retireVersion"),
+                      onConfirm: (value) => props.onRetire(selected, value)
+                    })
+                  }
                 >
                   {t("workflow.retireVersion")}
                 </button>
@@ -288,6 +350,21 @@ export function WorkflowLearningPanel(props: {
           </>
         )}
       </section>
+
+      <PromptDialog
+        open={prompt !== null}
+        onOpenChange={(open) => {
+          if (!open) setPrompt(null);
+        }}
+        title={prompt?.title ?? ""}
+        label={prompt?.label ?? ""}
+        defaultValue={prompt?.defaultValue ?? ""}
+        confirmLabel={prompt?.confirmLabel ?? ""}
+        pending={props.busy}
+        onConfirm={(value) => {
+          prompt?.onConfirm(value);
+        }}
+      />
     </div>
   );
 }

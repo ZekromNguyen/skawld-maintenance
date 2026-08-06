@@ -1,111 +1,98 @@
 import { useState } from "react";
-import { useApi } from "../useApi";
-import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
+import { useQuery } from "../useQuery";
+import { useCommand } from "../useCommand";
+import { usePrincipal } from "../usePrincipal";
+import { useSite } from "../state/SiteContext";
 import { useI18n } from "../../i18n/I18nProvider";
-import type { WorkflowVersion } from "../../types";
-import { Topbar } from "../layout/Topbar";
+import { PageHeader } from "../layout/PageHeader";
+import { PageTrailProvider } from "../layout/PageTrail";
 import { WorkflowLearningPanel } from "../components/WorkflowLearningPanel";
+import type { WorkflowApplicability, WorkflowVersion } from "../../types";
 
 /**
  * WorkflowsPage: learned workflow compilation, review, publish, retire.
+ * Site-scoped demos, toast feedback, names resolved from the workflow data.
  */
 export function WorkflowsPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
-  const siteID = principal?.site_ids[0];
-  const workflows = useApi(() => api.workflows());
-  const demonstrations = useApi(() => api.demonstrations(siteID));
-  const assets = useApi(() => api.assets());
+  const { siteId } = useSite();
+  const workflows = useQuery(() => api.workflows().then((list) => list.items));
+  const demonstrations = useQuery(
+    () => api.demonstrations(siteId).then((list) => list.items),
+    [siteId],
+  );
+  const assets = useQuery(() => api.assets().then((list) => list.items));
   const [selected, setSelected] = useState<WorkflowVersion | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
 
-  const mutate = async (action: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await action();
-      await workflows.refetch();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const compile = useCommand(
+    (name: string, ids: string[]) => api.compileWorkflow(name, ids),
+    {
+      successMessage: t("workflow.compileSuccess"),
+      onSuccess: (value) => setSelected(value),
+    },
+  );
+  const review = useCommand(
+    (value: WorkflowVersion, decision: "APPROVED" | "REJECTED" | "REVIEW_REQUIRED", reason: string) =>
+      api.reviewWorkflow(value, decision, reason, applicabilityFor(value)),
+    {
+      successMessage: t("workflow.reviewSuccess"),
+      onSuccess: (value) => setSelected(value),
+    },
+  );
+  const publish = useCommand(
+    (value: WorkflowVersion, reason: string) => api.publishWorkflow(value, reason),
+    {
+      successMessage: t("workflow.publishSuccess"),
+      onSuccess: (value) => setSelected(value),
+    },
+  );
+  const retire = useCommand(
+    (value: WorkflowVersion, reason: string) => api.retireWorkflow(value, reason),
+    {
+      successMessage: t("workflow.retireSuccess"),
+      onSuccess: (value) => setSelected(value),
+    },
+  );
 
-  const values = workflows.data?.items ?? [];
-  const demos = demonstrations.data?.items ?? [];
+  function applicabilityFor(value: WorkflowVersion): WorkflowApplicability[] {
+    const asset = (assets.data ?? []).find(
+      (item) => item.site_id === value.site_id && item.class === value.asset_class
+    );
+    return [
+      {
+        site_id: value.site_id,
+        asset_id: asset?.id,
+        asset_class: value.asset_class,
+        manufacturer: asset?.manufacturer,
+        model: asset?.model,
+        validation_status: "VALIDATED"
+      }
+    ];
+  }
+
+  const busy = compile.pending || review.pending || publish.pending || retire.pending;
 
   return (
-    <section>
-      <Topbar title={t("nav.workflows")} principal={principal} />
-      {workflows.error && (
-        <div className="toast-error" role="alert">{workflows.error}</div>
-      )}
-      {workflows.loading && !workflows.data ? (
-        <div className="skeleton" style={{ height: 300 }} />
-      ) : (
+    <PageTrailProvider trail={[]}>
+      <section>
+        <PageHeader title={t("nav.workflows")} principal={principal} />
         <WorkflowLearningPanel
-          values={values}
-          demonstrations={demos}
+          values={workflows.data ?? []}
+          demonstrations={demonstrations.data ?? []}
           selected={selected}
           busy={busy}
-          onSelect={(value) =>
-            mutate(async () => {
-              const detail = await api.workflow(value.workflow_id, value.version);
-              setSelected(detail);
-            })
-          }
-          onCompile={(demonstrationIDs) =>
-            mutate(async () => {
-              const source = demos.find((demonstration) =>
-                demonstrationIDs.includes(demonstration.id),
-              );
-              const name =
-                source?.workflow_key === "maintenance.shift_handover"
-                  ? "Shift handover workflow"
-                  : "High vibration pump inspection";
-              const value = await api.compileWorkflow(name, demonstrationIDs);
-              setSelected(value);
-            })
-          }
-          onReview={(value, decision, reason) =>
-            mutate(async () => {
-              const asset = (assets.data?.items ?? []).find(
-                (item) =>
-                  item.site_id === value.site_id &&
-                  item.class === value.asset_class,
-              );
-              const applicability = [
-                {
-                  site_id: value.site_id,
-                  asset_id: asset?.id,
-                  asset_class: value.asset_class,
-                  manufacturer: asset?.manufacturer,
-                  model: asset?.model,
-                  validation_status: "VALIDATED" as const
-                }
-              ];
-              const detail = await api.reviewWorkflow(
-                value,
-                decision,
-                reason,
-                applicability,
-              );
-              setSelected(detail);
-            })
-          }
-          onPublish={(value, reason) =>
-            mutate(async () => {
-              const detail = await api.publishWorkflow(value, reason);
-              setSelected(detail);
-            })
-          }
-          onRetire={(value, reason) =>
-            mutate(async () => {
-              const detail = await api.retireWorkflow(value, reason);
-              setSelected(detail);
-            })
-          }
+          onSelect={(value) => setSelected(value)}
+          onCompile={(ids) => {
+            const source = demonstrations.data?.find((demo) => demo.id === ids[0]);
+            void compile.run(source?.workflow_key ?? "compiled workflow", ids);
+          }}
+          onReview={(value, decision, reason) => void review.run(value, decision, reason)}
+          onPublish={(value, reason) => void publish.run(value, reason)}
+          onRetire={(value, reason) => void retire.run(value, reason)}
         />
-      )}
-    </section>
+      </section>
+    </PageTrailProvider>
   );
 }
