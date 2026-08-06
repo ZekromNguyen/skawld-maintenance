@@ -67,6 +67,10 @@ func validConfig(role Role) Config {
 			Region: "us-east-1",
 			Bucket: "test",
 		},
+		AI: AI{
+			StructuredProvider: "deterministic",
+			EmbeddingProvider:  "deterministic",
+		},
 	}
 }
 
@@ -128,5 +132,12 @@ func TestValidateRequiresOpenAIAPIKey(t *testing.T) {
 	cfg.AI.Model = "gpt-4o"
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected missing AI_API_KEY error")
+	}
+}
+
+func TestValidConfigPassesValidation(t *testing.T) {
+	t.Parallel()
+	if err := validConfig(RoleAPI).Validate(); err != nil {
+		t.Fatalf("validConfig(RoleAPI) must validate clean: %v", err)
 	}
 }
