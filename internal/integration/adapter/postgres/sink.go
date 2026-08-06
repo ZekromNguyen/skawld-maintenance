@@ -128,7 +128,7 @@ func (s Sink) Apply(
 				},
 				OccurredAt: now,
 			}); err != nil {
-				return outcome{}, err
+				return outcome{}, fmt.Errorf("append audit event: %w", err)
 			}
 		}
 		return outcome{}, nil
@@ -137,11 +137,15 @@ func (s Sink) Apply(
 }
 
 func requiredString(attributes map[string]any, key string) (string, error) {
-	value := strings.TrimSpace(fmt.Sprint(attributes[key]))
-	if value == "" {
+	value, ok := attributes[key]
+	if !ok {
 		return "", fmt.Errorf("missing required attribute %q", key)
 	}
-	return value, nil
+	text := strings.TrimSpace(fmt.Sprint(value))
+	if text == "" {
+		return "", fmt.Errorf("missing required attribute %q", key)
+	}
+	return text, nil
 }
 
 func optionalString(attributes map[string]any, key string) string {

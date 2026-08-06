@@ -232,3 +232,22 @@ func TestSinkRejectsUnsupportedKind(t *testing.T) {
 		t.Fatalf("rejected page inserted %d assets, want 0", count)
 	}
 }
+
+func TestSinkRejectsMissingRequiredAttribute(t *testing.T) {
+	pool, ctx := openSinkTestPool(t)
+	fixture := seedSinkFixture(t, ctx, pool)
+	record := externalAsset(fixture, "a-5001")
+	delete(record.Attributes, "tag")
+	if err := sinkFor(pool).Apply(ctx, fixture.principal, []integrationdomain.ExternalRecord{record}); err == nil {
+		t.Fatal("expected missing tag attribute to be rejected")
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM assets WHERE organization_id = $1::uuid
+	`, fixture.organizationID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("rejected record inserted %d assets, want 0", count)
+	}
+}
