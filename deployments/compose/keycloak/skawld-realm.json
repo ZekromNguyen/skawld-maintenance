@@ -8,6 +8,9 @@
   "sslRequired": "external",
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 28800,
+  "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespan": 5184000,
+  "offlineSessionMaxLifespanEnabled": true,
   "clients": [
     {
       "clientId": "skawld-web",
@@ -18,8 +21,14 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:8080/auth/callback"],
+      "redirectUris": [
+        "http://localhost:8080/auth/callback",
+        "http://localhost:5173/auth/callback"
+      ],
       "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5173/"
+      },
       "protocol": "openid-connect",
       "protocolMappers": [
         {
@@ -31,6 +40,21 @@
             "included.client.audience": "skawld-api",
             "id.token.claim": "false",
             "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "skawld role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "skawld_role",
+            "claim.name": "skawld_role",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "jsonType.label": "String",
+            "aggregate.attrs": "false"
           }
         }
       ]
@@ -66,6 +90,42 @@
       ]
     }
   ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "providerId": "google",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "config": {
+        "clientId": "dev-google-client-id",
+        "clientSecret": "dev-google-client-secret",
+        "hostedDomain": "example.com",
+        "syncMode": "IMPORT",
+        "useJwksUrl": "true"
+      }
+    },
+    {
+      "alias": "microsoft",
+      "providerId": "microsoft",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "config": {
+        "clientId": "dev-microsoft-client-id",
+        "clientSecret": "dev-microsoft-client-secret",
+        "tenantId": "00000000-0000-0000-0000-000000000000",
+        "syncMode": "IMPORT",
+        "useJwksUrl": "true"
+      }
+    }
+  ],
   "users": [
     {
       "id": "00000000-0000-4000-8000-000000000001",
@@ -75,10 +135,96 @@
       "email": "phase0.admin@example.invalid",
       "emailVerified": true,
       "enabled": true,
+      "realmRoles": ["offline_access"],
       "credentials": [
         {
           "type": "password",
           "value": "phase0-admin-dev",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000101",
+      "username": "dev.admin",
+      "firstName": "Dev",
+      "lastName": "Administrator",
+      "email": "dev.admin@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-admin-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000102",
+      "username": "dev.supervisor",
+      "firstName": "Dev",
+      "lastName": "Supervisor",
+      "email": "dev.supervisor@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-supervisor-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000103",
+      "username": "dev.senior",
+      "firstName": "Dev",
+      "lastName": "Senior Technician",
+      "email": "dev.senior@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-senior-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000104",
+      "username": "dev.technician",
+      "firstName": "Dev",
+      "lastName": "Technician",
+      "email": "dev.technician@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-technician-pw",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000105",
+      "username": "dev.manager",
+      "firstName": "Dev",
+      "lastName": "Manager",
+      "email": "dev.manager@example.invalid",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": ["offline_access"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev-manager-pw",
           "temporary": false
         }
       ]

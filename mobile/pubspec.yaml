@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   connectivity_plus: ^7.3.1
   crypto: ^3.0.7
   dio: ^5.11.0
@@ -16,8 +18,10 @@ dependencies:
   drift_flutter: ^0.3.1
   file_selector: ^1.1.0
   flutter_secure_storage: ^10.3.1
+  intl: any
   openid_client: ^0.4.10+1
   path_provider: ^2.1.6
+  shared_preferences: ^2.5.0
   sqlite3: ^3.5.0
   uuid: ^4.6.0
   url_launcher: ^6.3.2
@@ -31,3 +35,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true

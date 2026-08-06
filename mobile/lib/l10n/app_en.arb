@@ -1,0 +1,90 @@
+{
+  "@@locale": "en",
+  "appTitle": "Skawld Maintenance",
+  "language": "Language",
+  "locale_system": "System",
+  "locale_english": "English",
+  "locale_vietnamese": "Tiếng Việt",
+  "login_subtitle": "Sign in while connected. Cached assigned work remains available during later outages.",
+  "login_button": "Sign in with OIDC",
+  "login_connecting": "Connecting…",
+  "list_assignedMaintenance": "Assigned maintenance",
+  "list_offlineBanner": "OFFLINE READY · ADVISORY ONLY",
+  "list_syncNow": "Sync now",
+  "list_empty": "No cached executions.\nConnect once to download your assigned work.",
+  "list_footer": "Pending changes are stored on this device and sync automatically.",
+  "signout_title": "Sign out?",
+  "signout_message": "Your session on this device will be ended. Cached work stays on this device and syncs after you sign back in.",
+  "signout_cancel": "Cancel",
+  "signout_confirm": "Sign out",
+  "signout_tooltip": "Sign out",
+  "detail_disclaimer": "Skawld guides and records work. External PTW/LOTO remains authoritative.",
+  "detail_startOffline": "Start inspection offline",
+  "detail_requiresPrerequisite": "Requires {prerequisite}",
+  "@detail_requiresPrerequisite": {
+    "placeholders": {
+      "prerequisite": {
+        "type": "String"
+      }
+    }
+  },
+  "detail_complete": "Complete",
+  "measurement_record": "Record measurement",
+  "measurement_vibrationVelocity": "Vibration velocity · mm/s",
+  "measurement_bearingTemperature": "Bearing temperature · °C",
+  "measurement_exactValue": "Exact value",
+  "measurement_save": "Save measurement locally",
+  "copilot_title": "Evidence-backed copilot",
+  "copilot_disclaimer": "Online only. Advisory proposals cannot complete workflow steps or authorize PTW/LOTO.",
+  "copilot_busy": "Retrieving eligible evidence…",
+  "copilot_recommend": "Recommend next inspection",
+  "copilot_confidence": "{percent}% confidence",
+  "@copilot_confidence": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "copilot_insufficient": "INSUFFICIENT EVIDENCE",
+  "copilot_unknowns": "Unknowns: {value}",
+  "@copilot_unknowns": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "copilot_humanConfirmation": "{provenance} · human confirmation required",
+  "@copilot_humanConfirmation": {
+    "placeholders": {
+      "provenance": {
+        "type": "String"
+      }
+    }
+  },
+  "observation_title": "Technician observation",
+  "observation_hint": "What did you observe?",
+  "observation_save": "Save note locally",
+  "attachment_title": "Photo or voice evidence",
+  "attachment_subtitle": "The file is queued separately. A failed upload does not remove the inspection record.",
+  "attachment_choose": "Choose file from this device",
+  "attachment_pickerLabel": "Photos and voice notes",
+  "savedPendingSync": "Saved locally · pending sync",
+  "error_notAssigned": "Only an assigned execution can start",
+  "error_notInProgress": "Execution is not in progress",
+  "error_prerequisiteUnverified": "{prerequisite} must be verified by the external authority while online",
+  "@error_prerequisiteUnverified": {
+    "placeholders": {
+      "prerequisite": {
+        "type": "String"
+      }
+    }
+  },
+  "error_copilotOffline": "Copilot requires a live authenticated connection. Offline field records remain safe.",
+  "error_copilotEmpty": "Copilot returned an empty response",
+  "error_attachmentSize": "Attachment must be between 1 byte and 50 MiB",
+  "error_attachmentType": "Unsupported attachment type",
+  "config_invalid": "Desktop configuration is invalid",
+  "config_hint": "Check skawld-config.json or the managed environment variables."
+}

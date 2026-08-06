@@ -9,8 +9,11 @@ import 'package:flutter/material.dart';
 import 'core/app_config.dart';
 import 'core/auth_service.dart';
 import 'core/device_identity.dart';
+import 'core/locale_controller.dart';
+import 'core/repository_errors.dart';
 import 'data/database.dart';
 import 'data/technician_repository.dart';
+import 'l10n/app_localizations.dart';
 import 'sync/pull_service.dart';
 import 'sync/sync_coordinator.dart';
 import 'sync/sync_engine.dart';
@@ -24,6 +27,7 @@ Future<void> main() async {
     runApp(ConfigurationFailure(error: error));
     return;
   }
+  final localeController = await LocaleController.load();
   final database = MaintenanceDatabase();
   final deviceId = await DeviceIdentity().getOrCreate();
   final http = Dio(BaseOptions(baseUrl: config.apiUrl));
@@ -48,6 +52,7 @@ Future<void> main() async {
       deviceId: deviceId,
       auth: auth,
       sync: coordinator,
+      localeController: localeController,
     ),
   );
 }
@@ -59,8 +64,11 @@ class ConfigurationFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: Scaffold(
         body: Center(
           child: ConstrainedBox(
@@ -72,13 +80,16 @@ class ConfigurationFailure extends StatelessWidget {
                 children: [
                   const Icon(Icons.warning_amber, size: 48),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Desktop configuration is invalid',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  Text(
+                    l10n.config_invalid,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$error\n\nCheck skawld-config.json or the managed environment variables.',
+                    '$error\n\n${l10n.config_hint}',
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -97,6 +108,7 @@ class SkawldMobile extends StatelessWidget {
     required this.deviceId,
     required this.auth,
     required this.sync,
+    required this.localeController,
     super.key,
   });
 
@@ -104,25 +116,58 @@ class SkawldMobile extends StatelessWidget {
   final String deviceId;
   final AuthService auth;
   final SyncCoordinator sync;
+  final LocaleController localeController;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Skawld Maintenance',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF286B4D),
-          brightness: Brightness.light,
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: localeController.locale,
+      builder: (context, locale, _) => MaterialApp(
+        onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+        debugShowCheckedModeBanner: false,
+        locale: locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF286B4D),
+            brightness: Brightness.light,
+          ),
+          scaffoldBackgroundColor: const Color(0xFFF0F2F0),
+          useMaterial3: true,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF0F2F0),
-        useMaterial3: true,
+        home: SessionGate(
+          repository: repository,
+          deviceId: deviceId,
+          auth: auth,
+          sync: sync,
+          localeController: localeController,
+        ),
       ),
-      home: SessionGate(
-        repository: repository,
-        deviceId: deviceId,
-        auth: auth,
-        sync: sync,
+    );
+  }
+}
+
+class LanguageMenu extends StatelessWidget {
+  const LanguageMenu({required this.controller, super.key});
+
+  final LocaleController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: controller.locale,
+      builder: (context, locale, _) => PopupMenuButton<String>(
+        icon: const Icon(Icons.translate),
+        tooltip: l10n.language,
+        initialValue: locale?.languageCode ?? '',
+        onSelected: controller.setLanguage,
+        itemBuilder: (_) => [
+          PopupMenuItem(value: '', child: Text(l10n.locale_system)),
+          const PopupMenuItem(value: 'en', child: Text('English')),
+          const PopupMenuItem(value: 'vi', child: Text('Tiếng Việt')),
+        ],
       ),
     );
   }
@@ -134,6 +179,7 @@ class SessionGate extends StatefulWidget {
     required this.deviceId,
     required this.auth,
     required this.sync,
+    required this.localeController,
     super.key,
   });
 
@@ -141,6 +187,7 @@ class SessionGate extends StatefulWidget {
   final String deviceId;
   final AuthService auth;
   final SyncCoordinator sync;
+  final LocaleController localeController;
 
   @override
   State<SessionGate> createState() => _SessionGateState();
@@ -176,13 +223,23 @@ class _SessionGateState extends State<SessionGate> {
     if (success) await widget.sync.synchronize();
   }
 
+  Future<void> _signOut() async {
+    await widget.auth.signOutLocal();
+    if (!mounted) return;
+    setState(() => authenticated = false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (authenticated == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (authenticated == false) {
       return Scaffold(
+        appBar: AppBar(
+          actions: [LanguageMenu(controller: widget.localeController)],
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -196,14 +253,11 @@ class _SessionGateState extends State<SessionGate> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Sign in while connected. Cached assigned work remains available during later outages.',
-                  textAlign: TextAlign.center,
-                ),
+                Text(l10n.login_subtitle, textAlign: TextAlign.center),
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: busy ? null : _login,
-                  child: Text(busy ? 'Connecting…' : 'Sign in with OIDC'),
+                  child: Text(busy ? l10n.login_connecting : l10n.login_button),
                 ),
               ],
             ),
@@ -215,6 +269,8 @@ class _SessionGateState extends State<SessionGate> {
       repository: widget.repository,
       deviceId: widget.deviceId,
       sync: widget.sync,
+      localeController: widget.localeController,
+      onSignOut: _signOut,
     );
   }
 }
@@ -224,32 +280,65 @@ class AssignedExecutionList extends StatelessWidget {
     required this.repository,
     required this.deviceId,
     required this.sync,
+    required this.localeController,
+    required this.onSignOut,
     super.key,
   });
 
   final TechnicianRepository repository;
   final String deviceId;
   final SyncCoordinator sync;
+  final LocaleController localeController;
+  final VoidCallback onSignOut;
+
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.signout_title),
+        content: Text(l10n.signout_message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.signout_cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.signout_confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onSignOut();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Assigned maintenance'),
+            Text(l10n.list_assignedMaintenance),
             Text(
-              'OFFLINE READY · ADVISORY ONLY',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+              l10n.list_offlineBanner,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ],
         ),
         actions: [
+          LanguageMenu(controller: localeController),
           IconButton(
-            tooltip: 'Sync now',
+            tooltip: l10n.list_syncNow,
             onPressed: () => sync.synchronize(),
             icon: const Icon(Icons.sync),
+          ),
+          IconButton(
+            tooltip: l10n.signout_tooltip,
+            onPressed: () => _confirmSignOut(context),
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
@@ -258,13 +347,10 @@ class AssignedExecutionList extends StatelessWidget {
         builder: (context, snapshot) {
           final executions = snapshot.data ?? const [];
           if (executions.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'No cached executions.\nConnect once to download your assigned work.',
-                  textAlign: TextAlign.center,
-                ),
+                padding: const EdgeInsets.all(32),
+                child: Text(l10n.list_empty, textAlign: TextAlign.center),
               ),
             );
           }
@@ -299,13 +385,13 @@ class AssignedExecutionList extends StatelessWidget {
           );
         },
       ),
-      bottomNavigationBar: const SafeArea(
+      bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           child: Text(
-            'Pending changes are stored on this device and sync automatically.',
+            l10n.list_footer,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11),
+            style: const TextStyle(fontSize: 11),
           ),
         ),
       ),
@@ -344,26 +430,60 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
     super.dispose();
   }
 
+  String _localizeError(Object error, AppLocalizations l10n) {
+    if (error is RepositoryException) {
+      return switch (error.code) {
+        RepositoryErrorCode.notAssigned => l10n.error_notAssigned,
+        RepositoryErrorCode.notInProgress => l10n.error_notInProgress,
+        RepositoryErrorCode.prerequisiteUnverified =>
+          l10n.error_prerequisiteUnverified(
+            error.params!['prerequisite']! as String,
+          ),
+        RepositoryErrorCode.copilotOffline => l10n.error_copilotOffline,
+        RepositoryErrorCode.copilotEmptyResponse => l10n.error_copilotEmpty,
+        RepositoryErrorCode.attachmentSizeOutOfRange =>
+          l10n.error_attachmentSize,
+        RepositoryErrorCode.unsupportedAttachmentType =>
+          l10n.error_attachmentType,
+      };
+    }
+    return error.toString();
+  }
+
   Future<void> run(Future<void> Function() action) async {
+    final l10n = AppLocalizations.of(context);
     try {
       await action();
-      if (mounted) setState(() => message = 'Saved locally · pending sync');
+      if (mounted) setState(() => message = l10n.savedPendingSync);
     } on Object catch (error) {
-      if (mounted) setState(() => message = error.toString());
+      if (mounted) setState(() => message = _localizeError(error, l10n));
     }
   }
 
   Future<void> pickAttachment() async {
-    const acceptedFiles = XTypeGroup(
-      label: 'Photos and voice notes',
-      extensions: ['jpg', 'jpeg', 'png', 'webp', 'm4a', 'mp4', 'mp3', 'wav'],
+    final l10n = AppLocalizations.of(context);
+    final acceptedFiles = XTypeGroup(
+      label: l10n.attachment_pickerLabel,
+      extensions: const [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'm4a',
+        'mp4',
+        'mp3',
+        'wav',
+      ],
     );
-    final selected = await openFile(acceptedTypeGroups: const [acceptedFiles]);
+    final selected = await openFile(acceptedTypeGroups: [acceptedFiles]);
     if (selected == null) return;
     final file = File(selected.path);
     final size = await file.length();
     if (size <= 0 || size > 50 << 20) {
-      throw StateError('Attachment must be between 1 byte and 50 MiB');
+      throw RepositoryException(
+        RepositoryErrorCode.attachmentSizeOutOfRange,
+        'Attachment must be between 1 byte and 50 MiB',
+      );
     }
     final digest = await sha256.bind(file.openRead()).first;
     await widget.repository.queueAttachment(
@@ -379,6 +499,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
   }
 
   Future<void> requestRecommendation() async {
+    final l10n = AppLocalizations.of(context);
     setState(() {
       copilotBusy = true;
       message = null;
@@ -390,7 +511,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
       );
       if (mounted) setState(() => recommendation = value);
     } on Object catch (error) {
-      if (mounted) setState(() => message = error.toString());
+      if (mounted) setState(() => message = _localizeError(error, l10n));
     } finally {
       if (mounted) setState(() => copilotBusy = false);
     }
@@ -398,6 +519,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(widget.execution.assetTag)),
       body: ListView(
@@ -408,10 +530,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Skawld guides and records work. External PTW/LOTO remains authoritative.',
-            style: TextStyle(fontSize: 11),
-          ),
+          Text(l10n.detail_disclaimer, style: const TextStyle(fontSize: 11)),
           if (widget.execution.state == 'ASSIGNED') ...[
             const SizedBox(height: 16),
             FilledButton(
@@ -421,7 +540,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                   deviceId: widget.deviceId,
                 ),
               ),
-              child: const Text('Start inspection offline'),
+              child: Text(l10n.detail_startOffline),
             ),
           ],
           const SizedBox(height: 16),
@@ -444,7 +563,12 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                             [
                               step.riskLevel.replaceAll('_', ' '),
                               if (step.requiredPrerequisite != null)
-                                'Requires ${step.requiredPrerequisite!.replaceAll('_', ' ')}',
+                                l10n.detail_requiresPrerequisite(
+                                  step.requiredPrerequisite!.replaceAll(
+                                    '_',
+                                    ' ',
+                                  ),
+                                ),
                             ].join('\n'),
                           ),
                           trailing: TextButton(
@@ -457,7 +581,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                                       deviceId: widget.deviceId,
                                     ),
                                   ),
-                            child: const Text('Complete'),
+                            child: Text(l10n.detail_complete),
                           ),
                         ),
                       ),
@@ -473,21 +597,21 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Record measurement',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  Text(
+                    l10n.measurement_record,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     initialValue: measurementType,
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'VIBRATION_VELOCITY',
-                        child: Text('Vibration velocity · mm/s'),
+                        child: Text(l10n.measurement_vibrationVelocity),
                       ),
                       DropdownMenuItem(
                         value: 'TEMPERATURE',
-                        child: Text('Bearing temperature · °C'),
+                        child: Text(l10n.measurement_bearingTemperature),
                       ),
                     ],
                     onChanged: (value) =>
@@ -499,7 +623,9 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(labelText: 'Exact value'),
+                    decoration: InputDecoration(
+                      labelText: l10n.measurement_exactValue,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   FilledButton.tonal(
@@ -514,7 +640,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                         deviceId: widget.deviceId,
                       );
                     }),
-                    child: const Text('Save measurement locally'),
+                    child: Text(l10n.measurement_save),
                   ),
                 ],
               ),
@@ -527,23 +653,21 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Evidence-backed copilot',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  Text(
+                    l10n.copilot_title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 5),
-                  const Text(
-                    'Online only. Advisory proposals cannot complete workflow steps or authorize PTW/LOTO.',
-                    style: TextStyle(fontSize: 11),
+                  Text(
+                    l10n.copilot_disclaimer,
+                    style: const TextStyle(fontSize: 11),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: copilotBusy ? null : requestRecommendation,
                     icon: const Icon(Icons.manage_search),
                     label: Text(
-                      copilotBusy
-                          ? 'Retrieving eligible evidence…'
-                          : 'Recommend next inspection',
+                      copilotBusy ? l10n.copilot_busy : l10n.copilot_recommend,
                     ),
                   ),
                   if (recommendation case final value?) ...[
@@ -553,14 +677,16 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                         Chip(label: Text(value.riskLevel)),
                         const SizedBox(width: 8),
                         Text(
-                          '${(value.confidence * 100).round()}% confidence',
+                          l10n.copilot_confidence(
+                            (value.confidence * 100).round(),
+                          ),
                           style: const TextStyle(fontSize: 11),
                         ),
                       ],
                     ),
                     Text(
                       value.recommendation.isEmpty
-                          ? 'INSUFFICIENT EVIDENCE'
+                          ? l10n.copilot_insufficient
                           : value.recommendation,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
@@ -575,12 +701,12 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                       ),
                     ),
                     Text(
-                      'Unknowns: ${value.unknowns.join(' · ')}',
+                      l10n.copilot_unknowns(value.unknowns.join(' · ')),
                       style: const TextStyle(fontSize: 10),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${value.provenance} · human confirmation required',
+                      l10n.copilot_humanConfirmation(value.provenance),
                       style: const TextStyle(
                         fontSize: 9,
                         fontFamily: 'monospace',
@@ -597,16 +723,16 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Technician observation',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  Text(
+                    l10n.observation_title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   TextField(
                     controller: note,
                     minLines: 2,
                     maxLines: 5,
-                    decoration: const InputDecoration(
-                      hintText: 'What did you observe?',
+                    decoration: InputDecoration(
+                      hintText: l10n.observation_hint,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -619,7 +745,7 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
                       );
                       note.clear();
                     }),
-                    child: const Text('Save note locally'),
+                    child: Text(l10n.observation_save),
                   ),
                 ],
               ),
@@ -631,20 +757,20 @@ class _ExecutionDetailState extends State<ExecutionDetail> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Photo or voice evidence',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  Text(
+                    l10n.attachment_title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'The file is queued separately. A failed upload does not remove the inspection record.',
-                    style: TextStyle(fontSize: 11),
+                  Text(
+                    l10n.attachment_subtitle,
+                    style: const TextStyle(fontSize: 11),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () => run(pickAttachment),
                     icon: const Icon(Icons.attach_file),
-                    label: const Text('Choose file from this device'),
+                    label: Text(l10n.attachment_choose),
                   ),
                 ],
               ),
@@ -671,7 +797,10 @@ String attachmentMIME(String filename) {
     'mp4' => 'audio/mp4',
     'mp3' => 'audio/mpeg',
     'wav' => 'audio/wav',
-    _ => throw StateError('Unsupported attachment type'),
+    _ => throw RepositoryException(
+      RepositoryErrorCode.unsupportedAttachmentType,
+      'Unsupported attachment type',
+    ),
   };
 }
 

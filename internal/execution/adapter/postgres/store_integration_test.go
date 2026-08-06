@@ -189,3 +189,116 @@ func TestPumpExecutionPersistsEvidenceAndBlocksIntrusiveStep(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestOrgScopedPrincipalWithNilSiteIDsSeesExecution is a regression test for
+// tenant queries treating a nil SiteIDs slice as "no site restriction". An
+// org-level principal (for example the bootstrap administrator created with an
+// organization) has SiteIDs == nil, which pgx encodes as a NULL array. Without
+// NULL-safe cardinality checks every scoped query silently returned no rows or
+// Create failed with "no rows in result set".
+func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	generator := id.UUID{}
+	organizationID, siteID, technicianID, orgAdminID :=
+		uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	_, err = pool.Exec(ctx, `
+		INSERT INTO organizations (
+			id, name, source_of_truth, version, created_at, updated_at
+		) VALUES ($1::uuid, 'Integration Organization', 'OWNED_BY_SKAWLD', 1, $2, $2)
+	`, organizationID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = pool.Exec(ctx, `
+		INSERT INTO sites (
+			id, organization_id, code, name, timezone, status, version, created_at, updated_at
+		) VALUES ($2::uuid, $1::uuid, 'TEST', 'Integration Site', 'UTC', 'ACTIVE', 1, $3, $3)
+	`, organizationID, siteID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, principalID := range []string{technicianID, orgAdminID} {
+		_, err = pool.Exec(ctx, `
+			INSERT INTO principals (
+				id, external_subject, display_name, status, created_at, updated_at
+			) VALUES ($1::uuid, $1, 'Integration Technician', 'ACTIVE', $2, $2)
+		`, principalID, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	technician := identitydomain.Principal{
+		ID: technicianID, OrganizationID: organizationID, SiteIDs: []string{siteID},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionAssetCreate:    {},
+			identitydomain.PermissionIncidentCreate: {},
+			identitydomain.PermissionExecutionWrite: {},
+			identitydomain.PermissionExecutionRead:  {},
+		},
+	}
+	// The org-scoped principal has no site memberships; SiteIDs must stay nil to
+	// reproduce the NULL-array encoding regression.
+	orgAdmin := identitydomain.Principal{
+		ID: orgAdminID, OrganizationID: organizationID, SiteIDs: nil,
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionExecutionRead: {},
+		},
+	}
+	commonClock := clock.Fixed{Time: now}
+	assetStore := assetpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+	incidentStore := incidentpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+	executionStore := executionpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+
+	asset, _, err := assetStore.Create(ctx, technician, uuid.NewString(), assetapp.CreateAsset{
+		SiteID: siteID, Tag: "P-302", Name: "Process Pump P-302",
+		Class: "CENTRIFUGAL_PUMP", SourceOfTruth: "OWNED_BY_SKAWLD",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	incident, _, err := incidentStore.Create(ctx, technician, uuid.NewString(), incidentapp.CreateIncident{
+		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
+		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := executionStore.Create(ctx, technician, uuid.NewString(), executionapp.CreateExecution{
+		IncidentID: incident.ID, Purpose: "Inspect high vibration",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := executionStore.List(ctx, orgAdmin, executionapp.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("org-scoped principal listed %d executions, want 1", len(items))
+	}
+	if _, err := executionStore.Get(ctx, orgAdmin, items[0].ID); err != nil {
+		t.Fatalf("org-scoped Get failed: %v", err)
+	}
+}

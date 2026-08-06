@@ -33,7 +33,7 @@ func (s Store) List(
 		SELECT e.id::text
 		FROM maintenance_executions e
 		WHERE e.organization_id = $1::uuid
-		  AND (cardinality($2::uuid[]) = 0 OR e.site_id = ANY($2::uuid[]))
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR e.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR e.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR e.state = $4)
 		  AND (nullif($5, '') IS NULL OR e.assigned_to = $5::uuid)
@@ -90,7 +90,7 @@ func loadExecution(
 		JOIN assets a ON a.id = e.asset_id
 		WHERE e.id = $1::uuid
 		  AND e.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR e.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR e.site_id = ANY($3::uuid[]))
 	`+suffix, executionID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.IncidentID,
 		&value.AssetID, &value.AssetTag, &value.Purpose, &value.State,

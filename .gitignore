@@ -22,3 +22,6 @@ mobile/dist/
 mobile/macos/
 mobile/windows/
 mobile/.flutter-plugins-dependencies
+
+# Local review scratch artifacts
+/.review_diff.txt

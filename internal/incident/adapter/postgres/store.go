@@ -140,7 +140,7 @@ func (s Store) Get(
 	value, err := scanIncident(s.Pool.QueryRow(ctx, incidentSelect+`
 		WHERE i.id = $1::uuid
 		  AND i.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR i.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR i.site_id = ANY($3::uuid[]))
 	`, id, principal.OrganizationID, principal.SiteIDs))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return incidentapp.Incident{}, incidentapp.ErrNotFound
@@ -155,7 +155,7 @@ func (s Store) List(
 ) ([]incidentapp.Incident, error) {
 	rows, err := s.Pool.Query(ctx, incidentSelect+`
 		WHERE i.organization_id = $1::uuid
-		  AND (cardinality($2::uuid[]) = 0 OR i.site_id = ANY($2::uuid[]))
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR i.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR i.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR i.asset_id = $4::uuid)
 		  AND (nullif($5, '') IS NULL OR i.state = $5)

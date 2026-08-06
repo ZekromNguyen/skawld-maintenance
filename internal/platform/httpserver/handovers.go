@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	handoverapp "github.com/ZekromNguyen/skawld-maintenance/internal/handover/application"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -12,12 +13,45 @@ import (
 )
 
 func mountHandoverRoutes(router chi.Router, service handoverapp.Service) {
+	router.Get("/handovers", listHandovers(service))
 	router.Post("/handovers/prepare-draft", prepareHandover(service))
 	router.Get("/handovers/{handoverID}", getHandover(service))
 	router.Post("/handovers/{handoverID}/edit", editHandover(service))
 	router.Post("/handovers/{handoverID}/submit", handoverTransition(service.Submit))
 	router.Post("/handovers/{handoverID}/accept", handoverTransition(service.Accept))
 	router.Post("/handovers/{handoverID}/acknowledge", handoverTransition(service.Acknowledge))
+}
+
+func listHandovers(service handoverapp.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := principalFromRequest(w, r)
+		if !ok {
+			return
+		}
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := handoverapp.HandoverFilter{PageSize: pageSize}
+		if siteID := r.URL.Query().Get("site_id"); siteID != "" {
+			if !validUUIDParam(w, siteID, "site ID") {
+				return
+			}
+			filter.SiteID = siteID
+		}
+		filter.States = r.URL.Query()["state"]
+		filter.Cursor = strings.TrimSpace(r.URL.Query().Get("cursor"))
+		result, err := service.List(r.Context(), principal, filter)
+		if err != nil {
+			writeHandoverError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       result.Items,
+			"next_cursor": nullableString(result.NextCursor),
+			"has_more":    result.HasMore,
+		})
+	}
 }
 
 func prepareHandover(service handoverapp.Service) http.HandlerFunc {

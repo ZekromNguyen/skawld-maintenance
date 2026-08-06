@@ -4,6 +4,7 @@ import type {
   EvaluationSummary,
   Execution,
   KnowledgeDocument,
+  ListPage,
   MaintenanceReport,
   Incident,
   ListResponse,
@@ -26,23 +27,52 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers
+/** Parse an error body defensively: non-JSON bodies (proxy/gateway HTML,
+ * empty 5xx) must not crash the error path with a SyntaxError. */
+async function parseProblem(response: Response): Promise<Problem> {
+  try {
+    const body = (await response.json()) as Partial<Problem>;
+    if (body && typeof body === "object" && typeof body.status === "number") {
+      return {
+        status: body.status,
+        title: body.title ?? "Request failed",
+        detail: body.detail
+      };
     }
-  });
+  } catch {
+    // non-JSON error body; fall through to a status-derived problem
+  }
+  return {
+    status: response.status,
+    title: "Request failed",
+    detail: `Request failed with status ${response.status}`
+  };
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...init?.headers
+      }
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ApiError({ status: 0, title: "Network error", detail: `Network error: ${message}` });
+  }
   if (response.status === 401) {
-    window.location.assign("/auth/login");
+    const login = new URL("/auth/login", window.location.origin);
+    login.searchParams.set("return_to", window.location.pathname + window.location.search);
+    window.location.assign(login.toString());
     throw new ApiError({ title: "Authentication required", status: 401 });
   }
   if (!response.ok) {
-    const problem = (await response.json()) as Problem;
-    throw new ApiError(problem);
+    throw new ApiError(await parseProblem(response));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -54,6 +84,37 @@ function command<T>(path: string, value: unknown): Promise<T> {
     headers: { "Idempotency-Key": crypto.randomUUID() },
     body: JSON.stringify(value)
   });
+}
+
+export interface ListOptions {
+  site_id?: string;
+  state?: string[];
+  cursor?: string;
+  page_size?: number;
+}
+
+function listQuery(options: ListOptions): string {
+  const params = new URLSearchParams();
+  if (options.site_id) params.set("site_id", options.site_id);
+  for (const state of options.state ?? []) params.append("state", state);
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.page_size) params.set("page_size", String(options.page_size));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function fetchAll<T>(
+  first: ListPage<T>,
+  fetchPage: (cursor: string) => Promise<ListPage<T>>,
+): Promise<T[]> {
+  const items = [...first.items];
+  let cursor = first.next_cursor;
+  while (cursor) {
+    const page = await fetchPage(cursor);
+    items.push(...page.items);
+    cursor = page.next_cursor;
+  }
+  return items;
 }
 
 export const api = {
@@ -173,7 +234,7 @@ export const api = {
       attachment_id: manifest.id
     });
   },
-  searchKnowledge: (siteID: string, query: string, assetID?: string) =>
+  searchKnowledge: (siteID: string, query: string, assetID?: string, limit?: number) =>
     request<{ retrieval_run_id: string; items: import("./types").Evidence[] }>(
       "/search",
       {
@@ -182,7 +243,7 @@ export const api = {
           site_id: siteID,
           asset_id: assetID || "",
           query,
-          limit: 8
+          limit: limit ?? 8
         })
       }
     ),
@@ -320,5 +381,46 @@ export const api = {
   applicableWorkflows: (assetID: string) =>
     request<ListResponse<WorkflowVersion>>(
       `/workflows/applicable?asset_id=${encodeURIComponent(assetID)}`
-    )
+    ),
+  asset: (id: string) => request<Asset>(`/assets/${id}`),
+  approveAssetCriticality: (assetID: string) =>
+    command<unknown>(`/assets/${assetID}/criticality-approvals`, {}),
+  incident: (id: string) => request<Incident>(`/incidents/${id}`),
+  listExecutions: () => request<ListResponse<Execution>>("/executions"),
+  resolveIncident: (incidentID: string) =>
+    command<Incident>(`/incidents/${incidentID}/resolution`, {}),
+  generateRecommendation: (incidentID: string) =>
+    command<Recommendation>(`/incidents/${incidentID}/recommendations`, {}),
+  recommendationFeedback: (
+    id: string,
+    value: { accepted: boolean; correction?: string }
+  ) => command<unknown>(`/recommendations/${id}/feedback`, value),
+  reports: (options: ListOptions = {}) =>
+    request<ListPage<MaintenanceReport>>(`/reports${listQuery(options)}`),
+  report: (id: string) => request<MaintenanceReport>(`/reports/${id}`),
+  submitReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/submit`, {}),
+  approveReport: (id: string) => command<MaintenanceReport>(`/reports/${id}/approve`, {}),
+  editReport: (id: string, value: unknown) =>
+    command<MaintenanceReport>(`/reports/${id}/edit`, value),
+  document: (id: string) => request<KnowledgeDocument>(`/documents/${id}`),
+  approveDocumentRevision: (revisionID: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/approve`, {}),
+  retireDocumentRevision: (revisionID: string, reason: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/retire`, { reason }),
+  requestDocumentIngestion: (revisionID: string) =>
+    command<unknown>(`/document-revisions/${revisionID}/ingestion`, {}),
+  handovers: (options: ListOptions = {}) =>
+    request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`),
+  pendingHandovers: async () => {
+    const options = { state: ["DRAFT", "SUBMITTED", "ACCEPTED"], page_size: 100 };
+    const first = await request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`);
+    return fetchAll(first, (cursor) =>
+      request<ListPage<ShiftHandover>>(`/handovers${listQuery({ ...options, cursor })}`)
+    );
+  },
+  handover: (id: string) => request<ShiftHandover>(`/handovers/${id}`),
+  submitHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/submit`, {}),
+  acceptHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/accept`, {}),
+  acknowledgeHandover: (id: string) =>
+    command<ShiftHandover>(`/handovers/${id}/acknowledge`, {})
 };

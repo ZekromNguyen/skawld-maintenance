@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -17,6 +18,13 @@ type Repository struct {
 	Pool  *pgxpool.Pool
 	IDs   id.Generator
 	Clock clock.Clock
+	// EmailDomainAllowlist restricts federated sign-in to company email
+	// domains. Empty disables the gate. Bootstrap and already-provisioned
+	// principals are exempt.
+	EmailDomainAllowlist []string
+	// FederatedOrgID is the organization federated users with a valid
+	// skawld_role claim are provisioned into (site-less membership).
+	FederatedOrgID string
 }
 
 type Flow struct {
@@ -30,6 +38,9 @@ type IdentityClaims struct {
 	Subject     string
 	DisplayName string
 	Email       string
+	// Role is the federated role attribute (skawld_role claim) used to
+	// provision first-login company accounts. Empty when absent.
+	Role string
 }
 
 func (r Repository) SaveFlow(
@@ -150,7 +161,78 @@ func (r Repository) ResolvePrincipal(
 	if _, ok := bootstrapSubjects[claims.Subject]; ok {
 		principal.Permissions[domain.PermissionOrganizationCreate] = struct{}{}
 	}
+	// Federated (Google / Microsoft Entra) first-login provisioning. Only
+	// runs for principals with no memberships that are not bootstrap
+	// subjects. Existing seeded/provisioned accounts are untouched.
+	if len(roleSet) == 0 {
+		if _, isBootstrap := bootstrapSubjects[claims.Subject]; !isBootstrap {
+			if err := r.provisionFederatedPrincipal(ctx, &principal, claims); err != nil {
+				return domain.Principal{}, err
+			}
+		}
+	}
 	return principal, nil
+}
+
+// provisionFederatedPrincipal enforces the company-account allowlist and
+// provisions a site-less membership from the IdP skawld_role attribute.
+// The gate is inactive when no allowlist is configured (legacy behavior).
+func (r Repository) provisionFederatedPrincipal(
+	ctx context.Context,
+	principal *domain.Principal,
+	claims IdentityClaims,
+) error {
+	if len(r.EmailDomainAllowlist) == 0 {
+		return nil
+	}
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	at := strings.LastIndex(email, "@")
+	if at <= 0 {
+		return fmt.Errorf("federated principal %q has no valid email for allowlist check", claims.Subject)
+	}
+	domainName := email[at+1:]
+	allowed := false
+	for _, allowedDomain := range r.EmailDomainAllowlist {
+		if strings.EqualFold(strings.TrimSpace(allowedDomain), domainName) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return fmt.Errorf("email domain %q is not allowlisted for federated sign-in", domainName)
+	}
+	if r.FederatedOrgID == "" {
+		return nil
+	}
+	role := domain.Role(strings.TrimSpace(claims.Role))
+	if len(domain.PermissionsForRole(role)) == 0 {
+		// Unknown or absent role attribute: authenticate with no access
+		// rather than failing the request.
+		return nil
+	}
+	now := r.Clock.Now()
+	_, err := r.Pool.Exec(ctx, `
+		INSERT INTO memberships (
+			id, principal_id, organization_id, site_id, role, created_at
+		)
+		SELECT $1::uuid, $2::uuid, $3::uuid, NULL, $4, $5
+		WHERE NOT EXISTS (
+			SELECT 1 FROM memberships
+			WHERE principal_id = $2::uuid
+			  AND organization_id = $3::uuid
+			  AND site_id IS NULL
+			  AND role = $4
+		)
+	`, r.IDs.New(), principal.ID, r.FederatedOrgID, string(role), now)
+	if err != nil {
+		return fmt.Errorf("provision federated membership: %w", err)
+	}
+	principal.OrganizationID = r.FederatedOrgID
+	principal.Roles = append(principal.Roles, role)
+	for _, permission := range domain.PermissionsForRole(role) {
+		principal.Permissions[permission] = struct{}{}
+	}
+	return nil
 }
 
 func (r Repository) CreateSession(
@@ -158,14 +240,15 @@ func (r Repository) CreateSession(
 	token string,
 	principalID string,
 	expiresAt time.Time,
+	idToken string,
 ) error {
 	hash := sha256.Sum256([]byte(token))
 	now := r.Clock.Now()
 	_, err := r.Pool.Exec(ctx, `
 		INSERT INTO web_sessions (
-			token_hash, principal_id, expires_at, created_at, last_seen_at
-		) VALUES ($1, $2::uuid, $3, $4, $4)
-	`, hash[:], principalID, expiresAt.UTC(), now)
+			token_hash, principal_id, expires_at, created_at, last_seen_at, id_token
+		) VALUES ($1, $2::uuid, $3, $4, $4, nullif($5, ''))
+	`, hash[:], principalID, expiresAt.UTC(), now, idToken)
 	if err != nil {
 		return fmt.Errorf("create web session: %w", err)
 	}
@@ -192,6 +275,24 @@ func (r Repository) PrincipalForSession(
 		return domain.Principal{}, fmt.Errorf("load web session: %w", err)
 	}
 	return r.ResolvePrincipal(ctx, claims, bootstrapSubjects)
+}
+
+// SessionIDToken returns the OIDC id_token bound to an active web session so
+// the API can pass it to the provider's end_session_endpoint as id_token_hint.
+func (r Repository) SessionIDToken(ctx context.Context, token string) (string, error) {
+	hash := sha256.Sum256([]byte(token))
+	var idToken string
+	err := r.Pool.QueryRow(ctx, `
+		SELECT coalesce(id_token, '')
+		FROM web_sessions
+		WHERE token_hash = $1
+		  AND revoked_at IS NULL
+		  AND expires_at > $2
+	`, hash[:], r.Clock.Now()).Scan(&idToken)
+	if err != nil {
+		return "", fmt.Errorf("load web session id_token: %w", err)
+	}
+	return idToken, nil
 }
 
 func (r Repository) RevokeSession(ctx context.Context, token string) error {

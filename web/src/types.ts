@@ -355,6 +355,11 @@ export type WorkflowVersion = {
 
 export type ListResponse<T> = { items: T[] };
 
+export type ListPage<T> = ListResponse<T> & {
+  next_cursor: string | null;
+  has_more: boolean;
+};
+
 export type Problem = {
   title: string;
   status: number;

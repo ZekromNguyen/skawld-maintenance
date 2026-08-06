@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -73,7 +74,7 @@ func (s Store) LoadExecutionContext(
 		       )
 		FROM maintenance_executions e
 		WHERE e.id = $1::uuid AND e.organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR e.site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR e.site_id = ANY($3::uuid[]))
 		  AND (
 		    e.assigned_to = $4::uuid OR
 		    $5 = true
@@ -249,7 +250,7 @@ func (s Store) Get(
 		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
 		FROM maintenance_reports
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, reportID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.ExecutionID,
 		&value.Revision, &value.Version, &value.State, &content, &evidence,
@@ -271,6 +272,80 @@ func (s Store) Get(
 		return reportapp.Report{}, err
 	}
 	return value, nil
+}
+
+func (s Store) List(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	filter reportapp.ReportFilter,
+) ([]reportapp.Report, bool, error) {
+	query := `
+		SELECT id::text, organization_id::text, site_id::text, execution_id::text,
+		       revision, version, state, structured_content, evidence_snapshot,
+		       coalesce(provider, ''), coalesce(model, ''),
+		       coalesce(model_version, ''), coalesce(prompt_version, ''),
+		       coalesce(input_sha256, ''), coalesce(output_sha256, ''),
+		       generated_by_kind, coalesce(submitted_by::text, ''), submitted_at,
+		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
+		FROM maintenance_reports
+		WHERE organization_id = $1::uuid
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR site_id = ANY($2::uuid[]))`
+	args := []any{principal.OrganizationID, principal.SiteIDs}
+	if filter.SiteID != "" {
+		args = append(args, filter.SiteID)
+		query += fmt.Sprintf(" AND site_id = $%d::uuid", len(args))
+	}
+	if len(filter.States) > 0 {
+		args = append(args, filter.States)
+		query += fmt.Sprintf(" AND state = ANY($%d::text[])", len(args))
+	}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, reportapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (created_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+
+	items := make([]reportapp.Report, 0, filter.PageSize+1)
+	for rows.Next() {
+		var value reportapp.Report
+		var content, evidence []byte
+		if err := rows.Scan(
+			&value.ID, &value.OrganizationID, &value.SiteID, &value.ExecutionID,
+			&value.Revision, &value.Version, &value.State, &content, &evidence,
+			&value.Provider, &value.Model, &value.ModelVersion, &value.PromptVersion,
+			&value.InputSHA256, &value.OutputSHA256, &value.GeneratedBy,
+			&value.SubmittedBy, &value.SubmittedAt, &value.ApprovedBy,
+			&value.ApprovedAt, &value.CreatedAt, &value.UpdatedAt,
+		); err != nil {
+			return nil, false, err
+		}
+		if err := json.Unmarshal(content, &value.Content); err != nil {
+			return nil, false, err
+		}
+		if err := json.Unmarshal(evidence, &value.Evidence); err != nil {
+			return nil, false, err
+		}
+		items = append(items, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(items) > filter.PageSize
+	if hasMore {
+		items = items[:filter.PageSize]
+	}
+	return items, hasMore, nil
 }
 
 func (s Store) Edit(
@@ -469,7 +544,7 @@ func getForUpdate(
 		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
 		FROM maintenance_reports
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 		FOR UPDATE
 	`, reportID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.ExecutionID,

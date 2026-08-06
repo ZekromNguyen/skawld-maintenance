@@ -11,6 +11,7 @@ import (
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	knowledgedomain "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/skawld"
 )
 
@@ -81,6 +82,19 @@ type Transition struct {
 	ExpectedVersion int64 `json:"expected_version"`
 }
 
+type ReportFilter struct {
+	SiteID   string
+	States   []string
+	Cursor   string
+	PageSize int
+}
+
+type ListResult struct {
+	Items      []Report
+	NextCursor string
+	HasMore    bool
+}
+
 type Searcher interface {
 	Search(context.Context, identitydomain.Principal, knowledgedomain.SearchQuery) (knowledgedomain.SearchResult, error)
 }
@@ -89,6 +103,7 @@ type Store interface {
 	LoadExecutionContext(context.Context, identitydomain.Principal, string) (ExecutionContext, error)
 	SaveDraft(context.Context, identitydomain.Principal, string, Report, json.RawMessage) (Report, bool, error)
 	Get(context.Context, identitydomain.Principal, string) (Report, error)
+	List(context.Context, identitydomain.Principal, ReportFilter) ([]Report, bool, error)
 	Edit(context.Context, identitydomain.Principal, string, string, Edit) (Report, bool, error)
 	Submit(context.Context, identitydomain.Principal, string, string, Transition) (Report, bool, error)
 	Approve(context.Context, identitydomain.Principal, string, string, Transition) (Report, bool, error)
@@ -244,6 +259,50 @@ func (s Service) Get(
 		return Report{}, ErrForbidden
 	}
 	return s.Store.Get(ctx, principal, reportID)
+}
+
+func (s Service) List(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	filter ReportFilter,
+) (ListResult, error) {
+	if !principal.Has(identitydomain.PermissionReportWrite) &&
+		!principal.Has(identitydomain.PermissionReportApprove) {
+		return ListResult{}, ErrForbidden
+	}
+	if filter.SiteID != "" && !principal.CanAccessSite(principal.OrganizationID, filter.SiteID) {
+		return ListResult{}, ErrForbidden
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	for _, state := range filter.States {
+		switch state {
+		case "DRAFT", "SUBMITTED", "APPROVED", "REJECTED":
+		default:
+			return ListResult{}, ErrInvalid
+		}
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return ListResult{}, ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.List(ctx, principal, filter)
+	if err != nil {
+		return ListResult{}, err
+	}
+	result := ListResult{Items: items, HasMore: hasMore}
+	if hasMore && len(items) > 0 {
+		last := items[len(items)-1]
+		result.NextCursor = keyset.Encode(last.CreatedAt, last.ID)
+	}
+	return result, nil
 }
 
 func decodeContent(raw json.RawMessage, evidence []skawld.Evidence) (Content, error) {

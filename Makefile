@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 COMPOSE ?= podman compose
 CONTAINER_ENGINE ?= podman
 
-.PHONY: fmt vet test test-integration check build eval sbom loadcheck package package-backend-desktop web-check mobile-check desktop-windows desktop-macos migrate-up migrate-status compose-up compose-up-objectstore compose-down container-build pilot-config
+.PHONY: fmt vet test test-integration check build eval sbom loadcheck package package-backend-desktop web-check mobile-check desktop-windows desktop-macos migrate-up migrate-status compose-up compose-resume compose-up-objectstore compose-down container-build pilot-config seed
 
 fmt:
 	gofmt -w $$(find . -type f -name '*.go' -not -path './vendor/*')
@@ -37,6 +37,7 @@ package-backend-desktop:
 	go run ./tools/package -version "$${VERSION:-dev}" -platforms windows,darwin -clean
 
 web-check:
+	cp api/openapi.yaml web/public/openapi.yaml
 	cd web && npm ci && npm run lint && npm test && npm run build
 
 mobile-check:
@@ -61,6 +62,13 @@ migrate-status:
 compose-up:
 	$(COMPOSE) up -d --wait postgres keycloak
 
+# Fast path for an already-provisioned stack (e.g. after a reboot or when the
+# host was restarted): start the existing containers without the --wait health
+# gate, config-diff checks, image pulls, or rebuilds. Containers should also
+# auto-start at boot via the podman-restart user service (see ReadMe).
+compose-resume:
+	$(COMPOSE) start
+
 compose-up-objectstore:
 	$(COMPOSE) --profile objectstore up -d --wait s3mock
 
@@ -75,3 +83,6 @@ container-build:
 
 pilot-config:
 	$(COMPOSE) --env-file deployments/pilot/.env.example -f deployments/pilot/compose.yaml config
+
+seed:
+	go run ./cmd/seed

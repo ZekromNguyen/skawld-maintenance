@@ -11,6 +11,7 @@ import (
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	knowledgedomain "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/skawld"
 )
 
@@ -86,10 +87,24 @@ type Transition struct {
 	ExpectedVersion int64 `json:"expected_version"`
 }
 
+type HandoverFilter struct {
+	SiteID   string
+	States   []string
+	Cursor   string
+	PageSize int
+}
+
+type ListResult struct {
+	Items      []Handover
+	NextCursor string
+	HasMore    bool
+}
+
 type Store interface {
 	LoadWindowContext(context.Context, identitydomain.Principal, PrepareDraft) (WindowContext, error)
 	SaveDraft(context.Context, identitydomain.Principal, string, Handover) (Handover, bool, error)
 	Get(context.Context, identitydomain.Principal, string) (Handover, error)
+	List(context.Context, identitydomain.Principal, HandoverFilter) ([]Handover, bool, error)
 	Edit(context.Context, identitydomain.Principal, string, string, Edit) (Handover, bool, error)
 	Submit(context.Context, identitydomain.Principal, string, string, Transition) (Handover, bool, error)
 	Accept(context.Context, identitydomain.Principal, string, string, Transition) (Handover, bool, error)
@@ -164,6 +179,50 @@ func (s Service) Get(
 		return Handover{}, ErrForbidden
 	}
 	return s.Store.Get(ctx, principal, handoverID)
+}
+
+func (s Service) List(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	filter HandoverFilter,
+) (ListResult, error) {
+	if !principal.Has(identitydomain.PermissionHandoverWrite) &&
+		!principal.Has(identitydomain.PermissionHandoverAccept) {
+		return ListResult{}, ErrForbidden
+	}
+	if filter.SiteID != "" && !principal.CanAccessSite(principal.OrganizationID, filter.SiteID) {
+		return ListResult{}, ErrForbidden
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	for _, state := range filter.States {
+		switch state {
+		case "DRAFT", "SUBMITTED", "ACCEPTED", "ACKNOWLEDGED":
+		default:
+			return ListResult{}, ErrInvalid
+		}
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return ListResult{}, ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.List(ctx, principal, filter)
+	if err != nil {
+		return ListResult{}, err
+	}
+	result := ListResult{Items: items, HasMore: hasMore}
+	if hasMore && len(items) > 0 {
+		last := items[len(items)-1]
+		result.NextCursor = keyset.Encode(last.ShiftStart, last.ID)
+	}
+	return result, nil
 }
 
 func (s Service) Edit(

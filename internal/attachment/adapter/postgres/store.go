@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
@@ -168,6 +170,10 @@ func (s Store) Complete(
 	if err != nil {
 		return attachmentapp.Attachment{}, false, fmt.Errorf("inspect uploaded attachment: %w", err)
 	}
+	// Normalize the detected type before persistence so consumers (for
+	// example document ingestion eligibility) compare stable media types
+	// instead of raw detected strings that may carry parameters.
+	verifiedMIME = normalizeMIME(verifiedMIME)
 	if size != pending.SizeBytes || checksum != pending.ChecksumSHA256 ||
 		!mimeMatches(pending.DeclaredMIME, verifiedMIME) {
 		_ = s.reject(ctx, principal, pending, "uploaded object failed size, checksum, or MIME verification")
@@ -247,7 +253,7 @@ func (s Store) load(
 		       size_bytes, checksum_sha256, state, object_key
 		FROM attachments
 		WHERE id = $1::uuid AND organization_id = $2::uuid
-		  AND (cardinality($3::uuid[]) = 0 OR site_id = ANY($3::uuid[]))
+		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR site_id = ANY($3::uuid[]))
 	`, attachmentID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.EntityKind,
 		&value.EntityID, &value.ClientEventID, &value.OriginalFilename,
@@ -349,7 +355,24 @@ func mimeMatches(declared, verified string) bool {
 	if declared == verified {
 		return true
 	}
-	return declared == "audio/m4a" && verified == "audio/mp4"
+	declaredType := normalizeMIME(declared)
+	verifiedType := normalizeMIME(verified)
+	// http.DetectContentType appends a parameters section such as
+	// "; charset=utf-8" for text types; treat that as the same media type.
+	if declaredType != "" && verifiedType == declaredType {
+		return true
+	}
+	// http.DetectContentType reports MP4 containers as audio/mp4 even when
+	// the caller declared the m4a alias; allow the alias to satisfy ingestion.
+	return declaredType == "audio/m4a" && verifiedType == "audio/mp4"
+}
+
+func normalizeMIME(value string) string {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return strings.ToLower(strings.TrimSpace(mediaType))
 }
 
 func (s Store) reject(

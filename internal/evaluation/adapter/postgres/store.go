@@ -23,7 +23,7 @@ func (s Store) Counts(
 			FROM recommendations
 			WHERE organization_id = $1::uuid
 			  AND (
-			    cardinality($2::uuid[]) = 0
+			    COALESCE(cardinality($2::uuid[]), 0) = 0
 			    OR site_id = ANY($2::uuid[])
 			  )
 		),
@@ -79,7 +79,7 @@ func (s Store) Counts(
 		FROM ai_call_records
 		WHERE organization_id = $1::uuid
 		  AND (
-		    cardinality($2::uuid[]) = 0
+		    COALESCE(cardinality($2::uuid[]), 0) = 0
 		    OR site_id = ANY($2::uuid[])
 		  )
 	`, principal.OrganizationID, principal.SiteIDs).Scan(
@@ -103,7 +103,7 @@ func (s Store) Counts(
 		WHERE report.organization_id = $1::uuid
 		  AND version.organization_id = $1::uuid
 		  AND (
-		    cardinality($2::uuid[]) = 0
+		    COALESCE(cardinality($2::uuid[]), 0) = 0
 		    OR version.site_id = ANY($2::uuid[])
 		  )
 	`, principal.OrganizationID, principal.SiteIDs).Scan(
