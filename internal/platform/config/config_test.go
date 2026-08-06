@@ -120,3 +120,13 @@ func TestLoadDefaultsStructuredProviderToDeterministic(t *testing.T) {
 		t.Fatalf("EmbeddingProvider = %q, want deterministic", cfg.AI.EmbeddingProvider)
 	}
 }
+
+func TestValidateRequiresOpenAIAPIKey(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "openai"
+	cfg.AI.Model = "gpt-4o"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing AI_API_KEY error")
+	}
+}

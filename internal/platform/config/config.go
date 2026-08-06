@@ -276,6 +276,9 @@ func (c Config) Validate() error {
 		if strings.TrimSpace(c.AI.Model) == "" {
 			errs = append(errs, errors.New("AI_MODEL is required when STRUCTURED_PROVIDER is openai"))
 		}
+		if strings.TrimSpace(c.AI.APIKey) == "" {
+			errs = append(errs, errors.New("AI_API_KEY is required when STRUCTURED_PROVIDER is openai"))
+		}
 		if c.AI.Endpoint != "" {
 			endpoint, err := url.Parse(c.AI.Endpoint)
 			if err != nil || !endpoint.IsAbs() ||
@@ -295,6 +298,9 @@ func (c Config) Validate() error {
 	if c.AI.EmbeddingProvider == "openai" {
 		if strings.TrimSpace(c.AI.EmbeddingModel) == "" {
 			errs = append(errs, errors.New("EMBEDDING_MODEL is required when EMBEDDING_PROVIDER is openai"))
+		}
+		if strings.TrimSpace(c.AI.APIKey) == "" {
+			errs = append(errs, errors.New("AI_API_KEY is required when EMBEDDING_PROVIDER is openai"))
 		}
 		if c.AI.EmbeddingEndpoint != "" {
 			endpoint, err := url.Parse(c.AI.EmbeddingEndpoint)
