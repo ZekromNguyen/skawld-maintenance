@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	monitoringpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/monitoring/adapter/postgres"
+	monitoringriver "github.com/ZekromNguyen/skawld-maintenance/internal/monitoring/adapter/river"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -107,6 +109,7 @@ type WorkerSet struct {
 	DocumentIngestor DocumentIngestor
 	Transcriber      Transcriber
 	SemanticCapturer SemanticCapturer
+	Monitoring       monitoringpostgres.Store
 }
 
 type DocumentIngestWorker struct {
@@ -333,6 +336,45 @@ func NewWithWorkers(
 			},
 			&river.PeriodicJobOpts{RunOnStart: true},
 		))
+	}
+	if set.Monitoring.Pool != nil {
+		if err := river.AddWorkerSafely(
+			workers,
+			&monitoringriver.SnapshotWorker{Store: set.Monitoring},
+		); err != nil {
+			return nil, err
+		}
+		if err := river.AddWorkerSafely(
+			workers,
+			&monitoringriver.DailyRollupWorker{Store: set.Monitoring},
+		); err != nil {
+			return nil, err
+		}
+		// Snapshot every 5 minutes; the daily rollup covers the previous UTC
+		// day, so a fixed 24h interval with RunOnStart is correct regardless
+		// of the wall-clock hour it runs at.
+		periodicJobs = append(periodicJobs,
+			river.NewPeriodicJob(
+				river.PeriodicInterval(5*time.Minute),
+				func() (river.JobArgs, *river.InsertOpts) {
+					return monitoringriver.SnapshotArgs{}, &river.InsertOpts{
+						Queue: QueueFoundation, MaxAttempts: 1,
+						UniqueOpts: river.UniqueOpts{ByPeriod: 5 * time.Minute},
+					}
+				},
+				&river.PeriodicJobOpts{RunOnStart: true},
+			),
+			river.NewPeriodicJob(
+				river.PeriodicInterval(24*time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) {
+					return monitoringriver.DailyRollupArgs{}, &river.InsertOpts{
+						Queue: QueueFoundation, MaxAttempts: 3,
+						UniqueOpts: river.UniqueOpts{ByPeriod: 24 * time.Hour},
+					}
+				},
+				&river.PeriodicJobOpts{RunOnStart: true},
+			),
+		)
 	}
 	client, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Schema: riverSchema,

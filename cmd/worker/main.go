@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/ingest"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/monitoring/adapter/postgres"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/audit"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/clock"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/config"
@@ -91,6 +92,7 @@ func main() {
 	client, err := jobs.NewWithWorkers(pool, cfg.Jobs, logger, jobs.WorkerSet{
 		DocumentIngestor: processor, Transcriber: transcriptionProcessor,
 		SemanticCapturer: captureProcessor,
+		Monitoring:       postgres.Store{Pool: pool},
 	})
 	if err != nil {
 		logger.Error("worker startup failed", "error", err)
