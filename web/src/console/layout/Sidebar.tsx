@@ -11,6 +11,7 @@ import {
   GitBranch,
   Gauge,
   Cube,
+  FadersHorizontal,
   type Icon,
 } from "@phosphor-icons/react";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -43,6 +44,7 @@ const CROSS_LINKS: NavItem[] = [
   { to: "/quality", key: "nav.quality", icon: Gauge, permission: "recommendation:review" },
   { to: "/demonstrations", key: "nav.demonstrations", icon: Play },
   { to: "/workflows", key: "nav.workflows", icon: GitBranch },
+  { to: "/admin/custom-fields", key: "nav.customFields", icon: FadersHorizontal, permission: "field:manage" },
 ];
 
 function isActive(pathname: string, to: string) {

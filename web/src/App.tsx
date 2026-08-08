@@ -20,6 +20,7 @@ import { DocumentDetailPage } from "./console/pages/DocumentDetailPage";
 import { SearchPage } from "./console/pages/SearchPage";
 import { ExecutionsPage } from "./console/pages/ExecutionsPage";
 import { AccountPage } from "./console/pages/AccountPage";
+import { CustomFieldsPage } from "./console/pages/CustomFieldsPage";
 import { AuthorizedRoute } from "./console/ui/AuthorizedRoute";
 
 export function App() {
@@ -32,6 +33,14 @@ export function App() {
               <Route element={<ConsoleLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/account" element={<AccountPage />} />
+                <Route
+                  path="/admin/custom-fields"
+                  element={
+                    <AuthorizedRoute anyOf={["field:manage"]}>
+                      <CustomFieldsPage />
+                    </AuthorizedRoute>
+                  }
+                />
                 <Route path="/assets" element={<AssetsPage />} />
                 <Route path="/assets/:assetId" element={<AssetDetailPage />} />
                 <Route path="/incidents" element={<IncidentsPage />} />
