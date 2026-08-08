@@ -30,7 +30,8 @@ vi.mock("../../api", () => ({
     incidents: vi.fn().mockResolvedValue({
       items: [
         { id: "i1", site_id: "s1", asset_id: "a1", asset_tag: "P-302", number: "IN-1", summary: "Pump vibration", severity: "HIGH", state: "OPEN", detected_at: new Date().toISOString(), version: 1 }
-      ]
+      ],
+      custom_fields: []
     }),
     listExecutions: vi.fn().mockResolvedValue({ items: [] }),
     applicableWorkflows: vi.fn().mockResolvedValue({ items: [] }),

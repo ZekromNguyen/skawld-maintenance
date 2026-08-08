@@ -41,7 +41,8 @@ vi.mock("../../api", () => ({
           detected_at: new Date().toISOString(),
           version: 1
         }
-      ]
+      ],
+      custom_fields: []
     }),
     assets: vi.fn().mockResolvedValue({
       items: [
