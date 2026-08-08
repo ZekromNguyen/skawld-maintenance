@@ -112,3 +112,57 @@ func TestListHandoversComputesCursor(t *testing.T) {
 		t.Fatalf("len(items) = %d, want 1", len(result.Items))
 	}
 }
+
+func TestDecodeContentAcceptsStructuredListItem(t *testing.T) {
+	t.Parallel()
+	content, err := decodeContent(json.RawMessage(`{
+		"summary":"Shift summary",
+		"open_incidents":[{"title":"P-302 vibration","detail":"High vibes","severity":"HIGH"}],
+		"active_executions":[],"safety_concerns":[],"follow_up":[],
+		"evidence_ids":[],"unknowns":[],
+		"requires_human_review":true
+	}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(content.OpenIncidents) != 1 || content.OpenIncidents[0].Title != "P-302 vibration" {
+		t.Fatalf("open_incidents = %+v, want structured item", content.OpenIncidents)
+	}
+	if content.OpenIncidents[0].Severity != "HIGH" {
+		t.Fatalf("severity = %q, want HIGH", content.OpenIncidents[0].Severity)
+	}
+}
+
+func TestDecodeContentAcceptsLegacyStringList(t *testing.T) {
+	t.Parallel()
+	content, err := decodeContent(json.RawMessage(`{
+		"summary":"Shift summary",
+		"open_incidents":["P-302 vibration"],
+		"active_executions":[],"safety_concerns":[],"follow_up":[],
+		"evidence_ids":[],"unknowns":[],
+		"requires_human_review":true
+	}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(content.OpenIncidents) != 1 || content.OpenIncidents[0].Title != "P-302 vibration" {
+		t.Fatalf("open_incidents = %+v, want legacy string normalized to title", content.OpenIncidents)
+	}
+}
+
+func TestDecodeContentNormalizesJsonStringItems(t *testing.T) {
+	t.Parallel()
+	content, err := decodeContent(json.RawMessage(`{
+		"summary":"Shift summary",
+		"open_incidents":["{\"asset_tag\":\"P-302\",\"summary\":\"High vibes\"}"],
+		"active_executions":[],"safety_concerns":[],"follow_up":[],
+		"evidence_ids":[],"unknowns":[],
+		"requires_human_review":true
+	}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(content.OpenIncidents) != 1 || content.OpenIncidents[0].Title != "High vibes" {
+		t.Fatalf("open_incidents = %+v, want embedded summary promoted to title", content.OpenIncidents)
+	}
+}
