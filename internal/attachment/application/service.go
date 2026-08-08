@@ -49,11 +49,13 @@ type Attachment struct {
 	UploadURL        string            `json:"upload_url,omitempty"`
 	UploadHeaders    map[string]string `json:"upload_headers,omitempty"`
 	UploadExpiresAt  time.Time         `json:"upload_expires_at,omitempty"`
+	DownloadURL      string            `json:"download_url,omitempty"`
 }
 
 type Store interface {
 	Create(context.Context, identitydomain.Principal, string, CreateManifest) (Attachment, bool, error)
 	Complete(context.Context, identitydomain.Principal, string, string, CompleteUpload) (Attachment, bool, error)
+	ListByEntity(context.Context, identitydomain.Principal, string, string) ([]Attachment, error)
 }
 
 type Service struct {
@@ -91,12 +93,32 @@ func (s Service) Create(
 	} else {
 		switch command.DeclaredMIME {
 		case "image/jpeg", "image/png", "image/webp", "audio/m4a",
-			"audio/mp4", "audio/mpeg", "audio/wav":
+			"audio/mp4", "audio/mpeg", "audio/wav",
+			"video/mp4", "video/webm", "video/quicktime":
 		default:
 			return Attachment{}, false, errors.Join(ErrInvalid, errors.New("unsupported attachment MIME type"))
 		}
 	}
 	return s.Store.Create(ctx, principal, key, command)
+}
+
+func (s Service) ListByEntity(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	entityKind, entityID string,
+) ([]Attachment, error) {
+	if !principal.Has(identitydomain.PermissionAttachmentWrite) {
+		return nil, ErrForbidden
+	}
+	if entityKind == "" || entityID == "" {
+		return nil, ErrInvalid
+	}
+	switch entityKind {
+	case "EXECUTION", "OBSERVATION", "INCIDENT":
+	default:
+		return nil, ErrInvalid
+	}
+	return s.Store.ListByEntity(ctx, principal, entityKind, entityID)
 }
 
 func (s Service) Complete(

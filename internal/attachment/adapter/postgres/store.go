@@ -266,6 +266,51 @@ func (s Store) load(
 	return value, objectKey, err
 }
 
+// ListByEntity returns the attachments for one entity within the principal's
+// authorized site scope, signing download URLs for uploaded objects.
+func (s Store) ListByEntity(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	entityKind, entityID string,
+) ([]attachmentapp.Attachment, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT id::text, organization_id::text, site_id::text, entity_kind,
+		       entity_id::text, coalesce(client_event_id::text, ''),
+		       original_filename, declared_mime, coalesce(verified_mime, ''),
+		       size_bytes, checksum_sha256, state, object_key
+		FROM attachments
+		WHERE organization_id = $1::uuid AND entity_kind = $2 AND entity_id = $3::uuid
+		  AND (COALESCE(cardinality($4::uuid[]), 0) = 0 OR site_id = ANY($4::uuid[]))
+		ORDER BY created_at ASC, id ASC
+	`, principal.OrganizationID, entityKind, entityID, principal.SiteIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []attachmentapp.Attachment{}
+	for rows.Next() {
+		var value attachmentapp.Attachment
+		var objectKey string
+		if err := rows.Scan(
+			&value.ID, &value.OrganizationID, &value.SiteID, &value.EntityKind,
+			&value.EntityID, &value.ClientEventID, &value.OriginalFilename,
+			&value.DeclaredMIME, &value.VerifiedMIME, &value.SizeBytes,
+			&value.ChecksumSHA256, &value.State, &objectKey,
+		); err != nil {
+			return nil, err
+		}
+		if value.State == "AVAILABLE" || value.State == "UPLOADED" {
+			url, err := s.Objects.SignedDownloadURL(ctx, objectKey, 15*time.Minute)
+			if err != nil {
+				return nil, fmt.Errorf("sign attachment download URL: %w", err)
+			}
+			value.DownloadURL = url
+		}
+		items = append(items, value)
+	}
+	return items, rows.Err()
+}
+
 func validateEntityScope(
 	ctx context.Context,
 	tx pgx.Tx,
