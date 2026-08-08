@@ -41,8 +41,32 @@ function highlight(text: string, query: string): ReactNode {
 
 /**
  * SearchPage: hybrid knowledge search. Query is URL-synced, results navigate
- * to their owning surface, and terms are highlighted.
+ * to their owning surface, terms are highlighted, recent queries persist in
+ * localStorage, and the input autofocuses.
  */
+const RECENT_KEY = "skawld.search.recent";
+const RECENT_LIMIT = 5;
+
+function readRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRecent(query: string) {
+  const next = [query, ...readRecent().filter((item) => item !== query)].slice(0, RECENT_LIMIT);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // storage unavailable (private mode); recent queries are best-effort
+  }
+}
+
 export function SearchPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -51,6 +75,7 @@ export function SearchPage() {
   const { data: principal } = usePrincipal();
   const { siteId } = useSite();
   const [input, setInput] = useState(query);
+  const [recent, setRecent] = useState<string[]>(() => readRecent());
 
   useEffect(() => {
     setInput(query);
@@ -67,6 +92,8 @@ export function SearchPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const value = input.trim();
+    if (value) writeRecent(value);
+    setRecent(readRecent());
     navigate(value ? `/search?q=${encodeURIComponent(value)}` : "/search");
   };
 
@@ -90,6 +117,7 @@ export function SearchPage() {
         <form onSubmit={submit} className="search-row" style={{ marginBottom: 18 }}>
           <input
             type="search"
+            autoFocus
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={t("search.placeholder")}
@@ -97,6 +125,18 @@ export function SearchPage() {
           />
           <button className="primary-button" type="submit">{t("search.submit")}</button>
         </form>
+        {!query && recent.length > 0 ? (
+          <div className="panel" style={{ marginBottom: 14 }}>
+            <div className="panel-heading"><h2>{t("search.recent")}</h2></div>
+            <div className="search-result">
+              {recent.map((item) => (
+                <Link key={item} to={`/search?q=${encodeURIComponent(item)}`} className="strong">
+                  {item}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {results.error ? (
           <ErrorState message={results.error} onRetry={() => void results.refetch()} />
         ) : null}
@@ -105,7 +145,7 @@ export function SearchPage() {
         ) : results.loading && !hasData ? (
           <Skeleton height={200} />
         ) : !hasData ? (
-          <EmptyState title={t("search.noResults")} />
+          <EmptyState title={t("search.noResults", { query })} />
         ) : (
           groups.map(([authority, items]) => (
             <div className="panel" key={authority} style={{ marginBottom: 14 }}>

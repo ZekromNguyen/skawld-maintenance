@@ -64,3 +64,37 @@ describe("SearchPage", () => {
     );
   });
 });
+
+describe("SearchPage affordances", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  it("autofocuses the search input", () => {
+    renderPage();
+    expect(document.activeElement).toBe(screen.getByRole("searchbox"));
+  });
+
+  it("stores recent queries and renders them as shortcuts", async () => {
+    renderPage();
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "bearing" } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("skawld.search.recent") ?? "[]")).toContain("bearing"),
+    );
+    const { unmount } = renderPage();
+    unmount();
+    renderPage();
+    expect(screen.getByRole("link", { name: /bearing/i })).toBeTruthy();
+  });
+
+  it("echoes the query when there are no results", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr0", items: []
+    });
+    renderPage("/search?q=zzzz");
+    expect(await screen.findByText(/zzzz/i)).toBeTruthy();
+  });
+});

@@ -130,7 +130,8 @@ const en = {
   "search.placeholder": "Search procedures, incidents, evidence...",
   "search.submit": "Search",
   "search.empty": "Type a query to search the knowledge base.",
-  "search.noResults": "No results for this query.",
+  "search.noResults": "No results for “{query}”. Try different terms.",
+  "search.recent": "Recent searches",
   "search.score": "Score",
   "search.unknownAuthority": "Other sources",
 
@@ -782,7 +783,8 @@ const vi: Record<MessageKey, string> = {
   "search.placeholder": "Tìm quy trình, sự cố, bằng chứng...",
   "search.submit": "Tìm kiếm",
   "search.empty": "Nhập truy vấn để tìm kiếm cơ sở tri thức.",
-  "search.noResults": "Không có kết quả cho truy vấn này.",
+  "search.noResults": "Không có kết quả cho “{query}”. Hãy thử từ khóa khác.",
+  "search.recent": "Tìm kiếm gần đây",
   "search.score": "Điểm",
   "search.unknownAuthority": "Nguồn khác",
 
