@@ -82,3 +82,62 @@ describe("fetchAll", () => {
     expect(fetchPage).not.toHaveBeenCalled();
   });
 });
+
+describe("monitoring API", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("builds the summary URL with optional site", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    );
+    await api.monitoringSummary("s1");
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/v1/monitoring/summary");
+    expect(String(url)).toContain("site_id=s1");
+  });
+
+  it("builds the metrics URL with key and range", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    );
+    await api.monitoringMetrics("sys.health_ready", { from: "2026-08-01T00:00:00Z" });
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/v1/monitoring/metrics?metric_key=sys.health_ready");
+    expect(String(url)).toContain("from=2026-08-01T00%3A00%3A00Z");
+  });
+
+  it("builds the alerts URL with state filter", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    );
+    await api.monitoringAlerts({ state: "OPEN" });
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/v1/monitoring/alerts?state=OPEN");
+  });
+
+  it("PUTs thresholds with idempotency key", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.setMonitoringThreshold({
+      metric_key: "sys.health_ready", comparator: "LT",
+      warn_value: 1, crit_value: 1, enabled: true,
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/v1/monitoring/thresholds");
+    expect(init?.method).toBe("PUT");
+    expect(init?.headers).toMatchObject({ "Idempotency-Key": expect.any(String) });
+    const body = JSON.parse(String(init?.body));
+    expect(body.metric_key).toBe("sys.health_ready");
+  });
+});

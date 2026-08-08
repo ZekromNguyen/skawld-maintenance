@@ -389,3 +389,42 @@ export type Problem = {
   status: number;
   detail?: string;
 };
+
+export type MonitoringMetric = {
+  day?: string;
+  value: number;
+  sample_count: number;
+  dimensions: Record<string, unknown>;
+  site_id?: string;
+};
+
+export type MonitoringSummaryEntry = {
+  metric_key: string;
+  status: "PASS" | "WARN" | "CRIT";
+  value: number;
+  unit: string;
+  group: string;
+  site_id?: string;
+  collected_at?: string;
+  open_alerts: number;
+};
+
+export type MonitoringAlert = {
+  id: number;
+  metric_key: string;
+  site_id?: string;
+  state: "WARN" | "CRIT";
+  message: string;
+  value: number;
+  opened_at: string;
+  resolved_at?: string;
+};
+
+export type MonitorThreshold = {
+  metric_key: string;
+  site_id?: string;
+  comparator: "GT" | "GTE" | "LT" | "LTE";
+  warn_value: number;
+  crit_value: number;
+  enabled: boolean;
+};

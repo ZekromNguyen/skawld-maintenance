@@ -16,7 +16,11 @@ import type {
   ShiftHandover,
   Step,
   WorkflowApplicability,
-  WorkflowVersion
+  WorkflowVersion,
+  MonitoringMetric,
+  MonitoringSummaryEntry,
+  MonitoringAlert,
+  MonitorThreshold
 } from "./types";
 
 export class ApiError extends Error {
@@ -431,5 +435,37 @@ export const api = {
   submitHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/submit`, {}),
   acceptHandover: (id: string) => command<ShiftHandover>(`/handovers/${id}/accept`, {}),
   acknowledgeHandover: (id: string) =>
-    command<ShiftHandover>(`/handovers/${id}/acknowledge`, {})
+    command<ShiftHandover>(`/handovers/${id}/acknowledge`, {}),
+  monitoringSummary: (siteID?: string) =>
+    request<ListResponse<MonitoringSummaryEntry>>(
+      `/monitoring/summary${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+    ),
+  monitoringMetrics: (
+    key: string,
+    opts?: { site_id?: string; from?: string; to?: string },
+  ) => {
+    const params = new URLSearchParams({ metric_key: key });
+    if (opts?.site_id) params.set("site_id", opts.site_id);
+    if (opts?.from) params.set("from", opts.from);
+    if (opts?.to) params.set("to", opts.to);
+    const query = params.toString();
+    return request<ListResponse<MonitoringMetric>>(
+      `/monitoring/metrics${query ? `?${query}` : ""}`
+    );
+  },
+  monitoringAlerts: (opts?: { state?: "OPEN" | "RESOLVED"; site_id?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.state) params.set("state", opts.state);
+    if (opts?.site_id) params.set("site_id", opts.site_id);
+    const query = params.toString();
+    return request<ListResponse<MonitoringAlert>>(
+      `/monitoring/alerts${query ? `?${query}` : ""}`
+    );
+  },
+  setMonitoringThreshold: (value: MonitorThreshold) =>
+    request<void>("/monitoring/thresholds", {
+      method: "PUT",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(value),
+    })
 };
