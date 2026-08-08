@@ -46,6 +46,7 @@ const (
 	PermissionWorkflowPublish      Permission = "workflow:publish"
 	PermissionReportApprove        Permission = "report:approve"
 	PermissionExternalImport       Permission = "integration:external:import"
+	PermissionFieldManage          Permission = "field:manage"
 )
 
 type RiskLevel int
@@ -124,6 +125,7 @@ func PermissionsForRole(role Role) []Permission {
 			PermissionWorkflowPublish,
 			PermissionReportApprove,
 			PermissionExternalImport,
+			PermissionFieldManage,
 		)
 	case RoleMaintenanceSupervisor:
 		return append(read,

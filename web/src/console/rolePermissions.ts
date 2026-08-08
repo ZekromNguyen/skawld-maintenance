@@ -44,6 +44,7 @@ export const ROLE_PERMISSIONS: Record<RoleName, PermissionKey[]> = {
     "workflow:publish",
     "report:approve",
     "integration:external:import",
+    "field:manage",
   ],
   "Maintenance Supervisor": [
     ...SHARED_WRITE,

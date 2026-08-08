@@ -9,6 +9,7 @@ export type PermissionKey =
   | "execution:read:all"
   | "execution:write"
   | "execution:prerequisite:verify"
+  | "field:manage"
   | "handover:accept"
   | "handover:write"
   | "incident:create"
