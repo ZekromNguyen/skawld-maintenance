@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
 	"github.com/go-chi/chi/v5"
@@ -13,11 +14,14 @@ func mountIncidentRoutes(
 	router chi.Router,
 	incidents incidentapp.Service,
 	executions executionapp.Service,
+	attachments attachmentapp.Service,
 ) {
 	router.Get("/incidents", listIncidents(incidents))
 	router.Post("/incidents", createIncident(incidents))
-	router.Get("/incidents/{incidentID}", getIncident(incidents))
+	router.Get("/incidents/{incidentID}", getIncident(incidents, attachments))
 	router.Post("/incidents/{incidentID}/resolution", resolveIncident(incidents))
+	router.Post("/incidents/{incidentID}/close", closeIncident(incidents))
+	router.Post("/incidents/{incidentID}/reopen", reopenIncident(incidents))
 	router.Post("/incidents/{incidentID}/executions", createExecution(executions))
 }
 
@@ -34,7 +38,7 @@ func listIncidents(service incidentapp.Service) http.HandlerFunc {
 		filter := incidentapp.Filter{
 			SiteID:   r.URL.Query().Get("site_id"),
 			AssetID:  r.URL.Query().Get("asset_id"),
-			Status:  r.URL.Query().Get("status"),
+			Status:   r.URL.Query().Get("status"),
 			PageSize: pageSize,
 			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
 		}
@@ -77,7 +81,7 @@ func createIncident(service incidentapp.Service) http.HandlerFunc {
 	}
 }
 
-func getIncident(service incidentapp.Service) http.HandlerFunc {
+func getIncident(incidents incidentapp.Service, attachments attachmentapp.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := principalFromRequest(w, r)
 		if !ok {
@@ -87,13 +91,21 @@ func getIncident(service incidentapp.Service) http.HandlerFunc {
 		if !validUUIDParam(w, id, "incident ID") {
 			return
 		}
-		result, err := service.Get(r.Context(), principal, id)
+		result, err := incidents.Get(r.Context(), principal, id)
 		if err != nil {
 			writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound,
 				incidentapp.ErrInvalid, incidentapp.ErrVersionConflict)
 			return
 		}
-		writeJSON(w, http.StatusOK, result)
+		items, err := attachments.ListByEntity(r.Context(), principal, "INCIDENT", id)
+		if err != nil {
+			writeDomainError(w, err, attachmentapp.ErrForbidden, attachmentapp.ErrNotFound, attachmentapp.ErrInvalid, attachmentapp.ErrConflict)
+			return
+		}
+		writeJSON(w, http.StatusOK, struct {
+			incidentapp.Incident
+			Attachments []attachmentapp.Attachment `json:"attachments"`
+		}{result, items})
 	}
 }
 
@@ -112,6 +124,58 @@ func resolveIncident(service incidentapp.Service) http.HandlerFunc {
 			return
 		}
 		result, replay, err := service.Resolve(
+			r.Context(), principal, idempotencyKey(r), id, command,
+		)
+		if err != nil {
+			writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound,
+				incidentapp.ErrInvalid, incidentapp.ErrVersionConflict)
+			return
+		}
+		writeMutation(w, http.StatusOK, result, replay)
+	}
+}
+
+func closeIncident(service incidentapp.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := principalFromRequest(w, r)
+		if !ok {
+			return
+		}
+		id := chi.URLParam(r, "incidentID")
+		if !validUUIDParam(w, id, "incident ID") {
+			return
+		}
+		command, ok := decodeCommand[incidentapp.CloseIncident](w, r)
+		if !ok {
+			return
+		}
+		result, replay, err := service.Close(
+			r.Context(), principal, idempotencyKey(r), id, command,
+		)
+		if err != nil {
+			writeDomainError(w, err, incidentapp.ErrForbidden, incidentapp.ErrNotFound,
+				incidentapp.ErrInvalid, incidentapp.ErrVersionConflict)
+			return
+		}
+		writeMutation(w, http.StatusOK, result, replay)
+	}
+}
+
+func reopenIncident(service incidentapp.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := principalFromRequest(w, r)
+		if !ok {
+			return
+		}
+		id := chi.URLParam(r, "incidentID")
+		if !validUUIDParam(w, id, "incident ID") {
+			return
+		}
+		command, ok := decodeCommand[incidentapp.ReopenIncident](w, r)
+		if !ok {
+			return
+		}
+		result, replay, err := service.Reopen(
 			r.Context(), principal, idempotencyKey(r), id, command,
 		)
 		if err != nil {

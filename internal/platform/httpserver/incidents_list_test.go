@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -141,4 +142,61 @@ func (*listIncidentStore) Reopen(
 	context.Context, identitydomain.Principal, string, string, incidentapp.ReopenIncident,
 ) (incidentapp.Incident, bool, error) {
 	return incidentapp.Incident{}, false, nil
+}
+
+type listAttachmentStore struct{}
+
+func (*listAttachmentStore) Create(
+	context.Context, identitydomain.Principal, string, attachmentapp.CreateManifest,
+) (attachmentapp.Attachment, bool, error) {
+	return attachmentapp.Attachment{}, false, nil
+}
+func (*listAttachmentStore) Complete(
+	context.Context, identitydomain.Principal, string, string, attachmentapp.CompleteUpload,
+) (attachmentapp.Attachment, bool, error) {
+	return attachmentapp.Attachment{}, false, nil
+}
+func (*listAttachmentStore) ListByEntity(
+	context.Context, identitydomain.Principal, string, string,
+) ([]attachmentapp.Attachment, error) {
+	return []attachmentapp.Attachment{{
+		ID:               "00000000-0000-0000-0000-00000000000a",
+		OriginalFilename: "clip.mp4",
+		DeclaredMIME:     "video/mp4",
+		State:            "AVAILABLE",
+	}}, nil
+}
+
+func TestGetIncidentIncludesAttachments(t *testing.T) {
+	principal := identitydomain.Principal{
+		ID: "00000000-0000-0000-0000-000000000001", OrganizationID: "o1",
+		SiteIDs: []string{"11111111-1111-4111-8111-111111111111"},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionIncidentRead:    {},
+			identitydomain.PermissionAttachmentWrite: {},
+		},
+	}
+	handler := New(Dependencies{
+		Logger:      slog.New(slog.DiscardHandler),
+		Auth:        fakeAuth{principal: principal},
+		Incidents:   incidentapp.Service{Store: &listIncidentStore{}},
+		Attachments: attachmentapp.Service{Store: &listAttachmentStore{}},
+	})
+	request := httptest.NewRequest(http.MethodGet,
+		"/api/v1/incidents/00000000-0000-0000-0000-00000000000c", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	var body struct {
+		ID          string                     `json:"id"`
+		Attachments []attachmentapp.Attachment `json:"attachments"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Attachments) != 1 || body.Attachments[0].OriginalFilename != "clip.mp4" {
+		t.Fatalf("unexpected attachments: %#v", body.Attachments)
+	}
 }

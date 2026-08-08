@@ -43,6 +43,8 @@ import (
 	reportpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/report/adapter/postgres"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/skawld"
+	teampostgres "github.com/ZekromNguyen/skawld-maintenance/internal/team/adapter/postgres"
+	teamapp "github.com/ZekromNguyen/skawld-maintenance/internal/team/application"
 	transcriptionpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/adapter/postgres"
 	transcriptionapp "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/application"
 	workflowapp "github.com/ZekromNguyen/skawld-maintenance/internal/workflow/application"
@@ -210,6 +212,9 @@ func main() {
 		Handovers: handoverapp.Service{
 			Store: handoverStore, Router: modelRouter,
 			Authorities: authorityReader, Now: systemClock.Now,
+		},
+		Teams: teamapp.Service{
+			Store: teampostgres.Store{Pool: pool},
 		},
 		Transcriptions: transcriptionapp.Service{
 			Store: transcriptionStore, Provider: transcriptionProvider,

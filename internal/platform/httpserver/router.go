@@ -26,6 +26,7 @@ import (
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/buildinfo"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/idempotency"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
+	teamapp "github.com/ZekromNguyen/skawld-maintenance/internal/team/application"
 	transcriptionapp "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/application"
 	workflowapp "github.com/ZekromNguyen/skawld-maintenance/internal/workflow/application"
 	"github.com/go-chi/chi/v5"
@@ -60,6 +61,7 @@ type Dependencies struct {
 	Demonstrations  demonstrationapp.Service
 	Workflows       workflowapp.Service
 	Evaluations     evaluationapp.Service
+	Teams           teamapp.Service
 	IntegrationSink integrationapp.ProjectionSink
 }
 
@@ -95,9 +97,10 @@ func New(dependencies Dependencies) http.Handler {
 		api.Post("/organizations", createOrganization(dependencies.Organizations))
 		api.Get("/sites/{siteID}", getSite(dependencies.Sites))
 		mountAssetRoutes(api, dependencies.Assets)
-		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions)
+		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions, dependencies.Attachments)
 		mountExecutionRoutes(api, dependencies.Executions)
 		mountAttachmentRoutes(api, dependencies.Attachments)
+		mountTeamRoutes(api, dependencies.Teams)
 		mountKnowledgeRoutes(api, dependencies.Knowledge)
 		mountCopilotRoutes(api, dependencies.Copilot)
 		mountReportRoutes(api, dependencies.Reports)

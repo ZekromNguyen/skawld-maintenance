@@ -87,8 +87,8 @@ func (s Store) Create(
 			ID: incidentID, OrganizationID: principal.OrganizationID,
 			SiteID: command.SiteID, AssetID: command.AssetID, Number: number,
 			Summary: command.Summary, Details: command.Details,
-			Priority: incidentdomain.Priority(command.Priority),
-			Status:   incidentdomain.Status(command.Status),
+			Priority:   incidentdomain.Priority(command.Priority),
+			Status:     incidentdomain.Status(command.Status),
 			AssigneeID: command.AssigneeID, ReporterID: reporterID, TeamID: command.TeamID,
 			SourceOfTruth:  integrationdomain.SourceOfTruth(command.SourceOfTruth),
 			ExternalSystem: command.ExternalSystem, ExternalID: command.ExternalID,
@@ -537,7 +537,7 @@ func mapIncident(value incidentdomain.Incident, assetTag string) incidentapp.Inc
 		OccurredAt: value.OccurredAt, DetectedAt: value.DetectedAt,
 		ResolvedAt: value.ResolvedAt, ResolutionSummary: value.ResolutionSummary,
 		TimeToCompleteSeconds: timeToCompleteSeconds(value.DetectedAt, value.ResolvedAt),
-		Version: value.Version,
+		Version:               value.Version,
 	}
 }
 
