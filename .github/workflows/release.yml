@@ -22,6 +22,13 @@ jobs:
             runner: macos-latest
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+      MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+      MACOS_NOTARY_PRIVATE_KEY: ${{ secrets.MACOS_NOTARY_PRIVATE_KEY }}
     defaults:
       run:
         working-directory: mobile
@@ -49,7 +56,7 @@ jobs:
         shell: pwsh
         run: flutter build windows --release
       - name: Import Windows signing certificate
-        if: runner.os == 'Windows' && secrets.WINDOWS_CERT_BASE64 != ''
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_BASE64 != ''
         shell: pwsh
         run: |
           $bytes = [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64)
@@ -57,12 +64,16 @@ jobs:
         env:
           WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
       - name: Sign Windows application
-        if: runner.os == 'Windows' && secrets.WINDOWS_CERT_BASE64 != '' && secrets.WINDOWS_CERT_PASSWORD != ''
-        uses: skyleedev/signtool-sign # pin a reviewed SHA at implementation time (repo convention)
-        with:
-          file: mobile/build/windows/x64/runner/Release/*.exe
-          certificate: ${{ runner.temp }}/cert.pfx
-          password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_BASE64 != '' && env.WINDOWS_CERT_PASSWORD != ''
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          Get-ChildItem "build/windows/x64/runner/Release/*.exe" | ForEach-Object {
+            & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p "$env:WINDOWS_CERT_PASSWORD" `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Package Windows application
         if: runner.os == 'Windows'
         shell: pwsh
@@ -71,7 +82,7 @@ jobs:
         if: runner.os == 'macOS'
         run: flutter build macos --release
       - name: Sign macOS application
-        if: runner.os == 'macOS' && secrets.MACOS_SIGNING_IDENTITY != ''
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_IDENTITY != ''
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
@@ -82,7 +93,7 @@ jobs:
         if: runner.os == 'macOS'
         run: ../scripts/package-desktop-macos.sh "signed-ci"
       - name: Notarize macOS package
-        if: runner.os == 'macOS' && secrets.MACOS_SIGNING_IDENTITY != '' && secrets.MACOS_NOTARY_KEY_ID != '' && secrets.MACOS_NOTARY_ISSUER_ID != '' && secrets.MACOS_NOTARY_PRIVATE_KEY != ''
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_NOTARY_KEY_ID != '' && env.MACOS_NOTARY_ISSUER_ID != '' && env.MACOS_NOTARY_PRIVATE_KEY != ''
         shell: bash
         env:
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
