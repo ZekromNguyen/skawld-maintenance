@@ -11,13 +11,15 @@ import type { Execution } from "../../types";
 vi.mock("../../api", () => ({
   api: {
     principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", site_ids: ["s1"], permissions: [] }),
-    listExecutions: vi.fn().mockResolvedValue({
-      next_cursor: null,
-      has_more: false,
-      items: [
-        { id: "e1", incident_id: "i1", asset_id: "a1", asset_tag: "P-302", purpose: "Shaft alignment", state: "IN_PROGRESS", version: 1, steps: [{ id: "s1", key: "k", sequence: 1, title: "T", state: "COMPLETED", risk_level: "INFORMATIONAL", version: 1 }], measurements: [], observations: [], actions: [] },
-        { id: "e2", incident_id: "i2", asset_id: "a2", asset_tag: "P-304", purpose: "Torque check", state: "COMPLETED", version: 1, steps: [], measurements: [], observations: [], actions: [] }
-      ]
+    listExecutions: vi.fn().mockImplementation((options?: { state?: string[] }) => {
+      let items: Execution[] = [
+        { id: "e1", incident_id: "i1", incident_number: "IN-1", asset_id: "a1", asset_tag: "P-302", purpose: "Shaft alignment", state: "IN_PROGRESS", version: 1, steps: [{ id: "s1", key: "k", sequence: 1, title: "T", state: "COMPLETED", risk_level: "INFORMATIONAL", version: 1 }], measurements: [], observations: [], actions: [] },
+        { id: "e2", incident_id: "i2", incident_number: "IN-2", asset_id: "a2", asset_tag: "P-304", purpose: "Torque check", state: "COMPLETED", version: 1, steps: [], measurements: [], observations: [], actions: [] }
+      ];
+      if (options?.state?.length) {
+        items = items.filter((execution) => options.state!.includes(execution.state));
+      }
+      return Promise.resolve({ next_cursor: null, has_more: false, items });
     })
   }
 }));
@@ -51,7 +53,7 @@ describe("ExecutionsPage", () => {
     await waitFor(() => expect(screen.queryByText("Shaft alignment")).toBeNull());
     expect(screen.getByText("Torque check")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: /all/i }));
-    expect(screen.getByText("Shaft alignment")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Shaft alignment")).toBeTruthy());
   });
 });
 
@@ -77,5 +79,15 @@ describe("ExecutionsPage i18n", () => {
     expect(screen.getAllByText(/completed/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/^IN_PROGRESS$/)).toBeNull();
     expect(screen.queryByText(/^COMPLETED$/)).toBeNull();
+  });
+});
+
+describe("ExecutionsPage incident identity", () => {
+  it("shows the incident number in the incident column", async () => {
+    renderPage();
+    await screen.findByText("Shaft alignment");
+    const link = screen.getByRole("link", { name: "IN-1" });
+    expect(link.getAttribute("href")).toBe("/incidents/i1");
+    expect(screen.getByRole("link", { name: "IN-2" })).toBeTruthy();
   });
 });

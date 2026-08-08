@@ -63,6 +63,7 @@ export type Measurement = {
 export type Execution = {
   id: string;
   incident_id: string;
+  incident_number?: string;
   asset_id: string;
   asset_tag: string;
   purpose: string;

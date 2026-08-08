@@ -193,6 +193,7 @@ type Execution struct {
 	OrganizationID string         `json:"organization_id"`
 	SiteID         string         `json:"site_id"`
 	IncidentID     string         `json:"incident_id,omitempty"`
+	IncidentNumber string         `json:"incident_number,omitempty"`
 	AssetID        string         `json:"asset_id"`
 	AssetTag       string         `json:"asset_tag"`
 	Purpose        string         `json:"purpose"`

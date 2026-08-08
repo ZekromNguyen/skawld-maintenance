@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
 import { usePaginatedList } from "../usePaginatedList";
@@ -15,13 +15,17 @@ const STATE_FILTERS: StateFilter[] = ["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLET
 
 export function ExecutionsPage() {
   const { t } = useI18n();
-  const executions = usePaginatedList((params) => api.listExecutions(params), []);
   const [filter, setFilter] = useState<StateFilter>("ALL");
+  const executions = usePaginatedList(
+    (params) =>
+      api.listExecutions({
+        ...params,
+        state: filter === "ALL" ? undefined : [filter],
+      }),
+    [filter],
+  );
 
-  const rows = useMemo(() => {
-    const items = executions.items;
-    return filter === "ALL" ? items : items.filter((execution) => execution.state === filter);
-  }, [executions.items, filter]);
+  const rows = executions.items;
 
   return (
     <PageTrailProvider trail={[]}>
@@ -59,7 +63,7 @@ export function ExecutionsPage() {
               render: (execution) =>
                 execution.incident_id ? (
                   <Link to={`/incidents/${execution.incident_id}`}>
-                    {execution.asset_tag ?? execution.incident_id}
+                    {execution.incident_number ?? execution.asset_tag ?? execution.incident_id}
                   </Link>
                 ) : (
                   <span className="muted">—</span>

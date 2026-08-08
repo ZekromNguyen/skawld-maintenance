@@ -104,20 +104,22 @@ func loadExecution(
 	var value executionapp.Execution
 	err := q.QueryRow(ctx, `
 		SELECT e.id::text, e.organization_id::text, e.site_id::text,
-		       coalesce(e.incident_id::text, ''), e.asset_id::text, a.tag,
+		       coalesce(e.incident_id::text, ''), coalesce(i.number, ''),
+		       e.asset_id::text, a.tag,
 		       e.purpose, e.state, coalesce(e.assigned_to::text, ''), e.version,
 		       e.started_at, e.completed_at, coalesce(e.outcome_summary, ''),
 		       e.updated_at
 		FROM maintenance_executions e
 		JOIN assets a ON a.id = e.asset_id
+		LEFT JOIN incidents i ON i.id = e.incident_id
 		WHERE e.id = $1::uuid
 		  AND e.organization_id = $2::uuid
 		  AND (COALESCE(cardinality($3::uuid[]), 0) = 0 OR e.site_id = ANY($3::uuid[]))
 	`+suffix, executionID, principal.OrganizationID, principal.SiteIDs).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.IncidentID,
-		&value.AssetID, &value.AssetTag, &value.Purpose, &value.State,
-		&value.AssignedTo, &value.Version, &value.StartedAt, &value.CompletedAt,
-		&value.OutcomeSummary, &value.UpdatedAt,
+		&value.IncidentNumber, &value.AssetID, &value.AssetTag, &value.Purpose,
+		&value.State, &value.AssignedTo, &value.Version, &value.StartedAt,
+		&value.CompletedAt, &value.OutcomeSummary, &value.UpdatedAt,
 	)
 	if err != nil {
 		return executionapp.Execution{}, err
