@@ -114,12 +114,13 @@ func TestSummaryHappyPath(t *testing.T) {
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO incidents (
 			id, organization_id, site_id, asset_id, number, summary, severity,
-			state, source_of_truth, occurred_at, detected_at, version, created_at, updated_at
+			state, source_of_truth, occurred_at, detected_at, created_by,
+			version, created_at, updated_at
 		) VALUES (
 			$1::uuid, $2::uuid, $3::uuid, $4::uuid, 'IN-1', 'High vibration', 'HIGH',
-			'OPEN', 'OWNED_BY_SKAWLD', $5, $5, 1, $5, $5
+			'OPEN', 'OWNED_BY_SKAWLD', $5, $5, $6::uuid, 1, $5, $5
 		)
-	`, uuid.NewString(), organizationID, siteID, assetID, now); err != nil {
+	`, uuid.NewString(), organizationID, siteID, assetID, now, principalID); err != nil {
 		t.Fatal(err)
 	}
 
