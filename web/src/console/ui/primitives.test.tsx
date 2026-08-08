@@ -6,6 +6,7 @@ import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
 import { FormField } from "./FormField";
 import { DataTable } from "./DataTable";
+import { RelativeTime } from "./RelativeTime";
 
 describe("console UI primitives", () => {
   it("renders a tone badge with the label", () => {
@@ -70,5 +71,14 @@ describe("console UI primitives", () => {
     fireEvent.click(screen.getByRole("button", { name: "N" }));
     const cells = screen.getAllByRole("cell");
     expect(cells[0].textContent).toBe("1");
+  });
+});
+
+describe("RelativeTime", () => {
+  it("exposes absolute time as a tooltip", () => {
+    render(<RelativeTime time="2026-08-06T12:00:00.000Z" locale="en" />);
+    const timeElement = screen.getByText(/ago|h|m/);
+    expect(timeElement.tagName).toBe("TIME");
+    expect(timeElement.getAttribute("title")).toContain("2026");
   });
 });

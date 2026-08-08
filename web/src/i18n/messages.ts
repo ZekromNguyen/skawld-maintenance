@@ -145,6 +145,7 @@ const en = {
 
   "sidebar.safetyBoundary": "Safety boundary",
   "sidebar.advisoryOnly": "Advisory only",
+  "sidebar.dismiss": "Dismiss",
   "sidebar.noControl": "No machinery control or permit authority.",
 
   "topbar.maintenanceOps": "Maintenance operations",
@@ -803,6 +804,7 @@ const vi: Record<MessageKey, string> = {
 
   "sidebar.safetyBoundary": "Ranh giới an toàn",
   "sidebar.advisoryOnly": "Chỉ để tham khảo",
+  "sidebar.dismiss": "Đóng",
   "sidebar.noControl": "Không điều khiển máy móc hoặc có thẩm quyền cấp phép.",
 
   "topbar.maintenanceOps": "Vận hành bảo trì",
