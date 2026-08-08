@@ -7,7 +7,8 @@ import type { KnowledgeDocument } from "../../types";
 
 /**
  * KnowledgePanel: document registry. Each document links to its detail page;
- * revision states use tone badges. The evidence search moved to /search.
+ * revisions render as chips with an effective marker on the latest approved
+ * revision (or the latest revision when none is approved yet).
  */
 export function KnowledgePanel({
   documents,
@@ -60,14 +61,18 @@ export function KnowledgePanel({
             key: "revision",
             header: t("document.version"),
             render: (document) => {
-              const latest = document.revisions[document.revisions.length - 1];
-              return latest ? (
-                <StatusBadge
-                  tone={approvalTone(latest.approval_status)}
-                  label={`${latest.revision} · ${approvalLabelKey(latest.approval_status) ? t(approvalLabelKey(latest.approval_status)!) : latest.approval_status}`}
-                />
-              ) : (
-                "—"
+              const effective = effectiveRevision(document);
+              if (!effective) return "—";
+              return (
+                <span className="revision-chips">
+                  {document.revisions.map((revision) => (
+                    <StatusBadge
+                      key={revision.id}
+                      tone={approvalTone(revision.approval_status)}
+                      label={`${revision.revision} · ${approvalLabelKey(revision.approval_status) ? t(approvalLabelKey(revision.approval_status)!) : revision.approval_status}${revision.id === effective.id ? ` · ${t("knowledge.effective")}` : ""}`}
+                    />
+                  ))}
+                </span>
               );
             }
           }
@@ -81,4 +86,11 @@ export function KnowledgePanel({
       />
     </div>
   );
+}
+
+/** Effective revision: latest APPROVED, else the latest revision. */
+function effectiveRevision(document: KnowledgeDocument) {
+  const approved = document.revisions.filter((r) => r.approval_status === "APPROVED");
+  if (approved.length > 0) return approved[approved.length - 1];
+  return document.revisions[document.revisions.length - 1];
 }

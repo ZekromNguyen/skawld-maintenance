@@ -326,6 +326,7 @@ const en = {
   "knowledge.evidenceSearch": "Evidence search",
   "knowledge.search": "Search",
   "knowledge.noDocuments": "No controlled documents in this site.",
+  "knowledge.effective": "Effective",
 
   "handover.normalWorkIntelligence": "Normal-work intelligence",
   "handover.draft": "Shift handover draft",
@@ -972,6 +973,7 @@ const vi: Record<MessageKey, string> = {
   "knowledge.evidenceSearch": "Tìm kiếm bằng chứng",
   "knowledge.search": "Tìm kiếm",
   "knowledge.noDocuments": "Không có tài liệu được kiểm soát trong nhà máy này.",
+  "knowledge.effective": "Đang áp dụng",
 
   "handover.normalWorkIntelligence": "Thông tin công việc bình thường",
   "handover.draft": "Bản nháp bàn giao ca",

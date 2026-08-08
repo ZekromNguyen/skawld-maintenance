@@ -63,3 +63,39 @@ describe("KnowledgePage", () => {
     );
   });
 });
+
+describe("KnowledgePage revision grouping", () => {
+  it("marks the latest approved revision as effective", async () => {
+    (api.documents as ReturnType<typeof vi.fn>).mockResolvedValue({
+      items: [{
+        id: "d1", site_id: "s1", document_type: "SOP",
+        title: "P-302 Bearing Lubrication SOP", authority: "SITE_APPROVED",
+        revisions: [
+          { id: "r1", document_id: "d1", revision: "R1", approval_status: "APPROVED", ingestion_state: "READY", language: "en", version: 1, applicability: [] },
+          { id: "r2", document_id: "d1", revision: "R2", approval_status: "DRAFT", ingestion_state: "READY", language: "en", version: 1, applicability: [] }
+        ]
+      }],
+      next_cursor: null, has_more: false
+    });
+    renderPage();
+    expect(await screen.findByText(/effective/i)).toBeTruthy();
+  });
+
+  it("shows revision chips per document", async () => {
+    (api.documents as ReturnType<typeof vi.fn>).mockResolvedValue({
+      items: [{
+        id: "d1", site_id: "s1", document_type: "SOP",
+        title: "P-302 Bearing Lubrication SOP", authority: "SITE_APPROVED",
+        revisions: [
+          { id: "r1", document_id: "d1", revision: "R1", approval_status: "APPROVED", ingestion_state: "READY", language: "en", version: 1, applicability: [] },
+          { id: "r2", document_id: "d1", revision: "R2", approval_status: "REVIEW_REQUIRED", ingestion_state: "READY", language: "en", version: 1, applicability: [] }
+        ]
+      }],
+      next_cursor: null, has_more: false
+    });
+    renderPage();
+    await screen.findByText(/effective/i);
+    expect(screen.getByText(/R1/)).toBeTruthy();
+    expect(screen.getByText(/R2/)).toBeTruthy();
+  });
+});
