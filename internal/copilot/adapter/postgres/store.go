@@ -58,7 +58,7 @@ func (s Store) LoadIncidentContext(
 			jsonb_build_object(
 			  'incident', jsonb_build_object(
 			    'id', i.id, 'number', i.number, 'summary', i.summary,
-			    'severity', i.severity, 'state', i.state, 'detected_at', i.detected_at
+			    'priority', i.priority, 'status', i.status, 'detected_at', i.detected_at
 			  ),
 			  'asset', jsonb_build_object(
 			    'id', a.id, 'tag', a.tag, 'name', a.name, 'class', a.asset_class,

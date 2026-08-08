@@ -47,11 +47,11 @@ func (s Store) LoadWindowContext(
 		  'open_incidents', coalesce((
 		    SELECT jsonb_agg(jsonb_build_object(
 		      'id', i.id, 'number', i.number, 'asset_tag', a.tag,
-		      'summary', i.summary, 'severity', i.severity, 'state', i.state
-		    ) ORDER BY i.severity DESC, i.detected_at)
+		      'summary', i.summary, 'priority', i.priority, 'status', i.status
+		    ) ORDER BY i.priority DESC, i.detected_at)
 		    FROM incidents i JOIN assets a ON a.id = i.asset_id
 		    WHERE i.organization_id = $1::uuid AND i.site_id = $2::uuid
-		      AND i.state IN ('OPEN', 'IN_PROGRESS')
+		      AND i.status IN ('OPEN', 'IN_PROGRESS')
 		  ), '[]'::jsonb),
 		  'active_executions', coalesce((
 		    SELECT jsonb_agg(jsonb_build_object(
@@ -113,11 +113,11 @@ func (s Store) loadEvidence(
 		SELECT kind, source_id::text, locator, content
 		FROM (
 		  SELECT 'INCIDENT' AS kind, i.id AS source_id, i.number AS locator,
-		         concat(a.tag, ': ', i.summary, ' [', i.severity, '/', i.state, ']') AS content,
+		         concat(a.tag, ': ', i.summary, ' [', i.priority, '/', i.status, ']') AS content,
 		         i.detected_at AS occurred_at
 		  FROM incidents i JOIN assets a ON a.id = i.asset_id
 		  WHERE i.organization_id = $1::uuid AND i.site_id = $2::uuid
-		    AND i.state IN ('OPEN', 'IN_PROGRESS')
+		    AND i.status IN ('OPEN', 'IN_PROGRESS')
 		  UNION ALL
 		  SELECT 'EXECUTION', e.id, a.tag,
 		         concat(e.purpose, ' [', e.state, ']'), e.created_at
