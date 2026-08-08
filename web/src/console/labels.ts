@@ -180,6 +180,21 @@ export function handoverStateTone(state: string): Tone {
   }
 }
 
+export function handoverStateLabelKey(state: string): MessageKey {
+  switch (state) {
+    case "DRAFT":
+      return "handover.state.draft";
+    case "SUBMITTED":
+      return "handover.state.submitted";
+    case "ACCEPTED":
+      return "handover.state.accepted";
+    case "ACKNOWLEDGED":
+      return "handover.state.acknowledged";
+    default:
+      return "handover.state.draft";
+  }
+}
+
 /** Execution lifecycle state label + tone. */
 export function executionStateLabelKey(state: string): MessageKey {
   switch (state) {
