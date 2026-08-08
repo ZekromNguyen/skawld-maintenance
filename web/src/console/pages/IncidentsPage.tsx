@@ -32,10 +32,21 @@ export function IncidentsPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incidents = usePaginatedList((params) => api.incidents(params), []);
-  const assets = useQuery(() => api.assets().then((list) => list.items));
+  const siteID = principal?.site_ids?.[0];
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [severity, setSeverity] = useState("ALL");
+  const incidents = usePaginatedList(
+    (params) =>
+      api.incidents({
+        ...params,
+        site_id: siteID,
+        state: tab === "ALL" ? undefined : [tab],
+        severity: severity === "ALL" ? undefined : severity,
+      }),
+    [tab, severity, siteID],
+  );
+  const assets = useQuery(() => api.assets().then((list) => list.items));
+  const summary = useQuery(() => api.summary(siteID), [siteID]);
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [params] = useSearchParams();
@@ -55,29 +66,22 @@ export function IncidentsPage() {
 
   const rows = useMemo(() => {
     const items = incidents.items;
-    return items
-      .filter((incident) => tab === "ALL" || incident.state === tab)
-      .filter((incident) => severity === "ALL" || incident.severity === severity)
-      .filter((incident) => {
-        if (!query.trim()) return true;
-        const q = query.trim().toLowerCase();
-        return (
-          incident.number.toLowerCase().includes(q) ||
-          incident.summary.toLowerCase().includes(q) ||
-          (incident.asset_tag ?? "").toLowerCase().includes(q)
-        );
-      });
-  }, [incidents.items, tab, severity, query]);
+    if (!query.trim()) return items;
+    const q = query.trim().toLowerCase();
+    return items.filter(
+      (incident) =>
+        incident.number.toLowerCase().includes(q) ||
+        incident.summary.toLowerCase().includes(q) ||
+        (incident.asset_tag ?? "").toLowerCase().includes(q),
+    );
+  }, [incidents.items, query]);
 
-  const counts = useMemo(() => {
-    const items = incidents.items;
-    return {
-      OPEN: items.filter((i) => i.state === "OPEN").length,
-      IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
-      RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
-      ALL: items.length,
-    } as Record<StateTab, number>;
-  }, [incidents.items]);
+  const counts = {
+    OPEN: summary.data?.open_incidents ?? 0,
+    IN_PROGRESS: summary.data?.in_progress_incidents ?? 0,
+    RESOLVED: summary.data?.resolved_incidents ?? 0,
+    ALL: summary.data?.total_incidents ?? 0,
+  } as Record<StateTab, number>;
 
   return (
     <PageTrailProvider trail={[]}>

@@ -56,7 +56,26 @@ vi.mock("../../api", () => ({
       site_ids: ["s1"],
       permissions: ["incident:create", "incident:read"]
     }),
-    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW], next_cursor: null, has_more: false }),
+    incidents: vi.fn().mockImplementation((options?: { state?: string[]; severity?: string }) => {
+      let items = [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW];
+      if (options?.state?.length) {
+        items = items.filter((incident) => options.state!.includes(incident.state));
+      }
+      if (options?.severity && options.severity !== "ALL") {
+        items = items.filter((incident) => incident.severity === options.severity);
+      }
+      return Promise.resolve({ items, next_cursor: null, has_more: false });
+    }),
+    summary: vi.fn().mockResolvedValue({
+      open_incidents: 1,
+      in_progress_incidents: 1,
+      resolved_incidents: 1,
+      total_incidents: 3,
+      by_severity: { LOW: 1, MEDIUM: 1, HIGH: 1, CRITICAL: 0 },
+      active_executions: 0,
+      critical_assets: 0,
+      pending_handovers: 0
+    }),
     assets: vi.fn().mockResolvedValue({
       items: [
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" }
@@ -99,7 +118,7 @@ describe("IncidentsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /all/i }));
     await waitFor(() => expect(screen.getByText("Resolved noise")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /resolved/i }));
-    expect(screen.queryByText("Pump vibration")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Pump vibration")).toBeNull());
     expect(screen.getByText("Resolved noise")).toBeTruthy();
   });
 
@@ -154,4 +173,24 @@ it("shows load more and appends the next page", async () => {
   await waitFor(() =>
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
   );
+});
+
+describe("IncidentsPage server-side filters", () => {
+  it("refetches with the selected severity", async () => {
+    renderPage();
+    await screen.findByText("Pump vibration");
+    fireEvent.change(screen.getByLabelText(/severity/i), { target: { value: "HIGH" } });
+    await waitFor(() => {
+      const calls = (api.incidents as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.some(([opts]) => opts && opts.severity === "HIGH")).toBe(true);
+    });
+  });
+
+  it("shows truthful tab counts from the summary endpoint", async () => {
+    renderPage();
+    await screen.findByText("Pump vibration");
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^open/i }).textContent).toContain("1");
+    });
+  });
 });
