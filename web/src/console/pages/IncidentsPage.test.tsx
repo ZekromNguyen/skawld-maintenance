@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { IncidentsPage } from "./IncidentsPage";
@@ -84,12 +84,27 @@ function renderPage() {
 
 describe("IncidentsPage", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p1",
       display_name: "Tester",
       site_ids: ["s1"],
       permissions: ["incident:create", "incident:read"]
     });
+  });
+
+  it("shows a kanban board with one column per state", async () => {
+    renderPage();
+    expect(await screen.findByText("Pump vibration")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /board/i }));
+    expect(await screen.findByText("Resolved noise")).toBeTruthy();
+    expect(screen.getByText("Pump vibration")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
+    const openColumn = screen.getByText("Pump vibration").closest(".board-column");
+    expect(openColumn?.textContent).toContain("IN-1");
+    expect(openColumn?.textContent).not.toContain("IN-2");
+    fireEvent.click(screen.getByRole("button", { name: /list/i }));
+    expect(await screen.findByRole("tab", { name: /all/i })).toBeTruthy();
   });
 
   it("filters rows by state tab", async () => {
@@ -101,6 +116,15 @@ describe("IncidentsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /resolved/i }));
     expect(screen.queryByText("Pump vibration")).toBeNull();
     expect(screen.getByText("Resolved noise")).toBeTruthy();
+  });
+
+  it("renders alarm-row severity edges in list view", async () => {
+    renderPage();
+    expect(await screen.findByText("Pump vibration")).toBeTruthy();
+    const row = screen.getByText("Pump vibration").closest("tr");
+    expect(row?.className).toContain("alarm-row--high");
+    const edge = row?.querySelector(".alarm-edge");
+    expect(edge).toBeTruthy();
   });
 
   it("hides create for unauthorized principals", async () => {

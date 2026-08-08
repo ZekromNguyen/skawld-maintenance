@@ -20,6 +20,7 @@ export function DataTable<T>({
   error,
   onRetry,
   onRowClick,
+  rowClassName,
 }: {
   columns: Array<Column<T>>;
   rows: T[];
@@ -30,6 +31,7 @@ export function DataTable<T>({
   error?: string;
   onRetry?: () => void;
   onRowClick?: (row: T) => void;
+  rowClassName?: (row: T) => string;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
 
@@ -96,6 +98,7 @@ export function DataTable<T>({
           {sorted.map((row) => (
             <tr
               key={rowKey(row)}
+              className={rowClassName?.(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {columns.map((column) => (

@@ -565,6 +565,17 @@ tr[onclick]:hover td { background: var(--raised); }
 .board-card-meta time { margin-left: auto; }
 .board-empty { color: var(--ink-muted); font-size: 11px; padding: 8px 4px; }
 .board-load-more { grid-column: 1 / -1; justify-self: center; }
+.alarm-row td:first-child { width: 3px; padding: 0; }
+.alarm-edge { display: block; width: 3px; height: 100%; min-height: 44px; background: var(--ink-muted); }
+.alarm-row--critical .alarm-edge { background: var(--red); }
+.alarm-row--high .alarm-edge { background: var(--amber); }
+.alarm-row--medium .alarm-edge { background: var(--amber); }
+.alarm-row--low .alarm-edge { background: var(--brand); }
+.board-card { border-top: 3px solid var(--line-soft); }
+.board-card--critical { border-top-color: var(--red); }
+.board-card--high { border-top-color: var(--amber); }
+.board-card--medium { border-top-color: var(--amber); }
+.board-card--low { border-top-color: var(--brand); }
 .sev-critical { color: var(--red); }
 .sev-high { color: var(--amber); }
 .sev-medium { color: var(--amber); }

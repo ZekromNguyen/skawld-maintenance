@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { Kanban, Rows } from "@phosphor-icons/react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePaginatedList } from "../usePaginatedList";
@@ -13,6 +14,7 @@ import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
+import { IncidentBoard } from "../components/IncidentBoard";
 import {
   severityTone,
   severityLabelKey,
@@ -23,6 +25,17 @@ import type { Incident } from "../../types";
 
 type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ALL";
 const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
+
+type ViewMode = "list" | "board";
+const VIEW_STORAGE_KEY = "skawld.incidents.view";
+
+function initialView(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === "board" ? "board" : "list";
+  } catch {
+    return "list";
+  }
+}
 
 /**
  * IncidentsPage: filterable incident queue with native creation inside a
@@ -37,12 +50,22 @@ export function IncidentsPage() {
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [severity, setSeverity] = useState("ALL");
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<ViewMode>(initialView);
   const [showForm, setShowForm] = useState(false);
   const [params] = useSearchParams();
   useEffect(() => {
     if (params.get("create") === "1") setShowForm(true);
   }, [params]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
+
+  function switchView(next: ViewMode) {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // storage unavailable — session-only preference
+    }
+  }
 
   const create = useCommand(
     (value: { site_id: string; asset_id: string; summary: string; severity: string }) =>
@@ -53,10 +76,9 @@ export function IncidentsPage() {
     },
   );
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     const items = incidents.items;
     return items
-      .filter((incident) => tab === "ALL" || incident.state === tab)
       .filter((incident) => severity === "ALL" || incident.severity === severity)
       .filter((incident) => {
         if (!query.trim()) return true;
@@ -67,17 +89,22 @@ export function IncidentsPage() {
           (incident.asset_tag ?? "").toLowerCase().includes(q)
         );
       });
-  }, [incidents.items, tab, severity, query]);
+  }, [incidents.items, severity, query]);
+
+  const rows = useMemo(
+    () => filtered.filter((incident) => tab === "ALL" || incident.state === tab),
+    [filtered, tab],
+  );
 
   const counts = useMemo(() => {
-    const items = incidents.items;
+    const items = filtered;
     return {
       OPEN: items.filter((i) => i.state === "OPEN").length,
       IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
       RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
       ALL: items.length,
     } as Record<StateTab, number>;
-  }, [incidents.items]);
+  }, [filtered]);
 
   return (
     <PageTrailProvider trail={[]}>
@@ -94,20 +121,22 @@ export function IncidentsPage() {
           }
         />
         <div className="incident-toolbar">
-          <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
-            {STATE_TABS.map((state) => (
-              <button
-                key={state}
-                role="tab"
-                aria-selected={tab === state}
-                className={`tab${tab === state ? " active" : ""}`}
-                onClick={() => setTab(state)}
-              >
-                {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
-                <span className="count">{counts[state]}</span>
-              </button>
-            ))}
-          </div>
+          {view === "list" && (
+            <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
+              {STATE_TABS.map((state) => (
+                <button
+                  key={state}
+                  role="tab"
+                  aria-selected={tab === state}
+                  className={`tab${tab === state ? " active" : ""}`}
+                  onClick={() => setTab(state)}
+                >
+                  {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
+                  <span className="count">{counts[state]}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <input
             aria-label={t("incidents.filter.search")}
             placeholder={t("incidents.filter.search")}
@@ -127,9 +156,45 @@ export function IncidentsPage() {
             <option value="HIGH">{t(severityLabelKey("HIGH"))}</option>
             <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
           </select>
+          <div className="view-toggle" role="group" aria-label={t("incidents.view.label")}>
+            <button
+              type="button"
+              className={view === "list" ? "view-toggle-button active" : "view-toggle-button"}
+              aria-pressed={view === "list"}
+              title={t("incidents.view.list")}
+              onClick={() => switchView("list")}
+            >
+              <Rows size={14} weight="bold" />
+              {t("incidents.view.list")}
+            </button>
+            <button
+              type="button"
+              className={view === "board" ? "view-toggle-button active" : "view-toggle-button"}
+              aria-pressed={view === "board"}
+              title={t("incidents.view.board")}
+              onClick={() => switchView("board")}
+            >
+              <Kanban size={14} weight="bold" />
+              {t("incidents.view.board")}
+            </button>
+          </div>
         </div>
+        {view === "board" ? (
+          <IncidentBoard
+            incidents={filtered}
+            loading={incidents.loading}
+            hasMore={incidents.hasMore}
+            onLoadMore={() => void incidents.loadMore()}
+            emptyTitle={t("incidents.noResults")}
+          />
+        ) : (
         <DataTable<Incident>
           columns={[
+            {
+              key: "edge",
+              header: "",
+              render: () => <span className="alarm-edge" aria-hidden="true" />,
+            },
             {
               key: "number",
               header: t("dashboard.table.incident"),
@@ -174,13 +239,15 @@ export function IncidentsPage() {
           ]}
           rows={rows}
           rowKey={(incident) => incident.id}
+          rowClassName={(incident) => `alarm-row alarm-row--${incident.severity.toLowerCase()}`}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
           emptyTitle={t("incidents.noResults")}
           loading={incidents.loading}
           error={incidents.error}
           onRetry={() => void incidents.refetch()}
         />
-        {incidents.hasMore ? (
+        )}
+        {view === "list" && incidents.hasMore ? (
           <button
             type="button"
             className="secondary-button"
