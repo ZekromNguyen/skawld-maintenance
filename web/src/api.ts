@@ -1,5 +1,6 @@
 import type {
   Asset,
+  DashboardSummary,
   Demonstration,
   EvaluationSummary,
   Execution,
@@ -89,6 +90,7 @@ function command<T>(path: string, value: unknown): Promise<T> {
 export interface ListOptions {
   site_id?: string;
   state?: string[];
+  severity?: string;
   cursor?: string;
   page_size?: number;
 }
@@ -97,6 +99,7 @@ function listQuery(options?: ListOptions): string {
   const params = new URLSearchParams();
   if (options?.site_id) params.set("site_id", options.site_id);
   for (const state of options?.state ?? []) params.append("state", state);
+  if (options?.severity) params.set("severity", options.severity);
   if (options?.cursor) params.set("cursor", options.cursor);
   if (options?.page_size) params.set("page_size", String(options.page_size));
   const query = params.toString();
@@ -415,6 +418,8 @@ export const api = {
     command<unknown>(`/document-revisions/${revisionID}/ingestion`, {}),
   handovers: (options: ListOptions = {}) =>
     request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`),
+  summary: (siteID?: string) =>
+    request<DashboardSummary>(`/summary${siteID ? `?site_id=${siteID}` : ""}`),
   pendingHandovers: async () => {
     const options = { state: ["DRAFT", "SUBMITTED", "ACCEPTED"], page_size: 100 };
     const first = await request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`);

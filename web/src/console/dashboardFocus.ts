@@ -10,14 +10,14 @@ export const FOCUS_CONFIG: Record<RoleFocus, FocusConfig> = {
     titleKey: "dashboard.focus.admin",
     links: [
       { labelKey: "nav.quality", to: "/quality" },
-      { labelKey: "dashboard.openIncidents", to: "/incidents" },
+      { labelKey: "dashboard.openIncidents", to: "/incidents?state=OPEN" },
       { labelKey: "dashboard.criticalAssets", to: "/assets" },
     ],
   },
   supervisor: {
     titleKey: "dashboard.focus.supervisor",
     links: [
-      { labelKey: "dashboard.openIncidents", to: "/incidents" },
+      { labelKey: "dashboard.openIncidents", to: "/incidents?state=OPEN" },
       { labelKey: "dashboard.pendingReports", to: "/reports" },
       { labelKey: "nav.quality", to: "/quality" },
     ],
@@ -41,7 +41,7 @@ export const FOCUS_CONFIG: Record<RoleFocus, FocusConfig> = {
     titleKey: "dashboard.focus.manager",
     links: [
       { labelKey: "dashboard.pendingHandovers", to: "/handovers" },
-      { labelKey: "dashboard.openIncidents", to: "/incidents" },
+      { labelKey: "dashboard.openIncidents", to: "/incidents?state=OPEN" },
       { labelKey: "nav.quality", to: "/quality" },
     ],
   },

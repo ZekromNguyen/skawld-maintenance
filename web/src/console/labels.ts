@@ -179,3 +179,45 @@ export function handoverStateTone(state: string): Tone {
       return "info";
   }
 }
+
+export function handoverStateLabelKey(state: string): MessageKey {
+  switch (state) {
+    case "DRAFT":
+      return "handover.state.draft";
+    case "SUBMITTED":
+      return "handover.state.submitted";
+    case "ACCEPTED":
+      return "handover.state.accepted";
+    case "ACKNOWLEDGED":
+      return "handover.state.acknowledged";
+    default:
+      return "handover.state.draft";
+  }
+}
+
+/** Execution lifecycle state label + tone. */
+export function executionStateLabelKey(state: string): MessageKey {
+  switch (state) {
+    case "ASSIGNED":
+      return "execution.state.assigned";
+    case "IN_PROGRESS":
+      return "execution.state.inProgress";
+    case "COMPLETED":
+      return "execution.state.completed";
+    default:
+      return "execution.state.unknown";
+  }
+}
+
+export function executionStateTone(state: string): Tone {
+  switch (state) {
+    case "ASSIGNED":
+      return "info";
+    case "IN_PROGRESS":
+      return "medium";
+    case "COMPLETED":
+      return "success";
+    default:
+      return "info";
+  }
+}

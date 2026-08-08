@@ -56,7 +56,26 @@ vi.mock("../../api", () => ({
       site_ids: ["s1"],
       permissions: ["incident:create", "incident:read"]
     }),
-    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW], next_cursor: null, has_more: false }),
+    incidents: vi.fn().mockImplementation((options?: { state?: string[]; severity?: string }) => {
+      let items = [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW];
+      if (options?.state?.length) {
+        items = items.filter((incident) => options.state!.includes(incident.state));
+      }
+      if (options?.severity && options.severity !== "ALL") {
+        items = items.filter((incident) => incident.severity === options.severity);
+      }
+      return Promise.resolve({ items, next_cursor: null, has_more: false });
+    }),
+    summary: vi.fn().mockResolvedValue({
+      open_incidents: 1,
+      in_progress_incidents: 1,
+      resolved_incidents: 1,
+      total_incidents: 3,
+      by_severity: { LOW: 1, MEDIUM: 1, HIGH: 1, CRITICAL: 0 },
+      active_executions: 0,
+      critical_assets: 0,
+      pending_handovers: 0
+    }),
     assets: vi.fn().mockResolvedValue({
       items: [
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" }
@@ -99,7 +118,7 @@ describe("IncidentsPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: /all/i }));
     await waitFor(() => expect(screen.getByText("Resolved noise")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /resolved/i }));
-    expect(screen.queryByText("Pump vibration")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Pump vibration")).toBeNull());
     expect(screen.getByText("Resolved noise")).toBeTruthy();
   });
 
@@ -149,9 +168,74 @@ it("shows load more and appends the next page", async () => {
     .mockResolvedValueOnce({ items: [fixtures.OPEN_HIGH as unknown as Incident], next_cursor: "c1", has_more: true })
     .mockResolvedValueOnce({ items: [fixtures.RESOLVED_LOW as unknown as Incident], next_cursor: null, has_more: false });
   renderPage();
-  const button = await screen.findByRole("button", { name: "Load more" });
+  const button = await screen.findByRole("button", { name: /load more/i });
   fireEvent.click(button);
   await waitFor(() =>
-    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
+    expect(screen.queryByRole("button", { name: /load more/i })).toBeNull(),
   );
+});
+
+describe("IncidentsPage server-side filters", () => {
+  it("refetches with the selected severity and filters rows", async () => {
+    renderPage();
+    await screen.findByText("Pump vibration");
+    fireEvent.click(screen.getByRole("tab", { name: /all/i }));
+    await waitFor(() => expect(screen.getByText("Bearing temperature")).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(/severity/i), { target: { value: "HIGH" } });
+    await waitFor(() => {
+      const calls = (api.incidents as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.some(([opts]) => opts && opts.severity === "HIGH")).toBe(true);
+    });
+    await waitFor(() => expect(screen.queryByText("Bearing temperature")).toBeNull());
+    expect(screen.getByText("Pump vibration")).toBeTruthy();
+  });
+
+  it("shows truthful tab counts from the summary endpoint", async () => {
+    renderPage();
+    await screen.findByText("Pump vibration");
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^open/i }).textContent).toContain("1");
+    });
+  });
+});
+
+describe("IncidentsPage deep links", () => {
+  it("opens the tab from the state query param", async () => {
+    const { unmount } = render(
+      <I18nProvider>
+        <PrincipalProvider>
+          <SiteProvider>
+            <ToastProvider>
+              <MemoryRouter initialEntries={["/incidents?state=RESOLVED"]}>
+                <IncidentsPage />
+              </MemoryRouter>
+            </ToastProvider>
+          </SiteProvider>
+        </PrincipalProvider>
+      </I18nProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("Pump vibration")).toBeNull();
+    });
+    expect(screen.getByText("Resolved noise")).toBeTruthy();
+    unmount();
+  });
+});
+
+describe("IncidentsPage load feedback", () => {
+  it("shows loaded count on the load-more button", async () => {
+    (api.incidents as ReturnType<typeof vi.fn>).mockResolvedValue({
+      items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED],
+      next_cursor: "c1",
+      has_more: true
+    });
+    (api.summary as ReturnType<typeof vi.fn>).mockResolvedValue({
+      open_incidents: 1, in_progress_incidents: 1, resolved_incidents: 0,
+      total_incidents: 132,
+      by_severity: { LOW: 40, MEDIUM: 50, HIGH: 40, CRITICAL: 2 },
+      active_executions: 0, critical_assets: 0, pending_handovers: 0
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/2 \/ 132/i)).toBeTruthy());
+  });
 });

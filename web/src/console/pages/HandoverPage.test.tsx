@@ -16,7 +16,7 @@ const fixtures = vi.hoisted(() => ({
     shift_end: "2026-08-06T18:00:00.000Z",
     state: "DRAFT" as const,
     version: 1,
-    structured_content: { summary: "Night shift summary", open_incidents: ["IN-1"], active_executions: [], safety_concerns: [], follow_up: [], evidence_ids: [], unknowns: ["torque spec unverified"], requires_human_review: true },
+    structured_content: { summary: "Night shift summary", open_incidents: [{ title: "IN-1" }], active_executions: [], safety_concerns: [], follow_up: [], evidence_ids: [], unknowns: [{ title: "torque spec unverified" }], requires_human_review: true },
     evidence: [],
     provider: "skawld-copilot",
     model: "copilot-v1",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
 import { usePaginatedList } from "../usePaginatedList";
@@ -6,47 +6,48 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { DataTable } from "../ui/DataTable";
-import { StatusBadge, type Tone } from "../ui/StatusBadge";
+import { StatusBadge } from "../ui/StatusBadge";
+import { Tabs, tabPanelId } from "../ui/Tabs";
+import { executionStateLabelKey, executionStateTone } from "../labels";
 import type { Execution } from "../../types";
-
-const EXECUTION_TONE: Record<string, Tone> = {
-  ASSIGNED: "info",
-  IN_PROGRESS: "medium",
-  COMPLETED: "success",
-};
 
 type StateFilter = "ALL" | "IN_PROGRESS" | "ASSIGNED" | "COMPLETED";
 const STATE_FILTERS: StateFilter[] = ["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLETED"];
 
 export function ExecutionsPage() {
   const { t } = useI18n();
-  const executions = usePaginatedList((params) => api.listExecutions(params), []);
   const [filter, setFilter] = useState<StateFilter>("ALL");
+  const executions = usePaginatedList(
+    (params) =>
+      api.listExecutions({
+        ...params,
+        state: filter === "ALL" ? undefined : [filter],
+      }),
+    [filter],
+  );
 
-  const rows = useMemo(() => {
-    const items = executions.items;
-    return filter === "ALL" ? items : items.filter((execution) => execution.state === filter);
-  }, [executions.items, filter]);
+  const rows = executions.items;
 
   return (
     <PageTrailProvider trail={[]}>
       <section>
         <PageHeader title={t("pageTitle.executions")} />
         <p className="section-lead">{t("executions.lead")}</p>
-        <div className="incident-tabs" role="tablist" aria-label={t("executions.state")}>
-          {STATE_FILTERS.map((state) => (
-            <button
-              key={state}
-              role="tab"
-              aria-selected={filter === state}
-              className={`tab${filter === state ? " active" : ""}`}
-              onClick={() => setFilter(state)}
-            >
-              {state === "ALL" ? t("incidents.tabs.all") : state.replace("_", " ")}
-            </button>
-          ))}
-        </div>
-        <DataTable<Execution>
+        <Tabs
+          label={t("executions.state")}
+          tabs={STATE_FILTERS.map((state) => ({
+            id: state,
+            label: state === "ALL" ? t("incidents.tabs.all") : t(executionStateLabelKey(state)),
+          }))}
+          active={filter}
+          onChange={(id) => setFilter(id as StateFilter)}
+        />
+        <div
+          id={tabPanelId(t("executions.state"))}
+          role="tabpanel"
+          aria-labelledby={`${tabPanelId(t("executions.state"))}-${filter}`}
+        >
+          <DataTable<Execution>
           columns={[
             {
               key: "purpose",
@@ -64,7 +65,7 @@ export function ExecutionsPage() {
               render: (execution) =>
                 execution.incident_id ? (
                   <Link to={`/incidents/${execution.incident_id}`}>
-                    {execution.asset_tag ?? execution.incident_id}
+                    {execution.incident_number ?? execution.asset_tag ?? execution.incident_id}
                   </Link>
                 ) : (
                   <span className="muted">—</span>
@@ -80,8 +81,8 @@ export function ExecutionsPage() {
               header: t("executions.state"),
               render: (execution) => (
                 <StatusBadge
-                  tone={EXECUTION_TONE[execution.state] ?? "info"}
-                  label={execution.state.replace("_", " ")}
+                  tone={executionStateTone(execution.state)}
+                  label={t(executionStateLabelKey(execution.state))}
                 />
               ),
               sortValue: (e) => e.state,
@@ -105,6 +106,7 @@ export function ExecutionsPage() {
           error={executions.error}
           onRetry={() => void executions.refetch()}
         />
+        </div>
         {executions.hasMore ? (
           <button
             type="button"

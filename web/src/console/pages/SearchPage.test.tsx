@@ -63,4 +63,66 @@ describe("SearchPage", () => {
       expect(api.searchKnowledge as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("s1", "bearing", undefined, 20),
     );
   });
+
+  it("links chunk evidence to the document, not the chunk id", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr1",
+      items: [
+        { id: "document_chunk:c1", kind: "DOCUMENT_CHUNK", source_id: "c1", document_id: "d9", title: "LOTO Procedure for P-302", locator: "sop/loto", authority: "SITE_APPROVED", content: "Apply lockout before inspection.", content_sha256: "x", score: { rrf_score: 0.94 } }
+      ]
+    });
+    renderPage("/search?q=loto");
+    const docLink = await screen.findByRole("link", { name: /loto procedure/i });
+    expect(docLink.getAttribute("href")).toBe("/knowledge/d9");
+  });
+});
+
+describe("SearchPage affordances", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  it("autofocuses the search input", () => {
+    renderPage();
+    expect(document.activeElement).toBe(screen.getByRole("searchbox"));
+  });
+
+  it("stores recent queries and renders them as shortcuts", async () => {
+    renderPage();
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "bearing" } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem("skawld.search.recent") ?? "[]")).toContain("bearing"),
+    );
+    const { unmount } = renderPage();
+    unmount();
+    renderPage();
+    expect(screen.getByRole("link", { name: /bearing/i })).toBeTruthy();
+  });
+
+  it("echoes the query when there are no results", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr0", items: []
+    });
+    renderPage("/search?q=zzzz");
+    expect(await screen.findByText(/zzzz/i)).toBeTruthy();
+  });
+
+  it("filters results by scope", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr1",
+      items: [
+        { id: "e1", kind: "DOCUMENT", source_id: "d9", title: "LOTO Procedure for P-302", locator: "sop/loto", authority: "SITE_APPROVED", content: "Apply lockout before inspection.", content_sha256: "x", score: { rrf_score: 0.94 } },
+        { id: "e2", kind: "INCIDENT", source_id: "i7", title: "Pump vibration incident", locator: "inc/7", authority: "SITE_APPROVED", content: "Vibration readings above threshold.", content_sha256: "y", score: { rrf_score: 0.5 } }
+      ]
+    });
+    renderPage("/search?q=loto");
+    await screen.findByRole("link", { name: /loto procedure/i });
+    expect(screen.getByRole("link", { name: /pump vibration incident/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: /incidents/i }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: /loto procedure/i })).toBeNull());
+    expect(screen.getByRole("link", { name: /pump vibration incident/i })).toBeTruthy();
+  });
 });

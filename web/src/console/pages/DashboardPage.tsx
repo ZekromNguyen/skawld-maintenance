@@ -9,40 +9,46 @@ import { focusRole } from "../permissions";
 import { FOCUS_CONFIG } from "../dashboardFocus";
 
 /**
- * DashboardPage: role-aware landing. Real KPIs, a "my queue" of in-progress
- * executions, and the active-incident table. No fabricated metrics.
+ * DashboardPage: role-aware landing. Metric cards come from the /summary
+ * endpoint (truthful counts regardless of page size); "my queue" and the
+ * active-incident table use capped list queries.
  */
 export function DashboardPage() {
   const { t } = useI18n();
   const { data: principal } = usePrincipal();
-  const incidents = useQuery(() => api.incidents().then((list) => list.items));
-  const assets = useQuery(() => api.assets().then((list) => list.items));
-  const executions = useQuery(() => api.listExecutions().then((list) => list.items));
-  const handovers = useQuery(() => api.pendingHandovers());
+  const siteID = principal?.site_ids?.[0];
+  const summary = useQuery(() => api.summary(siteID), [siteID]);
+  const incidents = useQuery(() =>
+    api.incidents({ site_id: siteID, page_size: 25 }).then((list) => list.items),
+    [siteID],
+  );
+  const executions = useQuery(() =>
+    api.listExecutions({ site_id: siteID, page_size: 25 }).then((list) => list.items),
+    [siteID],
+  );
+  const handovers = useQuery(() => api.pendingHandovers(), []);
 
   const loading =
-    incidents.loading || assets.loading || executions.loading || handovers.loading;
+    summary.loading || incidents.loading || executions.loading || handovers.loading;
   const error =
-    incidents.error ?? assets.error ?? executions.error ?? handovers.error;
+    summary.error ?? incidents.error ?? executions.error ?? handovers.error;
   const onRetry = () => {
+    void summary.refetch();
     void incidents.refetch();
-    void assets.refetch();
     void executions.refetch();
     void handovers.refetch();
   };
-  const pendingHandovers = handovers.data?.length ?? 0;
-  const focus = FOCUS_CONFIG[focusRole(principal)];
 
   return (
     <PageTrailProvider trail={[]}>
       <section>
         <PageHeader title={t("nav.overview")} principal={principal} />
         <Overview
-          focus={focus}
+          focus={FOCUS_CONFIG[focusRole(principal)]}
+          summary={summary.data}
           incidents={incidents.data ?? []}
           executions={executions.data ?? []}
-          assets={assets.data ?? []}
-          pendingHandoverCount={pendingHandovers}
+          pendingHandoverCount={handovers.data?.length ?? 0}
           loading={loading}
           error={error}
           onRetry={onRetry}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
   House,
@@ -65,6 +66,18 @@ export function Sidebar({ principal }: { principal?: Principal }) {
   const { t, locale, setLocale } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const [safetyDismissed, setSafetyDismissed] = useState(
+    () => localStorage.getItem("skawld.safety.dismissed") === "1",
+  );
+
+  const dismissSafety = () => {
+    try {
+      localStorage.setItem("skawld.safety.dismissed", "1");
+    } catch {
+      // storage unavailable; dismiss lasts for the session only
+    }
+    setSafetyDismissed(true);
+  };
 
   return (
     <aside className="sidebar">
@@ -120,11 +133,22 @@ export function Sidebar({ principal }: { principal?: Principal }) {
             <option value="vi">Tiếng Việt</option>
           </select>
         </label>
-        <div className="safety-boundary">
-          <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
-          <strong>{t("sidebar.advisoryOnly")}</strong>
-          <p>{t("sidebar.noControl")}</p>
-        </div>
+        {!safetyDismissed ? (
+          <div className="safety-boundary">
+            <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
+            <strong>{t("sidebar.advisoryOnly")}</strong>
+            <p>{t("sidebar.noControl")}</p>
+            <button
+              type="button"
+              className="safety-dismiss"
+              aria-label={t("sidebar.dismiss")}
+              title={t("sidebar.dismiss")}
+              onClick={dismissSafety}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         <button className="logout-button" onClick={() => signOut()}>
           {t("nav.signOut")}
         </button>

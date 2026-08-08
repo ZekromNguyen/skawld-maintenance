@@ -408,4 +408,9 @@ func TestExecutionListCursorPagination(t *testing.T) {
 	if len(seen) != 3 {
 		t.Fatalf("distinct executions across pages = %d, want 3", len(seen))
 	}
+	for _, item := range append(page1, page2...) {
+		if item.IncidentNumber == "" {
+			t.Fatalf("execution %s has empty incident_number, want IN-* populated", item.ID)
+		}
+	}
 }

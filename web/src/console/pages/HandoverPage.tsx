@@ -9,7 +9,9 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { GatedButton } from "../ui/GatedButton";
+import { StatusBadge } from "../ui/StatusBadge";
 import { HandoverPanel } from "../components/HandoverPanel";
+import { handoverStateLabelKey, handoverStateTone } from "../labels";
 import type { ShiftHandover } from "../../types";
 
 /**
@@ -156,7 +158,7 @@ export function HandoverPage() {
                   {historyList.map((handover) => (
                     <div key={handover.id} className="handover-history-row">
                       <span className="mono">{handover.shift_start.slice(0, 10)}</span>
-                      <span className="state-badge">{handover.state.replace("_", " ")}</span>
+                      <StatusBadge tone={handoverStateTone(handover.state)} label={t(handoverStateLabelKey(handover.state))} />
                       <span className="muted">{handover.structured_content.summary.slice(0, 80)}</span>
                     </div>
                   ))}

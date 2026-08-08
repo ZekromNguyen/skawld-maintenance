@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n/I18nProvider";
-import type { ShiftHandover } from "../../types";
+import type { HandoverListItem, ShiftHandover } from "../../types";
 import { EvidenceLinks } from "./EvidenceLinks";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
@@ -87,14 +87,17 @@ export function HandoverPanel(props: {
   );
 }
 
-export function HandoverSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+export function HandoverSection({ title, items, empty }: { title: string; items: HandoverListItem[]; empty: string }) {
   return (
     <div className="handover-section">
       <h3>{title}</h3>
       {items.length ? (
         <ul>
           {items.map((item, index) => (
-            <li key={`${title}-${index}`}>{item}</li>
+            <li key={`${title}-${item.title}-${index}`}>
+              {item.title}
+              {item.detail ? <span className="handover-detail"> · {item.detail}</span> : null}
+            </li>
           ))}
         </ul>
       ) : (

@@ -6,12 +6,23 @@ import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
 import { FormField } from "./FormField";
 import { DataTable } from "./DataTable";
+import { RelativeTime } from "./RelativeTime";
 
 describe("console UI primitives", () => {
   it("renders a tone badge with the label", () => {
     render(<StatusBadge tone="high" label="HIGH" />);
     const badge = screen.getByText("HIGH");
     expect(badge.className).toContain("tone-high");
+  });
+
+  it("renders distinct classes for each severity tone", () => {
+    const { container, rerender } = render(<StatusBadge tone="low" label="a" />);
+    const classes = new Set<string>();
+    for (const tone of ["low", "medium", "high", "critical"] as const) {
+      rerender(<StatusBadge tone={tone} label={tone} />);
+      classes.add(container.querySelector(".tone")?.className ?? "");
+    }
+    expect(classes.size).toBe(4);
   });
 
   it("renders an empty state with title and action", () => {
@@ -60,5 +71,14 @@ describe("console UI primitives", () => {
     fireEvent.click(screen.getByRole("button", { name: "N" }));
     const cells = screen.getAllByRole("cell");
     expect(cells[0].textContent).toBe("1");
+  });
+});
+
+describe("RelativeTime", () => {
+  it("exposes absolute time as a tooltip", () => {
+    render(<RelativeTime time="2026-08-06T12:00:00.000Z" locale="en" />);
+    const timeElement = screen.getByText(/ago|h|m/);
+    expect(timeElement.tagName).toBe("TIME");
+    expect(timeElement.getAttribute("title")).toContain("2026");
   });
 });

@@ -12,6 +12,7 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
+import { Tabs, tabPanelId } from "../ui/Tabs";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
 import {
   severityTone,
@@ -26,21 +27,37 @@ const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
 
 /**
  * IncidentsPage: filterable incident queue with native creation inside a
- * proper dialog. Client-side filter/sort; creation navigates to the detail.
+ * proper dialog. Server-side state/severity filtering; search applies to the
+ * loaded page; creation navigates to the detail.
  */
 export function IncidentsPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incidents = usePaginatedList((params) => api.incidents(params), []);
-  const assets = useQuery(() => api.assets().then((list) => list.items));
+  const siteID = principal?.site_ids?.[0];
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [severity, setSeverity] = useState("ALL");
+  const incidents = usePaginatedList(
+    (params) =>
+      api.incidents({
+        ...params,
+        site_id: siteID,
+        state: tab === "ALL" ? undefined : [tab],
+        severity: severity === "ALL" ? undefined : severity,
+      }),
+    [tab, severity, siteID],
+  );
+  const assets = useQuery(() => api.assets().then((list) => list.items));
+  const summary = useQuery(() => api.summary(siteID), [siteID]);
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [params] = useSearchParams();
   useEffect(() => {
     if (params.get("create") === "1") setShowForm(true);
+    const fromParams = params.get("state");
+    if (fromParams && STATE_TABS.includes(fromParams as StateTab)) {
+      setTab(fromParams as StateTab);
+    }
   }, [params]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
 
@@ -55,29 +72,22 @@ export function IncidentsPage() {
 
   const rows = useMemo(() => {
     const items = incidents.items;
-    return items
-      .filter((incident) => tab === "ALL" || incident.state === tab)
-      .filter((incident) => severity === "ALL" || incident.severity === severity)
-      .filter((incident) => {
-        if (!query.trim()) return true;
-        const q = query.trim().toLowerCase();
-        return (
-          incident.number.toLowerCase().includes(q) ||
-          incident.summary.toLowerCase().includes(q) ||
-          (incident.asset_tag ?? "").toLowerCase().includes(q)
-        );
-      });
-  }, [incidents.items, tab, severity, query]);
+    if (!query.trim()) return items;
+    const q = query.trim().toLowerCase();
+    return items.filter(
+      (incident) =>
+        incident.number.toLowerCase().includes(q) ||
+        incident.summary.toLowerCase().includes(q) ||
+        (incident.asset_tag ?? "").toLowerCase().includes(q),
+    );
+  }, [incidents.items, query]);
 
-  const counts = useMemo(() => {
-    const items = incidents.items;
-    return {
-      OPEN: items.filter((i) => i.state === "OPEN").length,
-      IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
-      RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
-      ALL: items.length,
-    } as Record<StateTab, number>;
-  }, [incidents.items]);
+  const counts = {
+    OPEN: summary.data?.open_incidents ?? 0,
+    IN_PROGRESS: summary.data?.in_progress_incidents ?? 0,
+    RESOLVED: summary.data?.resolved_incidents ?? 0,
+    ALL: summary.data?.total_incidents ?? 0,
+  } as Record<StateTab, number>;
 
   return (
     <PageTrailProvider trail={[]}>
@@ -94,20 +104,16 @@ export function IncidentsPage() {
           }
         />
         <div className="incident-toolbar">
-          <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
-            {STATE_TABS.map((state) => (
-              <button
-                key={state}
-                role="tab"
-                aria-selected={tab === state}
-                className={`tab${tab === state ? " active" : ""}`}
-                onClick={() => setTab(state)}
-              >
-                {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
-                <span className="count">{counts[state]}</span>
-              </button>
-            ))}
-          </div>
+          <Tabs
+            label={t("nav.incidents")}
+            tabs={STATE_TABS.map((state) => ({
+              id: state,
+              label: state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state)),
+              count: counts[state],
+            }))}
+            active={tab}
+            onChange={(id) => setTab(id as StateTab)}
+          />
           <input
             aria-label={t("incidents.filter.search")}
             placeholder={t("incidents.filter.search")}
@@ -128,7 +134,13 @@ export function IncidentsPage() {
             <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
           </select>
         </div>
-        <DataTable<Incident>
+        <p className="section-lead">{t("incidents.filter.searchHint")}</p>
+        <div
+          id={tabPanelId(t("nav.incidents"))}
+          role="tabpanel"
+          aria-labelledby={`${tabPanelId(t("nav.incidents"))}-${tab}`}
+        >
+          <DataTable<Incident>
           columns={[
             {
               key: "number",
@@ -180,6 +192,7 @@ export function IncidentsPage() {
           error={incidents.error}
           onRetry={() => void incidents.refetch()}
         />
+        </div>
         {incidents.hasMore ? (
           <button
             type="button"
@@ -189,6 +202,9 @@ export function IncidentsPage() {
             style={{ marginTop: 12 }}
           >
             {t("common.loadMore")}
+            {incidents.items.length > 0 && summary.data
+              ? ` · ${incidents.items.length} / ${summary.data.total_incidents}`
+              : ""}
           </button>
         ) : null}
         <Dialog

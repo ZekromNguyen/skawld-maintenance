@@ -63,6 +63,7 @@ export type Measurement = {
 export type Execution = {
   id: string;
   incident_id: string;
+  incident_number?: string;
   asset_id: string;
   asset_tag: string;
   purpose: string;
@@ -109,6 +110,8 @@ export type Evidence = {
   id: string;
   kind: string;
   source_id: string;
+  document_id?: string;
+  revision_id?: string;
   revision?: string;
   title: string;
   locator: string;
@@ -160,6 +163,17 @@ export type EvaluationSummary = {
   generated_at: string;
 };
 
+export type DashboardSummary = {
+  open_incidents: number;
+  in_progress_incidents: number;
+  resolved_incidents: number;
+  total_incidents: number;
+  by_severity: { LOW: number; MEDIUM: number; HIGH: number; CRITICAL: number };
+  active_executions: number;
+  critical_assets: number;
+  pending_handovers: number;
+};
+
 export type MaintenanceReport = {
   id: string;
   execution_id: string;
@@ -180,6 +194,16 @@ export type MaintenanceReport = {
   provider?: string;
   model?: string;
   prompt_version?: string;
+  asset_tag?: string;
+  incident_number?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type HandoverListItem = {
+  title: string;
+  detail?: string;
+  severity?: string;
 };
 
 export type ShiftHandover = {
@@ -191,12 +215,12 @@ export type ShiftHandover = {
   version: number;
   structured_content: {
     summary: string;
-    open_incidents: string[];
-    active_executions: string[];
-    safety_concerns: string[];
-    follow_up: string[];
+    open_incidents: HandoverListItem[];
+    active_executions: HandoverListItem[];
+    safety_concerns: HandoverListItem[];
+    follow_up: HandoverListItem[];
     evidence_ids: string[];
-    unknowns: string[];
+    unknowns: HandoverListItem[];
     requires_human_review: boolean;
   };
   evidence: Evidence[];

@@ -68,7 +68,9 @@ describe("ReportsPage", () => {
     const reportFixture = (id: string, executionId: string, revision: number, state: "DRAFT" | "SUBMITTED" | "APPROVED", summary: string): MaintenanceReport => ({
       id, execution_id: executionId, revision, version: 1, state,
       structured_content: { summary, measurements: [], observations: [], actions: [], outcome: "", evidence_ids: [], unknowns: [], requires_human_review: false },
-      evidence: []
+      evidence: [],
+      created_at: "2026-08-06T12:00:00.000Z",
+      updated_at: "2026-08-06T12:00:00.000Z"
     });
     const firstPage: ListPage<MaintenanceReport> = {
       items: [reportFixture("r1", "e1", 1, "DRAFT", "Pump inspection")],
@@ -89,5 +91,27 @@ describe("ReportsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Bearing replacement")).toBeTruthy();
     });
+  });
+});
+
+describe("ReportsPage identity columns", () => {
+  it("shows incident number, asset, and updated time for each report", async () => {
+    (api.reports as ReturnType<typeof vi.fn>).mockResolvedValue({
+      items: [{
+        id: "r1", execution_id: "e1", revision: 1, version: 1,
+        state: "APPROVED",
+        structured_content: { summary: "Diagnose high vibration on P-302", measurements: [], observations: [], actions: [], outcome: "", evidence_ids: [], unknowns: [], requires_human_review: false },
+        evidence: [],
+        asset_tag: "P-302",
+        incident_number: "IN-1042",
+        created_at: "2026-08-06T12:00:00.000Z",
+        updated_at: "2026-08-07T12:00:00.000Z"
+      }],
+      next_cursor: null, has_more: false
+    });
+    renderPage();
+    expect(await screen.findByText("IN-1042")).toBeTruthy();
+    expect(screen.getByText("P-302")).toBeTruthy();
+    expect(screen.getByText(/\d+(h|d) ago/i)).toBeTruthy();
   });
 });

@@ -11,29 +11,32 @@ import {
   severityLabelKey,
   incidentStateTone,
   incidentStateLabelKey,
+  executionStateTone,
+  executionStateLabelKey,
 } from "../labels";
-import type { Asset, Execution, Incident } from "../../types";
+import type { DashboardSummary, Execution, Incident } from "../../types";
 import type { FocusConfig } from "../dashboardFocus";
 
 /**
- * Overview: dashboard main content. Real KPIs computed from live data,
- * a "my queue" panel for in-progress executions, and the active-incident
- * table (open incidents only, clickable rows). No fabricated metrics.
+ * Overview: dashboard main content. Metric cards come from the /summary
+ * payload (truthful counts), a "my queue" panel for in-progress executions,
+ * and the active-incident table (open incidents only, clickable rows).
+ * No fabricated metrics.
  */
 export function Overview({
   focus,
+  summary,
   incidents,
   executions,
-  assets,
   pendingHandoverCount,
   loading,
   error,
   onRetry,
 }: {
   focus: FocusConfig;
+  summary?: DashboardSummary;
   incidents: Incident[];
   executions: Execution[];
-  assets: Asset[];
   pendingHandoverCount: number;
   loading: boolean;
   error?: string;
@@ -43,7 +46,6 @@ export function Overview({
   const navigate = useNavigate();
   const open = incidents.filter((incident) => incident.state !== "RESOLVED");
   const inProgress = executions.filter((execution) => execution.state === "IN_PROGRESS");
-  const critical = assets.filter((asset) => asset.criticality?.rating === "A");
 
   if (loading) {
     return (
@@ -59,19 +61,19 @@ export function Overview({
       <section className="metrics" aria-label={t("overview.operationalStatus")}>
         <MetricCard
           label={t("dashboard.openIncidents")}
-          value={String(open.length)}
+          value={String(summary?.open_incidents ?? open.length)}
           to="/incidents"
           tone="critical"
         />
         <MetricCard
           label={t("dashboard.executionsInProgress")}
-          value={String(inProgress.length)}
+          value={String(summary?.active_executions ?? inProgress.length)}
           to="/executions"
           tone="medium"
         />
         <MetricCard
           label={t("dashboard.criticalAssets")}
-          value={String(critical.length)}
+          value={String(summary?.critical_assets ?? 0)}
           to="/assets"
           tone="high"
         />
@@ -104,7 +106,14 @@ export function Overview({
           </Link>
         </div>
         {inProgress.length === 0 ? (
-          <EmptyState title={t("dashboard.myQueueEmpty")} />
+          <EmptyState
+            title={t("dashboard.myQueueEmpty")}
+            action={
+              <Link to="/executions" className="primary-button">
+                {t("dashboard.viewAll")}
+              </Link>
+            }
+          />
         ) : (
           <DataTable<Execution>
             columns={[
@@ -135,8 +144,8 @@ export function Overview({
                 header: t("executions.state"),
                 render: (execution) => (
                   <StatusBadge
-                    tone={execution.state === "IN_PROGRESS" ? "medium" : "info"}
-                    label={execution.state.replace("_", " ")}
+                    tone={executionStateTone(execution.state)}
+                    label={t(executionStateLabelKey(execution.state))}
                   />
                 ),
                 sortValue: (e) => e.state,

@@ -27,15 +27,21 @@ const (
 	handoverPrompt = "maintenance.shift_handover.evidence-first.v1"
 )
 
+type ListItem struct {
+	Title    string `json:"title"`
+	Detail   string `json:"detail,omitempty"`
+	Severity string `json:"severity,omitempty"`
+}
+
 type Content struct {
-	Summary             string   `json:"summary"`
-	OpenIncidents       []string `json:"open_incidents"`
-	ActiveExecutions    []string `json:"active_executions"`
-	SafetyConcerns      []string `json:"safety_concerns"`
-	FollowUp            []string `json:"follow_up"`
-	EvidenceIDs         []string `json:"evidence_ids"`
-	Unknowns            []string `json:"unknowns"`
-	RequiresHumanReview bool     `json:"requires_human_review"`
+	Summary             string     `json:"summary"`
+	OpenIncidents       []ListItem `json:"open_incidents"`
+	ActiveExecutions    []ListItem `json:"active_executions"`
+	SafetyConcerns      []ListItem `json:"safety_concerns"`
+	FollowUp            []ListItem `json:"follow_up"`
+	EvidenceIDs         []string   `json:"evidence_ids"`
+	Unknowns            []ListItem `json:"unknowns"`
+	RequiresHumanReview bool       `json:"requires_human_review"`
 }
 
 type Handover struct {
@@ -311,6 +317,39 @@ func (s Service) Acknowledge(
 		return Handover{}, false, ErrInvalid
 	}
 	return s.Store.Acknowledge(ctx, principal, key, handoverID, command)
+}
+
+// UnmarshalJSON accepts the legacy string form (normalized to Title) and the
+// structured {title, detail, severity} form, including a JSON object that a
+// provider serialized into a string.
+func (item *ListItem) UnmarshalJSON(raw []byte) error {
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		var embedded map[string]string
+		if json.Unmarshal([]byte(s), &embedded) == nil && len(embedded) > 0 {
+			item.Title = firstNonEmpty(embedded["summary"], embedded["title"], embedded["name"], s)
+			item.Severity = embedded["severity"]
+			return nil
+		}
+		item.Title = s
+		return nil
+	}
+	type alias ListItem
+	var plain alias
+	if err := json.Unmarshal(raw, &plain); err != nil {
+		return err
+	}
+	*item = ListItem(plain)
+	return nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 func decodeContent(raw json.RawMessage, evidence []skawld.Evidence) (Content, error) {
