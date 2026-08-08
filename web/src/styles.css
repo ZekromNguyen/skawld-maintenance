@@ -132,6 +132,23 @@ h2 { font-size: 15px; margin: 4px 0 0; font-weight: 650; }
 .metric-accent { border-top-color: var(--amber); }
 .metric-safe { border-top-color: var(--brand); }
 
+/* ---------- Annunciator strip ---------- */
+.annunciator { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
+.annunciator-cell { min-height: 96px; display: flex; flex-direction: column; justify-content: space-between; padding: 14px 16px 13px; border: 1px solid var(--line); border-left: 3px solid var(--ink-muted); background: var(--surface); }
+.annunciator-link { text-decoration: none; color: inherit; display: block; }
+.annunciator-link:hover .annunciator-cell { border-color: var(--brand-dim); }
+.annunciator-critical { border-left-color: var(--red); }
+.annunciator-high { border-left-color: var(--amber); }
+.annunciator-medium { border-left-color: var(--amber); }
+.annunciator-info { border-left-color: var(--blue); }
+.annunciator-success { border-left-color: var(--brand); }
+.annunciator-label { color: var(--ink-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.annunciator-cell strong { font: 750 32px/1.1 ui-monospace, monospace; color: var(--ink); margin-top: 6px; }
+.annunciator-eyebrow { color: var(--ink-muted); font-size: 10px; margin-top: 4px; }
+.mono-num { font-variant-numeric: tabular-nums; }
+@media (max-width: 1050px) { .annunciator { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) { .annunciator { grid-template-columns: 1fr 1fr; } }
+
 /* ---------- Panels ---------- */
 .panel { background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
 .panel-heading { min-height: 64px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); gap: 10px; }
