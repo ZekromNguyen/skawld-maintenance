@@ -15,6 +15,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
 import { IncidentBoard } from "../components/IncidentBoard";
+import { SavedViews, type SavedView } from "../components/SavedViews";
 import {
   severityTone,
   severityLabelKey,
@@ -28,12 +29,34 @@ const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
 
 type ViewMode = "list" | "board";
 const VIEW_STORAGE_KEY = "skawld.incidents.view";
+const SAVED_VIEWS_KEY = "skawld.incidents.savedViews";
 
 function initialView(): ViewMode {
   try {
     return localStorage.getItem(VIEW_STORAGE_KEY) === "board" ? "board" : "list";
   } catch {
     return "list";
+  }
+}
+
+function readSavedViews(seed: SavedView[]): SavedView[] {
+  try {
+    const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as SavedView[];
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // storage unavailable or corrupt; fall through to the seed
+  }
+  return seed;
+}
+
+function writeSavedViews(views: SavedView[]) {
+  try {
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
+  } catch {
+    // storage unavailable — session-only views
   }
 }
 
@@ -52,6 +75,17 @@ export function IncidentsPage() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>(initialView);
   const [showForm, setShowForm] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() =>
+    readSavedViews([
+      {
+        id: "my-critical",
+        name: t("incidents.views.myCritical"),
+        severity: "CRITICAL",
+        query: "",
+      },
+    ]),
+  );
   const [params] = useSearchParams();
   useEffect(() => {
     if (params.get("create") === "1") setShowForm(true);
@@ -65,6 +99,36 @@ export function IncidentsPage() {
     } catch {
       // storage unavailable — session-only preference
     }
+  }
+
+  function saveCurrentView() {
+    const next: SavedView = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Date.now()),
+      name: t("incidents.views.defaultName"),
+      severity,
+      query,
+    };
+    const updated = [...savedViews, next];
+    setSavedViews(updated);
+    writeSavedViews(updated);
+    setActiveViewId(next.id);
+  }
+
+  function applyView(id: string) {
+    const view = savedViews.find((item) => item.id === id);
+    if (!view) return;
+    setSeverity(view.severity);
+    setQuery(view.query);
+    setActiveViewId(id);
+  }
+
+  function deleteView(id: string) {
+    const updated = savedViews.filter((item) => item.id !== id);
+    setSavedViews(updated);
+    writeSavedViews(updated);
+    if (activeViewId === id) setActiveViewId(null);
   }
 
   const create = useCommand(
@@ -119,6 +183,13 @@ export function IncidentsPage() {
               </button>
             ) : undefined
           }
+        />
+        <SavedViews
+          views={savedViews}
+          activeId={activeViewId}
+          onSave={saveCurrentView}
+          onApply={applyView}
+          onDelete={deleteView}
         />
         <div className="incident-toolbar">
           {view === "list" && (

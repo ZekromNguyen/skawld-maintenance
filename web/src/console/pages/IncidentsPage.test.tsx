@@ -127,6 +127,16 @@ describe("IncidentsPage", () => {
     expect(edge).toBeTruthy();
   });
 
+  it("saves and applies a filter view", async () => {
+    renderPage();
+    expect(await screen.findByText("Pump vibration")).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "bearing" } });
+    fireEvent.click(screen.getByRole("button", { name: /save view/i }));
+    const applied = await screen.findByRole("button", { name: "Saved filter" });
+    fireEvent.click(applied);
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("bearing");
+  });
+
   it("hides create for unauthorized principals", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",

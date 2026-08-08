@@ -496,6 +496,14 @@ tr[onclick]:hover td { background: var(--raised); }
 .section-lead { color: var(--ink-soft); font-size: 13px; line-height: 1.6; max-width: 70ch; margin: 0 0 16px; }
 
 /* ---------- Incident queue toolbar ---------- */
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); padding: 5px 10px; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+.chip:hover { border-color: var(--brand-dim); }
+.chip.active { border-color: var(--brand-dim); color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, var(--surface)); }
+.chip-action { border-style: dashed; cursor: pointer; }
+.chip-apply { border: 0; background: transparent; color: inherit; font: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 0; cursor: pointer; }
+.chip-delete { border: 0; background: transparent; color: var(--ink-muted); padding: 2px; cursor: pointer; display: inline-flex; }
+.chip-delete:hover { color: var(--red); }
+.saved-views { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .incident-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .incident-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex: 1; }
 .tab { appearance: none; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-soft); padding: 9px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
