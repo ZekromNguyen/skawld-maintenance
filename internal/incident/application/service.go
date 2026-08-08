@@ -60,6 +60,7 @@ type Filter struct {
 	SiteID   string
 	AssetID  string
 	State    string
+	Severity string
 	PageSize int
 	Cursor   string
 }

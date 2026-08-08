@@ -158,10 +158,11 @@ func (s Store) List(
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR i.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR i.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR i.asset_id = $4::uuid)
-		  AND (nullif($5, '') IS NULL OR i.state = $5)`
+		  AND (nullif($5, '') IS NULL OR i.state = $5)
+		  AND (nullif($6, '') IS NULL OR i.severity = $6)`
 	args := []any{
 		principal.OrganizationID, principal.SiteIDs,
-		filter.SiteID, filter.AssetID, filter.State,
+		filter.SiteID, filter.AssetID, filter.State, filter.Severity,
 	}
 	if filter.Cursor != "" {
 		cut := strings.LastIndex(filter.Cursor, "|")
