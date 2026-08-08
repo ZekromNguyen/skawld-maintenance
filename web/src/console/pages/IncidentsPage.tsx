@@ -73,6 +73,7 @@ export function IncidentsPage() {
   const assets = useQuery(() => api.assets().then((list) => list.items));
   const teams = useQuery(() => api.teams().then((list) => list.items));
   const people = useQuery(() => api.people().then((list) => list.items));
+  const customFields = useQuery(() => api.listFieldDefinitions("incident").then((list) => list.items));
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [priority, setPriority] = useState("ALL");
   const [query, setQuery] = useState("");
@@ -403,6 +404,7 @@ export function IncidentsPage() {
             people={people.data ?? []}
             teams={teams.data ?? []}
             principal={principal}
+            customFields={customFields.data ?? []}
             pending={create.pending}
             onCancel={() => setShowForm(false)}
             onCreate={(value) => void create.run(value)}

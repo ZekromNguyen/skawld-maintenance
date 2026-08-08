@@ -95,6 +95,7 @@ const en = {
   "asset.productionImpact": "Production impact",
   "asset.approveCriticality": "Approve criticality",
 
+  "incident.customFields": "Custom fields",
   "incident.status": "Status",
   "incident.status.open": "Open",
   "incident.status.inProgress": "In progress",
@@ -123,6 +124,7 @@ const en = {
   "form.details": "Details",
   "form.assignee": "Assignee",
   "form.reporter": "Reporter",
+  "form.selectPlaceholder": "Select an option",
   "form.team": "Team",
   "form.date": "Date",
   "form.media": "Video or images",
@@ -863,6 +865,7 @@ const vi: Record<MessageKey, string> = {
   "asset.productionImpact": "Ảnh hưởng sản xuất",
   "asset.approveCriticality": "Duyệt mức độ quan trọng",
 
+  "incident.customFields": "Trường tùy chỉnh",
   "incident.status": "Trạng thái",
   "incident.status.open": "Mở",
   "incident.status.inProgress": "Đang xử lý",
@@ -891,6 +894,7 @@ const vi: Record<MessageKey, string> = {
   "form.details": "Chi tiết",
   "form.assignee": "Người phụ trách",
   "form.reporter": "Người báo cáo",
+  "form.selectPlaceholder": "Chọn một lựa chọn",
   "form.team": "Nhóm",
   "form.date": "Ngày",
   "form.media": "Video hoặc hình ảnh",

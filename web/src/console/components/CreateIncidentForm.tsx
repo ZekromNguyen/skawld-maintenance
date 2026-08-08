@@ -4,7 +4,8 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { FormField } from "../ui/FormField";
 import { priorityLabelKey } from "../labels";
 import { structureDescription } from "./structureDescription";
-import type { Asset, Person, Principal, Team } from "../../types";
+import { CustomFieldControl } from "./CustomFieldControl";
+import type { Asset, CustomFieldDefinition, Person, Principal, Team } from "../../types";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 const STATUSES = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "REOPENED"] as const;
@@ -22,6 +23,7 @@ export interface CreateIncidentValue {
   team_id?: string;
   occurred_at?: string;
   files: File[];
+  custom_values?: Record<string, unknown>;
 }
 
 /**
@@ -35,6 +37,7 @@ export function CreateIncidentForm(props: {
   people: Person[];
   teams: Team[];
   principal: Principal | undefined;
+  customFields: CustomFieldDefinition[];
   pending: boolean;
   onCancel: () => void;
   onCreate: (value: CreateIncidentValue) => void;
@@ -58,6 +61,7 @@ export function CreateIncidentForm(props: {
   const [occurredAt, setOccurredAt] = useState(today);
   const [teamID, setTeamID] = useState("");
   const [reporterID, setReporterID] = useState(props.principal?.id ?? "");
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
   const [touched, setTouched] = useState(false);
 
   const siteAssets = useMemo(
@@ -71,7 +75,19 @@ export function CreateIncidentForm(props: {
     summary: summary.trim().length < 3 ? t("form.required") : undefined,
     priority: !priority ? t("form.required") : undefined,
   };
-  const valid = !errors.site && !errors.asset && !errors.summary && !errors.priority;
+  const customFieldErrors = props.customFields.reduce<Record<string, string | undefined>>(
+    (acc, field) => {
+      const value = customValues[field.key];
+      const empty =
+        value === undefined || value === null || value === "" ||
+        (Array.isArray(value) && value.length === 0);
+      if (field.config.required && empty) acc[field.key] = t("form.required");
+      return acc;
+    },
+    {},
+  );
+  const customValid = Object.values(customFieldErrors).every((error) => error === undefined);
+  const valid = !errors.site && !errors.asset && !errors.summary && !errors.priority && customValid;
 
   const structureLabels = {
     what: t("incident.structure.what"),
@@ -114,6 +130,7 @@ export function CreateIncidentForm(props: {
       team_id: teamID || undefined,
       occurred_at: occurredAt ? new Date(`${occurredAt}T00:00:00`).toISOString() : undefined,
       files,
+      custom_values: Object.keys(customValues).length > 0 ? customValues : undefined,
     });
   }
 
@@ -293,6 +310,22 @@ export function CreateIncidentForm(props: {
           />
         </FormField>
       </div>
+
+      {props.customFields.length > 0 && (
+        <fieldset className="form-section">
+          <legend>{t("incident.customFields")}</legend>
+          {props.customFields.map((field) => (
+            <CustomFieldControl
+              key={field.id}
+              field={field}
+              value={customValues[field.key]}
+              onChange={(value) =>
+                setCustomValues((prev) => ({ ...prev, [field.key]: value }))
+              }
+            />
+          ))}
+        </fieldset>
+      )}
 
       <div className="dialog-footer">
         <button type="button" className="secondary-button" onClick={props.onCancel} disabled={props.pending}>

@@ -65,6 +65,7 @@ vi.mock("../../api", () => ({
     createIncident: vi.fn().mockResolvedValue({ id: "new1", number: "IN-9" }),
     teams: vi.fn().mockResolvedValue({ items: [{ id: "t1", name: "Facilities" }] }),
     people: vi.fn().mockResolvedValue({ items: [{ id: "p1", display_name: "Tester" }] }),
+    listFieldDefinitions: vi.fn().mockResolvedValue({ items: [] }),
     uploadIncidentAttachment: vi.fn().mockResolvedValue({ id: "att1" })
   }
 }));
