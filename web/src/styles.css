@@ -524,6 +524,11 @@ tr[onclick]:hover td { background: var(--raised); }
 .incident-facts > div { display: grid; gap: 6px; align-content: start; }
 .incident-facts a { color: var(--brand); text-decoration: none; }
 .incident-facts a:hover { text-decoration: underline; }
+.detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.detail-main { min-width: 0; }
+.metadata-rail { display: grid; gap: 16px; position: sticky; top: 72px; }
+.detail-layout .incident-facts { grid-template-columns: 1fr; gap: 14px; padding: 14px 16px; }
+@media (max-width: 1050px) { .detail-layout { grid-template-columns: 1fr; } .metadata-rail { position: static; } }
 
 /* ---------- Workbench (redesigned) ---------- */
 .workbench-meta { display: flex; align-items: center; gap: 12px; margin: -8px 0 16px; }

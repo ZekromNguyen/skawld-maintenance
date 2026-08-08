@@ -62,6 +62,12 @@ describe("IncidentDetailPage", () => {
     expect(screen.getByRole("button", { name: "Generate evidence-backed recommendation" })).toBeTruthy();
   });
 
+  it("renders the metadata rail", async () => {
+    renderDetail();
+    await screen.findByText("High vibration on pump");
+    expect(screen.getByRole("complementary")).toBeTruthy();
+  });
+
   it("requires confirmation before resolving", async () => {
     renderDetail();
     fireEvent.click(await screen.findByRole("button", { name: "Resolve incident" }));

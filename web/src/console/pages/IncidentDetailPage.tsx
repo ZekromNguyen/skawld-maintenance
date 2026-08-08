@@ -140,36 +140,12 @@ export function IncidentDetailPage() {
           }
         />
         <div className="incident-subtitle mono">{value.number}</div>
-        <div style={{ display: "grid", gap: 16 }}>
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>{t("incident.facts")}</h2>
-            </div>
-            <div className="incident-facts">
-              <div>
-                <span className="eyebrow">{t("incident.asset")}</span>
-                <Link to={`/assets/${value.asset_id}`} className="strong">
-                  {value.asset_tag ?? value.asset_id}
-                </Link>
-              </div>
-              <div>
-                <span className="eyebrow">{t("dashboard.table.severity")}</span>
-                <StatusBadge tone={severityTone(value.severity)} label={t(severityLabelKey(value.severity))} />
-              </div>
-              <div>
-                <span className="eyebrow">{t("incident.state")}</span>
-                <StatusBadge tone={incidentStateTone(value.state)} label={t(incidentStateLabelKey(value.state))} />
-              </div>
-              <div>
-                <span className="eyebrow">{t("incident.detected")}</span>
-                <RelativeTime time={value.detected_at} locale={locale} />
-              </div>
-            </div>
-          </div>
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>{t("incident.executions")}</h2>
-              <span className="count">{related.length}</span>
+        <div className="detail-layout">
+          <div className="detail-main" style={{ display: "grid", gap: 16 }}>
+            <div className="panel">
+              <div className="panel-heading">
+                <h2>{t("incident.executions")}</h2>
+                <span className="count">{related.length}</span>
             </div>
             <DataTable<Execution>
               columns={[
@@ -214,6 +190,34 @@ export function IncidentDetailPage() {
               onRetry={() => void executions.refetch()}
             />
           </div>
+          </div>
+          <aside className="metadata-rail" aria-label={t("incident.facts")}>
+            <div className="panel">
+              <div className="panel-heading">
+                <h2>{t("incident.facts")}</h2>
+              </div>
+              <div className="incident-facts">
+                <div>
+                  <span className="eyebrow">{t("incident.asset")}</span>
+                  <Link to={`/assets/${value.asset_id}`} className="strong">
+                    {value.asset_tag ?? value.asset_id}
+                  </Link>
+                </div>
+                <div>
+                  <span className="eyebrow">{t("dashboard.table.severity")}</span>
+                  <StatusBadge tone={severityTone(value.severity)} label={t(severityLabelKey(value.severity))} />
+                </div>
+                <div>
+                  <span className="eyebrow">{t("incident.state")}</span>
+                  <StatusBadge tone={incidentStateTone(value.state)} label={t(incidentStateLabelKey(value.state))} />
+                </div>
+                <div>
+                  <span className="eyebrow">{t("incident.detected")}</span>
+                  <RelativeTime time={value.detected_at} locale={locale} />
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
         <ConfirmDialog
           open={confirmResolve}
