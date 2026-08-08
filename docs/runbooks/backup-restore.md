@@ -17,6 +17,22 @@ scripts/backup-postgres.sh
 The script produces a PostgreSQL custom-format dump, SHA-256 file, and metadata
 containing schema version. Files are mode `0600`.
 
+Each run also records a row in `monitoring_backup_runs` (`SUCCESS` on
+completion) so the Monitoring console can surface backup freshness against
+the RPO. Optional scope variables pin the marker to an organization/site;
+left unset the marker is recorded for the first organization:
+
+```text
+SKAWLD_ORGANIZATION_ID=<uuid> \
+SKAWLD_SITE_ID=<uuid> \
+BACKUP_DATABASE_URL=postgres://... \
+BACKUP_DIR=/srv/skawld-backups/postgres \
+scripts/backup-postgres.sh
+```
+
+The marker write is best-effort: if `monitoring_backup_runs` is unavailable
+(e.g. schema not yet migrated), the backup still succeeds.
+
 ## Object storage
 
 The S3 API does not define a portable backup mechanism. Use the selected
