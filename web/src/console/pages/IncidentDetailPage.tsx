@@ -21,7 +21,40 @@ import {
   incidentStatusTone,
   incidentStatusLabelKey,
 } from "../labels";
-import type { Execution } from "../../types";
+import type { Attachment, Execution } from "../../types";
+
+function formatDuration(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+  return parts.join(" ");
+}
+
+function isVideo(mime: string): boolean {
+  return mime.startsWith("video/");
+}
+
+function MediaGallery(props: { attachments: Attachment[]; empty: string }) {
+  const available = props.attachments.filter((item) => item.download_url);
+  if (available.length === 0) {
+    return <p className="incident-details-body">{props.empty}</p>;
+  }
+  return (
+    <div className="incident-media-gallery">
+      {available.map((item) =>
+        isVideo(item.verified_mime || item.declared_mime) ? (
+          <video key={item.id} controls src={item.download_url} className="incident-media" />
+        ) : (
+          <img key={item.id} src={item.download_url} alt={item.original_filename} className="incident-media" />
+        ),
+      )}
+    </div>
+  );
+}
 
 /**
  * IncidentDetailPage: incident context, linked asset, executions, actions.
@@ -50,6 +83,22 @@ export function IncidentDetailPage() {
         setConfirmResolve(false);
         void incident.refetch();
       },
+    },
+  );
+
+  const closeIncidentCommand = useCommand(
+    (id: string) => api.closeIncident(id, incident.data?.version ?? 0),
+    {
+      successMessage: t("incident.close.success"),
+      onSuccess: () => void incident.refetch(),
+    },
+  );
+
+  const reopenCommand = useCommand(
+    (id: string) => api.reopenIncident(id, incident.data?.version ?? 0),
+    {
+      successMessage: t("incident.reopen.success"),
+      onSuccess: () => void incident.refetch(),
     },
   );
 
@@ -153,6 +202,28 @@ export function IncidentDetailPage() {
                   {t("incident.resolve")}
                 </GatedButton>
               )}
+              {value.status === "RESOLVED" && (
+                <GatedButton
+                  allowed={canResolve}
+                  reason={permissionReason}
+                  className="secondary-button"
+                  disabled={closeIncidentCommand.pending}
+                  onClick={() => void closeIncidentCommand.run(value.id)}
+                >
+                  {t("incident.close")}
+                </GatedButton>
+              )}
+              {value.status === "RESOLVED" && (
+                <GatedButton
+                  allowed={canResolve}
+                  reason={permissionReason}
+                  className="secondary-button"
+                  disabled={reopenCommand.pending}
+                  onClick={() => void reopenCommand.run(value.id)}
+                >
+                  {t("incident.reopen")}
+                </GatedButton>
+              )}
               {value.status !== "RESOLVED" && (
                 <GatedButton
                   allowed={canRecommend}
@@ -224,6 +295,21 @@ export function IncidentDetailPage() {
             </div>
             <ActivityFeed entries={activity} />
           </div>
+          {value.details ? (
+            <div className="panel">
+              <div className="panel-heading">
+                <h2>{t("incident.details")}</h2>
+              </div>
+              <p className="incident-details-body">{value.details}</p>
+            </div>
+          ) : null}
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>{t("incident.media")}</h2>
+              <span className="count">{(value.attachments ?? []).length}</span>
+            </div>
+            <MediaGallery attachments={value.attachments ?? []} empty={t("incident.media.empty")} />
+          </div>
           </div>
           <aside className="metadata-rail" aria-label={t("incident.facts")}>
             <div className="panel">
@@ -245,9 +331,37 @@ export function IncidentDetailPage() {
                   <span className="eyebrow">{t("incident.status")}</span>
                   <StatusBadge tone={incidentStatusTone(value.status)} label={t(incidentStatusLabelKey(value.status))} />
                 </div>
+                {value.assignee_name ? (
+                  <div>
+                    <span className="eyebrow">{t("incident.assignee")}</span>
+                    <span>{value.assignee_name}</span>
+                  </div>
+                ) : null}
+                {value.reporter_name ? (
+                  <div>
+                    <span className="eyebrow">{t("incident.reporter")}</span>
+                    <span>{value.reporter_name}</span>
+                  </div>
+                ) : null}
+                {value.team_name ? (
+                  <div>
+                    <span className="eyebrow">{t("incident.team")}</span>
+                    <span>{value.team_name}</span>
+                  </div>
+                ) : null}
                 <div>
-                  <span className="eyebrow">{t("incident.detected")}</span>
+                  <span className="eyebrow">{t("incident.date")}</span>
+                  <RelativeTime time={value.occurred_at ?? value.detected_at} locale={locale} />
+                </div>
+                <div>
+                  <span className="eyebrow">{t("incident.timeToCreate")}</span>
                   <RelativeTime time={value.detected_at} locale={locale} />
+                </div>
+                <div>
+                  <span className="eyebrow">{t("incident.timeToComplete")}</span>
+                  {value.time_to_complete_seconds != null
+                    ? formatDuration(value.time_to_complete_seconds)
+                    : "—"}
                 </div>
               </div>
             </div>

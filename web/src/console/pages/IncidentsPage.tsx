@@ -320,9 +320,23 @@ export function IncidentsPage() {
               sortValue: (i) => i.status,
             },
             {
+              key: "assignee",
+              header: t("incident.assignee"),
+              render: (incident) => incident.assignee_name ?? "—",
+              sortValue: (i) => i.assignee_name ?? "",
+            },
+            {
+              key: "team",
+              header: t("incident.team"),
+              render: (incident) => incident.team_name ?? "—",
+              sortValue: (i) => i.team_name ?? "",
+            },
+            {
               key: "age",
-              header: t("dashboard.table.age"),
-              render: (incident) => <RelativeTime time={incident.detected_at} locale={locale} />,
+              header: t("incident.date"),
+              render: (incident) => (
+                <RelativeTime time={incident.occurred_at ?? incident.detected_at} locale={locale} />
+              ),
             },
           ]}
           rows={rows}

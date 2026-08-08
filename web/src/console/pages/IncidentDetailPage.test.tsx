@@ -30,7 +30,9 @@ vi.mock("../../api", () => ({
     }),
     listExecutions: vi.fn().mockResolvedValue({ items: [] }),
     resolveIncident: vi.fn().mockResolvedValue({}),
-    generateRecommendation: vi.fn().mockResolvedValue({})
+    generateRecommendation: vi.fn().mockResolvedValue({}),
+    closeIncident: vi.fn().mockResolvedValue({}),
+    reopenIncident: vi.fn().mockResolvedValue({})
   }
 }));
 
@@ -121,5 +123,53 @@ describe("IncidentDetailPage", () => {
     const button = screen.getByRole("button", { name: "Generate evidence-backed recommendation" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.title).toBe("Required permission not granted");
+  });
+});
+
+describe("IncidentDetailPage resolved lifecycle", () => {
+  it("renders media gallery, details, and close/reopen actions for a resolved incident", async () => {
+    (api.incident as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "inc1",
+      site_id: "s1",
+      asset_id: "a1",
+      asset_tag: "P-302",
+      number: "IN-1042",
+      summary: "High vibration on pump",
+      priority: "HIGH",
+      status: "RESOLVED",
+      details: "Bearing wear observed on the outboard end.",
+      occurred_at: new Date().toISOString(),
+      detected_at: new Date().toISOString(),
+      resolved_at: new Date().toISOString(),
+      time_to_complete_seconds: 3661,
+      version: 3,
+      attachments: [
+        {
+          id: "att1",
+          organization_id: "o1",
+          site_id: "s1",
+          entity_kind: "INCIDENT",
+          entity_id: "inc1",
+          original_filename: "clip.mp4",
+          declared_mime: "video/mp4",
+          verified_mime: "video/mp4",
+          size_bytes: 1024,
+          checksum_sha256: "a".repeat(64),
+          state: "AVAILABLE",
+          download_url: "https://example.test/clip.mp4"
+        }
+      ]
+    });
+    renderDetail();
+    expect(await screen.findByText("Bearing wear observed on the outboard end.")).toBeTruthy();
+    expect(screen.getByText("Video or images")).toBeTruthy();
+    expect(screen.getByText("1h 1m")).toBeTruthy();
+    const close = screen.getByRole("button", { name: "Close incident" });
+    expect(close).toBeTruthy();
+    fireEvent.click(close);
+    await waitFor(() =>
+      expect(api.closeIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("inc1", 3),
+    );
+    expect(screen.getByText("Incident closed")).toBeTruthy();
   });
 });
