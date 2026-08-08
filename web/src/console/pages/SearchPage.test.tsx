@@ -63,6 +63,18 @@ describe("SearchPage", () => {
       expect(api.searchKnowledge as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("s1", "bearing", undefined, 20),
     );
   });
+
+  it("links chunk evidence to the document, not the chunk id", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr1",
+      items: [
+        { id: "document_chunk:c1", kind: "DOCUMENT_CHUNK", source_id: "c1", document_id: "d9", title: "LOTO Procedure for P-302", locator: "sop/loto", authority: "SITE_APPROVED", content: "Apply lockout before inspection.", content_sha256: "x", score: { rrf_score: 0.94 } }
+      ]
+    });
+    renderPage("/search?q=loto");
+    const docLink = await screen.findByRole("link", { name: /loto procedure/i });
+    expect(docLink.getAttribute("href")).toBe("/knowledge/d9");
+  });
 });
 
 describe("SearchPage affordances", () => {

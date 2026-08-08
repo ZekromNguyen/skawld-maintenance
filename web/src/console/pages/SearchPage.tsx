@@ -17,7 +17,8 @@ import type { Evidence } from "../../types";
 function routeFor(item: Evidence): string | null {
   const kind = item.kind.toLowerCase();
   if (kind.includes("document") || kind.includes("knowledge")) {
-    return `/knowledge/${item.source_id}`;
+    // For chunk evidence the source_id is the chunk, not the document.
+    return `/knowledge/${item.document_id ?? item.source_id}`;
   }
   if (kind.includes("incident")) {
     return `/incidents/${item.source_id}`;
