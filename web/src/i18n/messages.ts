@@ -282,6 +282,7 @@ const en = {
   "report.noEvidence": "No evidence cited in this report.",
 
   "quality.noSummary": "No quality summary loaded",
+  "quality.noData": "No data yet",
   "quality.reviewCoverage": "Review coverage",
   "quality.evidenceCoverage": "Evidence coverage",
   "quality.unsafeRate": "Unsafe rate",
@@ -939,6 +940,7 @@ const vi: Record<MessageKey, string> = {
   "report.noEvidence": "Báo cáo này không trích dẫn bằng chứng nào.",
 
   "quality.noSummary": "Chưa tải tổng kết chất lượng",
+  "quality.noData": "Chưa có dữ liệu",
   "quality.reviewCoverage": "Độ phủ đánh giá",
   "quality.evidenceCoverage": "Độ phủ bằng chứng",
   "quality.unsafeRate": "Tỷ lệ không an toàn",

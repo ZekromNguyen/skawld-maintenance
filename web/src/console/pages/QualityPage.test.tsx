@@ -50,7 +50,7 @@ function renderPage() {
 describe("QualityPage", () => {
   it("formats percentages, currency, and tokens correctly", async () => {
     renderPage();
-    expect(await screen.findByText("90%")).toBeTruthy();
+    expect(await screen.findByText(/90%.*90\/100/i)).toBeTruthy();
     expect(screen.getByText("0%")).toBeTruthy();
     expect(screen.getByText("$1.23")).toBeTruthy();
     expect(screen.getByText("120,000")).toBeTruthy();
@@ -62,5 +62,39 @@ describe("QualityPage", () => {
     const refresh = await screen.findByRole("button", { name: "Refresh" });
     fireEvent.click(refresh);
     await waitFor(() => expect(api.evaluationSummary as ReturnType<typeof vi.fn>).toHaveBeenCalled());
+  });
+});
+
+describe("QualityPage honesty", () => {
+  it("shows the denominator next to the review coverage percentage", async () => {
+    renderPage();
+    await screen.findByText(/90%.*90\/100/i);
+  });
+
+  it("shows no-data instead of hard zeros when no evaluations exist", async () => {
+    (api.evaluationSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
+      recommendations: 0,
+      reviewed: 0,
+      review_coverage: 0,
+      evidence_coverage: 0,
+      unsafe_recommendation_rate: 0,
+      workflow_gate_pass_rate: 0,
+      workflow_evaluations: 0,
+      recommendation_acceptance: 0,
+      human_override_rate: 0,
+      unsupported_recommendation_rate: 0,
+      incorrect_next_step_rate: 0,
+      retrieval_precision: 0,
+      llm_calls: 0,
+      average_latency_ms: 0,
+      tokens_in: 0,
+      tokens_out: 0,
+      estimated_cost_micros: 0,
+      generated_at: new Date().toISOString()
+    });
+    renderPage();
+    expect((await screen.findAllByText(/no data yet/i)).length).toBeGreaterThan(3);
+    expect(screen.queryByText("$0.00")).toBeNull();
+    expect(screen.queryByText("0%")).toBeNull();
   });
 });
