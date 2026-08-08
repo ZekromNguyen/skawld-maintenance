@@ -100,7 +100,7 @@ func TestPumpExecutionPersistsEvidenceAndBlocksIntrusiveStep(t *testing.T) {
 	}
 	incident, _, err := incidentStore.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
 		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
-		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +280,7 @@ func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
 	}
 	incident, _, err := incidentStore.Create(ctx, technician, uuid.NewString(), incidentapp.CreateIncident{
 		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
-		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -372,7 +372,7 @@ func TestExecutionListCursorPagination(t *testing.T) {
 	}
 	incident, _, err := incidentStore.Create(ctx, technician, uuid.NewString(), incidentapp.CreateIncident{
 		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
-		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
