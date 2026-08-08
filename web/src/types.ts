@@ -191,6 +191,10 @@ export type MaintenanceReport = {
   provider?: string;
   model?: string;
   prompt_version?: string;
+  asset_tag?: string;
+  incident_number?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type HandoverListItem = {

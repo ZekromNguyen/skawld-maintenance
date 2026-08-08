@@ -8,6 +8,7 @@ import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
+import { RelativeTime } from "../ui/RelativeTime";
 import { reportStateTone, reportStateLabelKey } from "../labels";
 import type { MaintenanceReport } from "../../types";
 
@@ -16,7 +17,7 @@ import type { MaintenanceReport } from "../../types";
  * execution links, and a state filter.
  */
 export function ReportsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
   const [stateFilter, setStateFilter] = useState<string>("ALL");
@@ -71,19 +72,33 @@ export function ReportsPage() {
           <DataTable<MaintenanceReport>
             columns={[
               {
-                key: "workOrder",
+                key: "incident",
                 header: t("report.workOrder"),
-                render: (report) => (
-                  <Link to={`/reports/${report.id}`} className="mono strong" onClick={(event) => event.stopPropagation()}>
-                    RP-{report.revision}
-                  </Link>
-                ),
-                sortValue: (r) => r.revision
+                render: (report) =>
+                  report.incident_number ? (
+                    <Link
+                      to={`/reports/${report.id}`}
+                      className="mono strong"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {report.incident_number}
+                    </Link>
+                  ) : (
+                    <Link to={`/reports/${report.id}`} className="mono strong" onClick={(event) => event.stopPropagation()}>
+                      RP-{report.revision}
+                    </Link>
+                  ),
+                sortValue: (r) => r.incident_number ?? `RP-${r.revision}`
               },
               {
                 key: "summary",
                 header: t("report.summary"),
                 render: (report) => <span className="summary-cell">{report.structured_content.summary}</span>
+              },
+              {
+                key: "asset",
+                header: t("dashboard.table.asset"),
+                render: (report) => report.asset_tag ?? "—"
               },
               {
                 key: "execution",
@@ -96,6 +111,12 @@ export function ReportsPage() {
                   ) : (
                     "—"
                   )
+              },
+              {
+                key: "updated",
+                header: t("report.updated"),
+                render: (report) => <RelativeTime time={report.updated_at} locale={locale} />,
+                sortValue: (r) => r.updated_at
               },
               {
                 key: "state",
