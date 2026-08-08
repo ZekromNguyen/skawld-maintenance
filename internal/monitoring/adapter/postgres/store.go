@@ -173,6 +173,58 @@ func (s Store) UpsertThreshold(ctx context.Context, value Threshold) error {
 	return nil
 }
 
+// Scope pairs an organization with its site IDs for job iteration.
+type Scope struct {
+	OrganizationID string
+	SiteIDs        []string
+}
+
+func (s Store) ListScopes(ctx context.Context) ([]Scope, error) {
+	orgRows, err := s.Pool.Query(ctx, `
+		SELECT id::text FROM organizations ORDER BY created_at
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	var orgs []string
+	for orgRows.Next() {
+		var id string
+		if err := orgRows.Scan(&id); err != nil {
+			orgRows.Close()
+			return nil, fmt.Errorf("scan organization: %w", err)
+		}
+		orgs = append(orgs, id)
+	}
+	orgRows.Close()
+	if err := orgRows.Err(); err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	var result []Scope
+	for _, orgID := range orgs {
+		rows, err := s.Pool.Query(ctx, `
+			SELECT id::text FROM sites WHERE organization_id = $1::uuid ORDER BY created_at
+		`, orgID)
+		if err != nil {
+			return nil, fmt.Errorf("list sites: %w", err)
+		}
+		var siteIDs []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("scan site: %w", err)
+			}
+			siteIDs = append(siteIDs, id)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("list sites: %w", err)
+		}
+		result = append(result, Scope{OrganizationID: orgID, SiteIDs: siteIDs})
+	}
+	return result, nil
+}
+
 type AlertEvent struct {
 	ID             int64
 	OrganizationID string
