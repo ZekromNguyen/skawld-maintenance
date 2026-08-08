@@ -16,6 +16,8 @@ import (
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	copilotpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/adapter/postgres"
 	copilotapp "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/application"
+	customfieldpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/adapter/postgres"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	demonstrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/demonstration/application"
 	evaluationpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/adapter/postgres"
 	evaluationapp "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/application"
@@ -96,6 +98,8 @@ func main() {
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
 		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
 	}
+	customFieldStore := customfieldpostgres.Store{Pool: pool}
+	customFieldService := customfieldapp.Service{Store: customFieldStore}
 	executionStore := executionpostgres.Store{
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
 		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
@@ -196,8 +200,12 @@ func main() {
 			Store:       assetStore,
 			Authorities: identitypostgres.AuthorityReader{Pool: pool},
 		},
-		Incidents:  incidentapp.Service{Store: incidentStore},
-		Executions: executionapp.Service{Store: executionStore},
+		Incidents: incidentapp.Service{
+			Store:  incidentStore,
+			Fields: customFieldService,
+		},
+		CustomFields: customFieldService,
+		Executions:   executionapp.Service{Store: executionStore},
 		Attachments: attachmentapp.Service{
 			Store: attachmentStore,
 		},

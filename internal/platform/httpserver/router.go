@@ -99,7 +99,7 @@ func New(dependencies Dependencies) http.Handler {
 		api.Post("/organizations", createOrganization(dependencies.Organizations))
 		api.Get("/sites/{siteID}", getSite(dependencies.Sites))
 		mountAssetRoutes(api, dependencies.Assets)
-		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions, dependencies.Attachments)
+		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions, dependencies.Attachments, dependencies.CustomFields)
 		mountExecutionRoutes(api, dependencies.Executions)
 		mountAttachmentRoutes(api, dependencies.Attachments)
 		mountTeamRoutes(api, dependencies.Teams)

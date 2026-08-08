@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
 	"github.com/go-chi/chi/v5"
@@ -15,17 +16,18 @@ func mountIncidentRoutes(
 	incidents incidentapp.Service,
 	executions executionapp.Service,
 	attachments attachmentapp.Service,
+	customFields customfieldapp.Service,
 ) {
-	router.Get("/incidents", listIncidents(incidents))
+	router.Get("/incidents", listIncidents(incidents, customFields))
 	router.Post("/incidents", createIncident(incidents))
-	router.Get("/incidents/{incidentID}", getIncident(incidents, attachments))
+	router.Get("/incidents/{incidentID}", getIncident(incidents, attachments, customFields))
 	router.Post("/incidents/{incidentID}/resolution", resolveIncident(incidents))
 	router.Post("/incidents/{incidentID}/close", closeIncident(incidents))
 	router.Post("/incidents/{incidentID}/reopen", reopenIncident(incidents))
 	router.Post("/incidents/{incidentID}/executions", createExecution(executions))
 }
 
-func listIncidents(service incidentapp.Service) http.HandlerFunc {
+func listIncidents(service incidentapp.Service, customFields customfieldapp.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := principalFromRequest(w, r)
 		if !ok {
@@ -51,10 +53,16 @@ func listIncidents(service incidentapp.Service) http.HandlerFunc {
 				incidentapp.ErrInvalid, incidentapp.ErrVersionConflict)
 			return
 		}
+		definitions, err := customFields.Definitions(r.Context(), principal.OrganizationID, "incident")
+		if err != nil {
+			writeFieldError(w, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"items":       items,
-			"next_cursor": nullableString(next),
-			"has_more":    next != "",
+			"items":         items,
+			"custom_fields": definitions,
+			"next_cursor":   nullableString(next),
+			"has_more":      next != "",
 		})
 	}
 }
@@ -81,7 +89,7 @@ func createIncident(service incidentapp.Service) http.HandlerFunc {
 	}
 }
 
-func getIncident(incidents incidentapp.Service, attachments attachmentapp.Service) http.HandlerFunc {
+func getIncident(incidents incidentapp.Service, attachments attachmentapp.Service, customFields customfieldapp.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := principalFromRequest(w, r)
 		if !ok {
@@ -102,10 +110,16 @@ func getIncident(incidents incidentapp.Service, attachments attachmentapp.Servic
 			writeDomainError(w, err, attachmentapp.ErrForbidden, attachmentapp.ErrNotFound, attachmentapp.ErrInvalid, attachmentapp.ErrConflict)
 			return
 		}
+		definitions, err := customFields.Definitions(r.Context(), principal.OrganizationID, "incident")
+		if err != nil {
+			writeFieldError(w, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, struct {
 			incidentapp.Incident
-			Attachments []attachmentapp.Attachment `json:"attachments"`
-		}{result, items})
+			Attachments  []attachmentapp.Attachment  `json:"attachments"`
+			CustomFields []customfieldapp.Definition `json:"custom_fields"`
+		}{result, items, definitions})
 	}
 }
 

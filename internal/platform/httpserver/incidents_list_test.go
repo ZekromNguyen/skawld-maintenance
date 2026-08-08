@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,7 @@ func TestListIncidentsEnvelope(t *testing.T) {
 		Incidents: incidentapp.Service{
 			Store: &listIncidentStore{},
 		},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?page_size=1", nil)
 	recorder := httptest.NewRecorder()
@@ -182,10 +184,11 @@ func TestGetIncidentIncludesAttachments(t *testing.T) {
 		},
 	}
 	handler := New(Dependencies{
-		Logger:      slog.New(slog.DiscardHandler),
-		Auth:        fakeAuth{principal: principal},
-		Incidents:   incidentapp.Service{Store: &listIncidentStore{}},
-		Attachments: attachmentapp.Service{Store: &listAttachmentStore{}},
+		Logger:       slog.New(slog.DiscardHandler),
+		Auth:         fakeAuth{principal: principal},
+		Incidents:    incidentapp.Service{Store: &listIncidentStore{}},
+		Attachments:  attachmentapp.Service{Store: &listAttachmentStore{}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
 	})
 	request := httptest.NewRequest(http.MethodGet,
 		"/api/v1/incidents/00000000-0000-0000-0000-00000000000c", nil)
