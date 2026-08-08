@@ -12,13 +12,15 @@ CREATE TABLE monitoring_metrics (
     collected_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- NULL-safe unique key: site_id NULL (org-wide) must still conflict so
--- upserts are idempotent. Plain UNIQUE constraints treat NULLs as distinct.
+-- NULL-safe unique key: site_id NULL (org-wide) and day NULL (latest
+-- granularity) must still conflict so upserts are idempotent. Plain UNIQUE
+-- constraints treat NULLs as distinct.
 CREATE UNIQUE INDEX monitoring_metrics_upsert_key
     ON monitoring_metrics (
         organization_id,
         COALESCE(site_id, '00000000-0000-0000-0000-000000000000'::uuid),
-        metric_key, dimensions, granularity, day
+        metric_key, dimensions, granularity,
+        COALESCE(day, '1970-01-01'::date)
     );
 
 CREATE UNIQUE INDEX monitoring_metrics_latest_key
