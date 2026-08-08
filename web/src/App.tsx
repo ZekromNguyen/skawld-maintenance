@@ -18,6 +18,7 @@ import { ReportDetailPage } from "./console/pages/ReportDetailPage";
 import { DocumentDetailPage } from "./console/pages/DocumentDetailPage";
 import { SearchPage } from "./console/pages/SearchPage";
 import { ExecutionsPage } from "./console/pages/ExecutionsPage";
+import { MonitoringPage } from "./console/pages/MonitoringPage";
 
 export function App() {
   return (
@@ -40,6 +41,7 @@ export function App() {
               <Route path="/knowledge/:documentId" element={<DocumentDetailPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/quality" element={<QualityPage />} />
+              <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/demonstrations" element={<DemonstrationsPage />} />
               <Route path="/workflows" element={<WorkflowsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

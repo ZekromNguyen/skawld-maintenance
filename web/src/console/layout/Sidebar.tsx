@@ -55,6 +55,12 @@ const SECTIONS: Array<{ heading: MessageKey; items: NavItem[] }> = [
   {
     heading: "sidebar.quality",
     items: [{ to: "/quality", key: "nav.quality", icon: Gauge }]
+  },
+  {
+    heading: "sidebar.monitoring",
+    items: [
+      { to: "/monitoring", key: "nav.monitoring", icon: Gauge, permission: "monitoring:read" }
+    ]
   }
 ];
 
