@@ -56,7 +56,7 @@ vi.mock("../../api", () => ({
       site_ids: ["s1"],
       permissions: ["incident:create", "incident:read"]
     }),
-    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW], next_cursor: null, has_more: false }),
+    incidents: vi.fn().mockResolvedValue({ items: [fixtures.OPEN_HIGH, fixtures.INPROG_MED, fixtures.RESOLVED_LOW], next_cursor: null, has_more: false, custom_fields: [] }),
     assets: vi.fn().mockResolvedValue({
       items: [
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" }
@@ -236,8 +236,8 @@ describe("IncidentsPage", () => {
 it("shows load more and appends the next page", async () => {
   const list = vi.mocked(api.incidents);
   list
-    .mockResolvedValueOnce({ items: [fixtures.OPEN_HIGH as unknown as Incident], next_cursor: "c1", has_more: true })
-    .mockResolvedValueOnce({ items: [fixtures.RESOLVED_LOW as unknown as Incident], next_cursor: null, has_more: false });
+    .mockResolvedValueOnce({ items: [fixtures.OPEN_HIGH as unknown as Incident], next_cursor: "c1", has_more: true, custom_fields: [] })
+    .mockResolvedValueOnce({ items: [fixtures.RESOLVED_LOW as unknown as Incident], next_cursor: null, has_more: false, custom_fields: [] });
   renderPage();
   const button = await screen.findByRole("button", { name: "Load more" });
   fireEvent.click(button);

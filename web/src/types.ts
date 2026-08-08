@@ -52,11 +52,50 @@ export type Incident = {
   resolved_at?: string;
   time_to_complete_seconds?: number;
   version: number;
+  custom_values?: Record<string, unknown>;
   attachments?: Attachment[];
 };
 
 export type Team = { id: string; name: string };
 export type Person = { id: string; display_name: string };
+
+export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "SELECT" | "MULTI_SELECT";
+export type CustomFieldStatus = "ACTIVE" | "RETIRED";
+
+export type CustomFieldOption = { label: string; value: string };
+
+export type CustomFieldConfig = {
+  required?: boolean;
+  max_length?: number;
+  regex?: string;
+  min?: number;
+  max?: number;
+  options?: CustomFieldOption[];
+};
+
+export type CustomFieldDefinition = {
+  id: string;
+  entity_type: string;
+  key: string;
+  label: string;
+  description?: string;
+  field_type: CustomFieldType;
+  config: CustomFieldConfig;
+  status: CustomFieldStatus;
+  sort_order: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  retired_at?: string;
+};
+
+export type HistoryEntry = {
+  incident_id: string;
+  principal_id: string;
+  value_before?: unknown;
+  value_after: unknown;
+  changed_at: string;
+};
 
 export type Attachment = {
   id: string;
@@ -408,6 +447,10 @@ export type WorkflowVersion = {
 };
 
 export type ListResponse<T> = { items: T[] };
+
+export type IncidentListResponse = ListPage<Incident> & {
+  custom_fields: CustomFieldDefinition[];
+};
 
 export type ListPage<T> = ListResponse<T> & {
   next_cursor: string | null;

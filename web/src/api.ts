@@ -1,6 +1,9 @@
 import type {
   Asset,
   Attachment,
+  CustomFieldConfig,
+  CustomFieldDefinition,
+  CustomFieldType,
   Demonstration,
   EvaluationSummary,
   Execution,
@@ -18,7 +21,9 @@ import type {
   Step,
   Team,
   WorkflowApplicability,
-  WorkflowVersion
+  WorkflowVersion,
+  IncidentListResponse,
+  HistoryEntry
 } from "./types";
 
 export class ApiError extends Error {
@@ -89,11 +94,20 @@ function command<T>(path: string, value: unknown): Promise<T> {
   });
 }
 
+function patch<T>(path: string, value: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(value)
+  });
+}
+
 export interface ListOptions {
   site_id?: string;
   state?: string[];
   cursor?: string;
   page_size?: number;
+  custom_fields?: Record<string, string>;
 }
 
 function listQuery(options?: ListOptions): string {
@@ -102,6 +116,9 @@ function listQuery(options?: ListOptions): string {
   for (const state of options?.state ?? []) params.append("state", state);
   if (options?.cursor) params.set("cursor", options.cursor);
   if (options?.page_size) params.set("page_size", String(options.page_size));
+  for (const [key, value] of Object.entries(options?.custom_fields ?? {})) {
+    params.set(`custom_field.${key}`, value);
+  }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -136,7 +153,7 @@ export const api = {
       components: []
     }),
   incidents: (options?: ListOptions) =>
-    request<ListPage<Incident>>(`/incidents${listQuery(options)}`),
+    request<IncidentListResponse>(`/incidents${listQuery(options)}`),
   createIncident: (value: {
     site_id: string;
     asset_id: string;
@@ -148,6 +165,7 @@ export const api = {
     reporter_id?: string;
     team_id?: string;
     occurred_at?: string;
+    custom_values?: Record<string, unknown>;
   }) =>
     command<Incident>("/incidents", {
       ...value,
@@ -156,6 +174,31 @@ export const api = {
     }),
   teams: () => request<{ items: Team[] }>("/teams"),
   people: () => request<{ items: Person[] }>("/people"),
+  listFieldDefinitions: (entityType = "incident") =>
+    request<{ items: CustomFieldDefinition[] }>(
+      `/admin/field-definitions?entity_type=${encodeURIComponent(entityType)}`
+    ),
+  createFieldDefinition: (value: {
+    entity_type: string;
+    key: string;
+    label: string;
+    description?: string;
+    field_type: CustomFieldType;
+    config: CustomFieldConfig;
+    sort_order: number;
+  }) => command<CustomFieldDefinition>("/admin/field-definitions", value),
+  updateFieldDefinition: (id: string, value: {
+    label: string;
+    description?: string;
+    field_type: CustomFieldType;
+    config: CustomFieldConfig;
+    sort_order: number;
+    expected_version: number;
+  }) => patch<CustomFieldDefinition>(`/admin/field-definitions/${id}`, value),
+  retireFieldDefinition: (id: string) =>
+    command<CustomFieldDefinition>(`/admin/field-definitions/${id}/retire`, {}),
+  fieldDefinitionHistory: (id: string) =>
+    request<{ items: HistoryEntry[] }>(`/admin/field-definitions/${id}/history`),
   listAttachments: (entityKind: string, entityId: string) =>
     request<{ items: Attachment[] }>(
       `/attachments?entity_kind=${encodeURIComponent(entityKind)}&entity_id=${encodeURIComponent(entityId)}`

@@ -82,3 +82,73 @@ describe("fetchAll", () => {
     expect(fetchPage).not.toHaveBeenCalled();
   });
 });
+
+describe("custom fields", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("forwards custom_values on createIncident", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "inc-1", custom_values: { "def-1": "PO-42" } }), { status: 201 }),
+    );
+    await api.createIncident({
+      site_id: "s1", asset_id: "a1", summary: "Pump", priority: "HIGH",
+      custom_values: { po_number: "PO-42" }
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.custom_values).toEqual({ po_number: "PO-42" });
+  });
+
+  it("serializes custom field filters on incident list", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], next_cursor: null, has_more: false, custom_fields: [] }), { status: 200 }),
+    );
+    await api.incidents({ custom_fields: { po_number: "PO-42" } });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(String(url)).toContain("custom_field.po_number=PO-42");
+  });
+
+  it("lists field definitions and creates one", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [{ id: "def-1", key: "po_number" }] }), { status: 200 }),
+    );
+    const listed = await api.listFieldDefinitions("incident");
+    expect(listed.items).toHaveLength(1);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: "def-2", key: "zone" }), { status: 201 }),
+    );
+    const created = await api.createFieldDefinition({
+      entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT",
+      config: { options: [{ label: "A", value: "a" }] }, sort_order: 1
+    });
+    expect(created.key).toBe("zone");
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(String(init.method)).toBe("POST");
+    expect(String(init.body)).toContain('"field_type":"SELECT"');
+  });
+
+  it("patches and retires a field definition", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: "def-1", label: "PO" }), { status: 200 }));
+    await api.updateFieldDefinition("def-1", {
+      label: "PO", field_type: "TEXT", config: {}, sort_order: 1, expected_version: 2
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(init.method)).toBe("PATCH");
+    expect(String(init.body)).toContain('"expected_version":2');
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: "def-1", status: "RETIRED" }), { status: 200 }));
+    const retired = await api.retireFieldDefinition("def-1");
+    expect(retired.status).toBe("RETIRED");
+  });
+});
