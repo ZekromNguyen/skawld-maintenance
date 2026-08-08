@@ -246,3 +246,46 @@ it("shows load more and appends the next page", async () => {
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
   );
 });
+
+it("blocks submit when a required custom field is empty", async () => {
+  (api.createIncident as ReturnType<typeof vi.fn>).mockClear();
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "po_number", label: "PO Number", field_type: "TEXT", config: { required: true }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: /create incident/i }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText(/asset/i), { target: { value: "a1" } });
+  fireEvent.change(within(dialog).getByLabelText(/summary/i), { target: { value: "High vibration on bearing" } });
+  fireEvent.change(within(dialog).getByLabelText(/priority/i), { target: { value: "HIGH" } });
+  const poField = await waitFor(() => within(dialog).getByLabelText(/PO Number/));
+  const label = poField.closest(".form-field")?.querySelector("label");
+  // probe: required marker should be present
+  expect(label?.textContent).toContain("*");
+  fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+  await waitFor(() => expect(api.createIncident).not.toHaveBeenCalled());
+});
+
+it("forwards custom_values from the create form", async () => {
+  (api.createIncident as ReturnType<typeof vi.fn>).mockClear();
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "po_number", label: "PO Number", field_type: "TEXT", config: { required: false }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: /create incident/i }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText(/asset/i), { target: { value: "a1" } });
+  fireEvent.change(within(dialog).getByLabelText(/summary/i), { target: { value: "High vibration on bearing" } });
+  fireEvent.change(within(dialog).getByLabelText(/priority/i), { target: { value: "HIGH" } });
+  fireEvent.change(within(dialog).getByLabelText(/PO Number/), { target: { value: "PO-42" } });
+  fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+  await waitFor(() =>
+    expect(api.createIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ custom_values: { po_number: "PO-42" } }),
+    ),
+  );
+});

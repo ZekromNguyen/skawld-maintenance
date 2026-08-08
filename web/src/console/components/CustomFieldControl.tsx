@@ -39,9 +39,14 @@ export function CustomFieldControl(props: {
             value={typeof value === "number" ? value : ""}
             min={field.config.min}
             max={field.config.max}
-            onChange={(event) =>
-              props.onChange(event.target.value === "" ? undefined : Number(event.target.value))
-            }
+            onChange={(event) => {
+              if (event.target.value === "") {
+                props.onChange(undefined);
+                return;
+              }
+              const parsed = Number(event.target.value);
+              props.onChange(Number.isNaN(parsed) ? undefined : parsed);
+            }}
           />
         </FormField>
       );
