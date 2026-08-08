@@ -7,6 +7,7 @@ import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
+import { Tabs } from "../ui/Tabs";
 import { executionStateLabelKey, executionStateTone } from "../labels";
 import type { Execution } from "../../types";
 
@@ -32,19 +33,15 @@ export function ExecutionsPage() {
       <section>
         <PageHeader title={t("pageTitle.executions")} />
         <p className="section-lead">{t("executions.lead")}</p>
-        <div className="incident-tabs" role="tablist" aria-label={t("executions.state")}>
-          {STATE_FILTERS.map((state) => (
-            <button
-              key={state}
-              role="tab"
-              aria-selected={filter === state}
-              className={`tab${filter === state ? " active" : ""}`}
-              onClick={() => setFilter(state)}
-            >
-              {state === "ALL" ? t("incidents.tabs.all") : t(executionStateLabelKey(state))}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          label={t("executions.state")}
+          tabs={STATE_FILTERS.map((state) => ({
+            id: state,
+            label: state === "ALL" ? t("incidents.tabs.all") : t(executionStateLabelKey(state)),
+          }))}
+          active={filter}
+          onChange={(id) => setFilter(id as StateFilter)}
+        />
         <DataTable<Execution>
           columns={[
             {

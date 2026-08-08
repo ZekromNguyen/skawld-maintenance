@@ -12,6 +12,7 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
+import { Tabs } from "../ui/Tabs";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
 import {
   severityTone,
@@ -103,20 +104,16 @@ export function IncidentsPage() {
           }
         />
         <div className="incident-toolbar">
-          <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
-            {STATE_TABS.map((state) => (
-              <button
-                key={state}
-                role="tab"
-                aria-selected={tab === state}
-                className={`tab${tab === state ? " active" : ""}`}
-                onClick={() => setTab(state)}
-              >
-                {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
-                <span className="count">{counts[state]}</span>
-              </button>
-            ))}
-          </div>
+          <Tabs
+            label={t("nav.incidents")}
+            tabs={STATE_TABS.map((state) => ({
+              id: state,
+              label: state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state)),
+              count: counts[state],
+            }))}
+            active={tab}
+            onChange={(id) => setTab(id as StateTab)}
+          />
           <input
             aria-label={t("incidents.filter.search")}
             placeholder={t("incidents.filter.search")}
