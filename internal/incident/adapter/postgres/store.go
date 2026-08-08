@@ -84,6 +84,10 @@ func (s Store) Create(
 		}
 		incidentID := s.IDs.New()
 		number := fmt.Sprintf("INC-%s-%s", now.UTC().Format("20060102"), strings.ToUpper(incidentID[:8]))
+		customValues := command.CustomValues
+		if customValues == nil {
+			customValues = map[string]any{}
+		}
 		incident, err := incidentdomain.New(incidentdomain.Incident{
 			ID: incidentID, OrganizationID: principal.OrganizationID,
 			SiteID: command.SiteID, AssetID: command.AssetID, Number: number,
@@ -94,12 +98,12 @@ func (s Store) Create(
 			SourceOfTruth:  integrationdomain.SourceOfTruth(command.SourceOfTruth),
 			ExternalSystem: command.ExternalSystem, ExternalID: command.ExternalID,
 			ExternalVersion: command.ExternalVersion, OccurredAt: occurredAt,
-			DetectedAt: command.DetectedAt, CustomValues: command.CustomValues,
+			DetectedAt: command.DetectedAt, CustomValues: customValues,
 		})
 		if err != nil {
 			return outcome{}, errors.Join(incidentapp.ErrInvalid, err)
 		}
-		customValues, err := json.Marshal(command.CustomValues)
+		encodedCustom, err := json.Marshal(customValues)
 		if err != nil {
 			return outcome{}, err
 		}
@@ -120,7 +124,7 @@ func (s Store) Create(
 			incident.Status, incident.SourceOfTruth, incident.ExternalSystem,
 			incident.ExternalID, incident.ExternalVersion, incident.OccurredAt,
 			incident.DetectedAt, incident.Version, principal.ID, incident.AssigneeID,
-			incident.ReporterID, incident.TeamID, customValues, now)
+			incident.ReporterID, incident.TeamID, encodedCustom, now)
 		if err != nil {
 			return outcome{}, fmt.Errorf("insert incident: %w", err)
 		}
@@ -185,6 +189,9 @@ func (s Store) List(
 	principal identitydomain.Principal,
 	filter incidentapp.Filter,
 ) ([]incidentapp.Incident, bool, error) {
+	if filter.PageSize < 1 {
+		filter.PageSize = 25
+	}
 	query := incidentSelect + `
 		WHERE i.organization_id = $1::uuid
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR i.site_id = ANY($2::uuid[]))
@@ -434,6 +441,18 @@ func (s Store) UpdateCustomValues(
 			return outcome{}, incidentapp.ErrVersionConflict
 		}
 		before := mapIncident(incident, assetTag)
+		if len(command.CustomValues) == 0 {
+			// Nothing to change: return the current incident without a
+			// version bump, event, or audit row so a no-op update cannot
+			// invalidate the client's optimistic-lock version.
+			body, _ := json.Marshal(before)
+			if err := s.Idempotency.Complete(
+				ctx, tx, principal.ID, scope, key, http.StatusOK, body, now,
+			); err != nil {
+				return outcome{}, err
+			}
+			return outcome{Value: before}, nil
+		}
 
 		previous := incident.CustomValues
 		if previous == nil {

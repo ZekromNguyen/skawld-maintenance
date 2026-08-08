@@ -156,3 +156,135 @@ func seedOrgSitePrincipal(
 		t.Fatal(err)
 	}
 }
+
+func TestIncidentCustomValuesIntegration(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	organizationID, siteID, principalID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	seedOrgSitePrincipal(t, ctx, pool, organizationID, siteID, principalID, now)
+	assetID := uuid.NewString()
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO assets (
+			id, organization_id, site_id, tag, name, asset_class,
+			status, source_of_truth, attributes, version, created_at, updated_at
+		) VALUES (
+			$1::uuid, $2::uuid, $3::uuid, 'P-303', 'Pump P-303', 'PUMP',
+			'ACTIVE', 'OWNED_BY_SKAWLD', '{}'::jsonb, 1, $4, $4
+		)
+	`, assetID, organizationID, siteID, now); err != nil {
+		t.Fatal(err)
+	}
+	var definitionID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO field_definitions (
+			organization_id, entity_type, key, label, field_type, config, status, version, created_at, updated_at
+		) VALUES (
+			$1::uuid, 'incident', 'po_number', 'PO Number', 'TEXT',
+			'{"required": true}'::jsonb, 'ACTIVE', 1, $2, $2
+		)
+		RETURNING id::text
+	`, organizationID, now).Scan(&definitionID); err != nil {
+		t.Fatal(err)
+	}
+
+	permissions := make(map[identitydomain.Permission]struct{})
+	for _, permission := range identitydomain.PermissionsForRole(identitydomain.RoleAdministrator) {
+		permissions[permission] = struct{}{}
+	}
+	principal := identitydomain.Principal{
+		ID: principalID, OrganizationID: organizationID,
+		SiteIDs: []string{siteID}, Permissions: permissions,
+	}
+	store := incidentpostgres.Store{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.System{},
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+
+	created, _, err := store.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
+		SiteID: siteID, AssetID: assetID,
+		Summary: "Custom values create", Priority: "MEDIUM",
+		SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		CustomValues: map[string]any{definitionID: "PO-1"},
+	})
+	if err != nil {
+		t.Fatalf("create with custom values: %v", err)
+	}
+	if created.CustomValues[definitionID] != "PO-1" {
+		t.Fatalf("create response custom_values = %#v", created.CustomValues)
+	}
+
+	// Create without custom values must store an empty object (regression
+	// for the nil-marshal path) and must not fail the NOT NULL column.
+	plain, _, err := store.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
+		SiteID: siteID, AssetID: assetID,
+		Summary: "Plain create", Priority: "LOW",
+		SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("plain create: %v", err)
+	}
+	if plain.CustomValues == nil || len(plain.CustomValues) != 0 {
+		t.Fatalf("plain create custom_values = %#v, want empty map", plain.CustomValues)
+	}
+
+	// No-op update (empty values) must not bump the version.
+	unchanged, _, err := store.UpdateCustomValues(ctx, principal, uuid.NewString(), created.ID, incidentapp.UpdateCustomValues{
+		ExpectedVersion: created.Version,
+		CustomValues:    map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("no-op update: %v", err)
+	}
+	if unchanged.Version != created.Version {
+		t.Fatalf("no-op update bumped version: %v -> %v", created.Version, unchanged.Version)
+	}
+
+	// Merge keeps existing values and adds new ones, bumps version.
+	updated, _, err := store.UpdateCustomValues(ctx, principal, uuid.NewString(), created.ID, incidentapp.UpdateCustomValues{
+		ExpectedVersion: unchanged.Version,
+		CustomValues:    map[string]any{definitionID: "PO-2"},
+	})
+	if err != nil {
+		t.Fatalf("merge update: %v", err)
+	}
+	if updated.Version != unchanged.Version+1 {
+		t.Fatalf("merge update version = %d, want %d", updated.Version, unchanged.Version+1)
+	}
+	if updated.CustomValues[definitionID] != "PO-2" {
+		t.Fatalf("merged custom_values = %#v", updated.CustomValues)
+	}
+
+	// History rows: one for create, one for the merge (before PO-1, after PO-2).
+	var historyCount int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM custom_value_history
+		WHERE incident_id = $1::uuid AND field_definition_id = $2::uuid
+	`, created.ID, definitionID).Scan(&historyCount); err != nil {
+		t.Fatal(err)
+	}
+	if historyCount != 2 {
+		t.Fatalf("history rows = %d, want 2", historyCount)
+	}
+
+	// Custom-field filter on the list endpoint matches only the matching incident.
+	matches, _, err := store.List(ctx, principal, incidentapp.Filter{
+		CustomFields: map[string]string{definitionID: "PO-2"},
+	})
+	if err != nil {
+		t.Fatalf("filtered list: %v", err)
+	}
+	if len(matches) != 1 || matches[0].ID != created.ID {
+		t.Fatalf("filtered list = %d items, want 1 matching %s", len(matches), created.ID)
+	}
+}
