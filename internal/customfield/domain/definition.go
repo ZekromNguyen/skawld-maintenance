@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type FieldType string
@@ -67,7 +68,7 @@ func New(value Definition) (Definition, error) {
 		return Definition{}, errors.New("field definition scope is required")
 	}
 	if !keyPattern.MatchString(value.Key) {
-		return Definition{}, errors.New("field key must match ^[a-z][a-z0-9_]{1,63}$")
+		return Definition{}, errors.New("field key must match ^[a-z][a-z0-9_]{0,63}$")
 	}
 	if value.Label == "" {
 		return Definition{}, errors.New("field label is required")
@@ -82,15 +83,15 @@ func New(value Definition) (Definition, error) {
 	}
 	if value.FieldType == FieldTypeSelect || value.FieldType == FieldTypeMultiSelect {
 		seen := make(map[string]struct{}, len(value.Config.Options))
-		for _, option := range value.Config.Options {
-			option.Value = strings.TrimSpace(option.Value)
-			if option.Value == "" {
+		for i := range value.Config.Options {
+			value.Config.Options[i].Value = strings.TrimSpace(value.Config.Options[i].Value)
+			if value.Config.Options[i].Value == "" {
 				return Definition{}, errors.New("select option values are required")
 			}
-			if _, dup := seen[option.Value]; dup {
-				return Definition{}, fmt.Errorf("duplicate select option value %q", option.Value)
+			if _, dup := seen[value.Config.Options[i].Value]; dup {
+				return Definition{}, fmt.Errorf("duplicate select option value %q", value.Config.Options[i].Value)
 			}
-			seen[option.Value] = struct{}{}
+			seen[value.Config.Options[i].Value] = struct{}{}
 		}
 	}
 	if value.Status == "" {
@@ -125,7 +126,7 @@ func ValidateValue(d Definition, value any) error {
 		if d.Config.Required && text == "" {
 			return fmt.Errorf("%s is required", d.Label)
 		}
-		if d.Config.MaxLength > 0 && len(text) > d.Config.MaxLength {
+		if d.Config.MaxLength > 0 && utf8.RuneCountInString(text) > d.Config.MaxLength {
 			return fmt.Errorf("%s must be at most %d characters", d.Label, d.Config.MaxLength)
 		}
 		if d.Config.Regex != "" {
@@ -153,7 +154,8 @@ func ValidateValue(d Definition, value any) error {
 		if !ok {
 			return fmt.Errorf("%s must be a date", d.Label)
 		}
-		if _, err := time.Parse("2006-01-02", date); err != nil {
+		parsed, err := time.Parse("2006-01-02", date)
+		if err != nil || parsed.Format("2006-01-02") != date {
 			return fmt.Errorf("%s must be a date in YYYY-MM-DD format", d.Label)
 		}
 	case FieldTypeSelect:
