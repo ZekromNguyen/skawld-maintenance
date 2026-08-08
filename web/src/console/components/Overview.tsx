@@ -11,6 +11,8 @@ import {
   severityLabelKey,
   incidentStateTone,
   incidentStateLabelKey,
+  executionStateTone,
+  executionStateLabelKey,
 } from "../labels";
 import type { DashboardSummary, Execution, Incident } from "../../types";
 import type { FocusConfig } from "../dashboardFocus";
@@ -135,8 +137,8 @@ export function Overview({
                 header: t("executions.state"),
                 render: (execution) => (
                   <StatusBadge
-                    tone={execution.state === "IN_PROGRESS" ? "medium" : "info"}
-                    label={execution.state.replace("_", " ")}
+                    tone={executionStateTone(execution.state)}
+                    label={t(executionStateLabelKey(execution.state))}
                   />
                 ),
                 sortValue: (e) => e.state,

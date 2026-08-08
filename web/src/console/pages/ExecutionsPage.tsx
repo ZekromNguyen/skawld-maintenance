@@ -6,14 +6,9 @@ import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { DataTable } from "../ui/DataTable";
-import { StatusBadge, type Tone } from "../ui/StatusBadge";
+import { StatusBadge } from "../ui/StatusBadge";
+import { executionStateLabelKey, executionStateTone } from "../labels";
 import type { Execution } from "../../types";
-
-const EXECUTION_TONE: Record<string, Tone> = {
-  ASSIGNED: "info",
-  IN_PROGRESS: "medium",
-  COMPLETED: "success",
-};
 
 type StateFilter = "ALL" | "IN_PROGRESS" | "ASSIGNED" | "COMPLETED";
 const STATE_FILTERS: StateFilter[] = ["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLETED"];
@@ -42,7 +37,7 @@ export function ExecutionsPage() {
               className={`tab${filter === state ? " active" : ""}`}
               onClick={() => setFilter(state)}
             >
-              {state === "ALL" ? t("incidents.tabs.all") : state.replace("_", " ")}
+              {state === "ALL" ? t("incidents.tabs.all") : t(executionStateLabelKey(state))}
             </button>
           ))}
         </div>
@@ -80,8 +75,8 @@ export function ExecutionsPage() {
               header: t("executions.state"),
               render: (execution) => (
                 <StatusBadge
-                  tone={EXECUTION_TONE[execution.state] ?? "info"}
-                  label={execution.state.replace("_", " ")}
+                  tone={executionStateTone(execution.state)}
+                  label={t(executionStateLabelKey(execution.state))}
                 />
               ),
               sortValue: (e) => e.state,

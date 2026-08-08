@@ -68,3 +68,14 @@ it("shows load more and appends the next page", async () => {
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
   );
 });
+
+describe("ExecutionsPage i18n", () => {
+  it("renders execution states via message keys, not raw enums", async () => {
+    renderPage();
+    await screen.findByText("Shaft alignment");
+    expect(screen.getAllByText(/in progress/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/completed/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^IN_PROGRESS$/)).toBeNull();
+    expect(screen.queryByText(/^COMPLETED$/)).toBeNull();
+  });
+});
