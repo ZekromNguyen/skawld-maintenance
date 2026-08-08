@@ -5,12 +5,15 @@ import { useQuery } from "../useQuery";
 import { usePrincipal } from "../usePrincipal";
 import { api } from "../../api";
 import { Overview } from "../components/Overview";
+import { ForYouTabs } from "../components/ForYouTabs";
+import { ShortcutCard } from "../components/ShortcutCard";
 import { focusRole } from "../permissions";
 import { FOCUS_CONFIG } from "../dashboardFocus";
 
 /**
- * DashboardPage: role-aware landing. Real KPIs, a "my queue" of in-progress
- * executions, and the active-incident table. No fabricated metrics.
+ * DashboardPage: role-aware landing. The annunciator strip and role focus
+ * panel come from Overview; the Jira-style tabbed "For you" queue below
+ * them aggregates the same live data into status-driven queues.
  */
 export function DashboardPage() {
   const { t } = useI18n();
@@ -46,6 +49,21 @@ export function DashboardPage() {
           loading={loading}
           error={error}
           onRetry={onRetry}
+        />
+        <ForYouTabs
+          incidents={incidents.data ?? []}
+          executions={executions.data ?? []}
+          assets={assets.data ?? []}
+          pendingHandoverCount={pendingHandovers}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+        />
+        <ShortcutCard
+          label={t("shortcuts.title")}
+          detail=""
+          to="/"
+          variant="shortcuts"
         />
       </section>
     </PageTrailProvider>

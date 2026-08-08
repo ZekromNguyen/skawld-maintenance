@@ -14,6 +14,7 @@ import { RelativeTime } from "../ui/RelativeTime";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
 import { GatedButton } from "../ui/GatedButton";
+import { ActivityFeed, type ActivityEntry } from "../components/ActivityFeed";
 import {
   severityTone,
   severityLabelKey,
@@ -92,6 +93,33 @@ export function IncidentDetailPage() {
   const value = incident.data;
   const related =
     executions.data?.filter((execution) => execution.incident_id === value.id) ?? [];
+
+  const activity: ActivityEntry[] = [
+    {
+      id: `detected-${value.id}`,
+      kind: "detected",
+      title: t("incident.activity.detected"),
+      time: value.detected_at,
+    },
+  ];
+  for (const execution of related) {
+    activity.push({
+      id: `execution-${execution.id}`,
+      kind: "execution",
+      title: execution.purpose,
+      to: `/executions/${execution.id}`,
+      detail: execution.state.replace("_", " "),
+    });
+    for (const measurement of execution.measurements ?? []) {
+      activity.push({
+        id: `measurement-${measurement.id}`,
+        kind: "measurement",
+        title: t("incident.activity.measurement"),
+        detail: `${measurement.value} ${measurement.unit}`,
+        time: measurement.observed_at,
+      });
+    }
+  }
 
   return (
     <PageTrailProvider
@@ -189,6 +217,12 @@ export function IncidentDetailPage() {
               error={executions.error}
               onRetry={() => void executions.refetch()}
             />
+          </div>
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>{t("incident.activity")}</h2>
+            </div>
+            <ActivityFeed entries={activity} />
           </div>
           </div>
           <aside className="metadata-rail" aria-label={t("incident.facts")}>

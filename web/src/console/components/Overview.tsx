@@ -1,24 +1,15 @@
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useI18n } from "../../i18n/I18nProvider";
 import { AnnunciatorStrip } from "./AnnunciatorStrip";
-import { DataTable } from "../ui/DataTable";
-import { StatusBadge } from "../ui/StatusBadge";
-import { EmptyState } from "../ui/EmptyState";
-import { RelativeTime } from "../ui/RelativeTime";
 import { Skeleton } from "../ui/Skeleton";
-import {
-  severityTone,
-  severityLabelKey,
-  incidentStateTone,
-  incidentStateLabelKey,
-} from "../labels";
 import type { Asset, Execution, Incident } from "../../types";
 import type { FocusConfig } from "../dashboardFocus";
 
 /**
- * Overview: dashboard main content. Real KPIs computed from live data,
- * a "my queue" panel for in-progress executions, and the active-incident
- * table (open incidents only, clickable rows). No fabricated metrics.
+ * Overview: dashboard signature band. The annunciator strip carries live
+ * operational counts with whole-cell click-through; the role focus panel
+ * links into the work a role owns. The tabbed "For you" queue lives in
+ * ForYouTabs (same data, below this component).
  */
 export function Overview({
   focus,
@@ -27,7 +18,6 @@ export function Overview({
   assets,
   pendingHandoverCount,
   loading,
-  error,
   onRetry,
 }: {
   focus: FocusConfig;
@@ -39,8 +29,7 @@ export function Overview({
   error?: string;
   onRetry: () => void;
 }) {
-  const { t, locale } = useI18n();
-  const navigate = useNavigate();
+  const { t } = useI18n();
   const open = incidents.filter((incident) => incident.state !== "RESOLVED");
   const inProgress = executions.filter((execution) => execution.state === "IN_PROGRESS");
   const critical = assets.filter((asset) => asset.criticality?.rating === "A");
@@ -49,7 +38,7 @@ export function Overview({
     return (
       <div style={{ display: "grid", gap: 16 }}>
         <Skeleton height={108} />
-        <Skeleton height={220} />
+        <Skeleton height={64} />
       </div>
     );
   }
@@ -100,132 +89,6 @@ export function Overview({
             </Link>
           ))}
         </div>
-      </section>
-
-      <section className="panel" style={{ marginBottom: 20 }}>
-        <div className="panel-heading">
-          <h2>{t("dashboard.myQueue")}</h2>
-          <Link to="/executions" className="secondary-button">
-            {t("dashboard.viewAll")}
-          </Link>
-        </div>
-        {inProgress.length === 0 ? (
-          <EmptyState title={t("dashboard.myQueueEmpty")} />
-        ) : (
-          <DataTable<Execution>
-            columns={[
-              {
-                key: "purpose",
-                header: t("executions.title"),
-                render: (execution) => (
-                  <Link to={`/executions/${execution.id}`} className="strong">
-                    {execution.purpose}
-                  </Link>
-                ),
-                sortValue: (e) => e.purpose,
-              },
-              {
-                key: "incident",
-                header: t("executions.incident"),
-                render: (execution) =>
-                  execution.incident_id ? (
-                    <Link to={`/incidents/${execution.incident_id}`}>
-                      {execution.asset_tag ?? execution.incident_id}
-                    </Link>
-                  ) : (
-                    "—"
-                  ),
-              },
-              {
-                key: "state",
-                header: t("executions.state"),
-                render: (execution) => (
-                  <StatusBadge
-                    tone={execution.state === "IN_PROGRESS" ? "medium" : "info"}
-                    label={execution.state.replace("_", " ")}
-                  />
-                ),
-                sortValue: (e) => e.state,
-              },
-            ]}
-            rows={inProgress}
-            rowKey={(execution) => execution.id}
-            emptyTitle={t("dashboard.myQueueEmpty")}
-          />
-        )}
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>{t("dashboard.activeIncidents")}</h2>
-        </div>
-        {error ? (
-          <div className="error-state" role="alert" style={{ margin: 16 }}>
-            <strong>Something went wrong</strong>
-            <p>{error}</p>
-            <div className="error-actions">
-              <button className="secondary-button" onClick={onRetry}>
-                Retry
-              </button>
-            </div>
-          </div>
-        ) : (
-          <DataTable<Incident>
-            columns={[
-              {
-                key: "number",
-                header: t("dashboard.table.incident"),
-                render: (incident) => (
-                  <Link to={`/incidents/${incident.id}`} className="strong">
-                    {incident.number}
-                  </Link>
-                ),
-                sortValue: (i) => i.number,
-              },
-              {
-                key: "summary",
-                header: t("executions.title"),
-                render: (incident) => <span className="summary-cell">{incident.summary}</span>,
-              },
-              {
-                key: "asset",
-                header: t("dashboard.table.asset"),
-                render: (incident) => incident.asset_tag ?? "—",
-              },
-              {
-                key: "severity",
-                header: t("dashboard.table.severity"),
-                render: (incident) => (
-                  <StatusBadge
-                    tone={severityTone(incident.severity)}
-                    label={t(severityLabelKey(incident.severity))}
-                  />
-                ),
-                sortValue: (i) => i.severity,
-              },
-              {
-                key: "state",
-                header: t("dashboard.table.state"),
-                render: (incident) => (
-                  <StatusBadge
-                    tone={incidentStateTone(incident.state)}
-                    label={t(incidentStateLabelKey(incident.state))}
-                  />
-                ),
-                sortValue: (i) => i.state,
-              },
-              {
-                key: "age",
-                header: t("dashboard.table.age"),
-                render: (incident) => <RelativeTime time={incident.detected_at} locale={locale} />,
-              },
-            ]}
-            rows={open}
-            rowKey={(incident) => incident.id}
-            onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
-            emptyTitle={t("dashboard.myQueueEmpty")}
-          />
-        )}
       </section>
     </>
   );

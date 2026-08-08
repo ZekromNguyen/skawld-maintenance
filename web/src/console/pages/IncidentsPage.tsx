@@ -5,6 +5,7 @@ import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
+import { useListKeyboard } from "../useListKeyboard";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
@@ -160,6 +161,12 @@ export function IncidentsPage() {
     [filtered, tab],
   );
 
+  const { selectedIndex, setSelectedIndex, onKeyDown } = useListKeyboard<Incident>({
+    rows,
+    onOpen: (incident) => navigate(`/incidents/${incident.id}`),
+  });
+  const selectedIncident = selectedIndex >= 0 ? rows[selectedIndex] : undefined;
+
   const counts = useMemo(() => {
     const items = filtered;
     return {
@@ -184,14 +191,15 @@ export function IncidentsPage() {
             ) : undefined
           }
         />
-        <SavedViews
-          views={savedViews}
-          activeId={activeViewId}
-          onSave={saveCurrentView}
-          onApply={applyView}
-          onDelete={deleteView}
-        />
         <div className="incident-toolbar">
+          <SavedViews
+            views={savedViews}
+            activeId={activeViewId}
+            onSave={saveCurrentView}
+            onApply={applyView}
+            onDelete={deleteView}
+          />
+          <div className="incident-filter-row">
           {view === "list" && (
             <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
               {STATE_TABS.map((state) => (
@@ -248,6 +256,7 @@ export function IncidentsPage() {
               <Kanban size={14} weight="bold" />
               {t("incidents.view.board")}
             </button>
+          </div>
           </div>
         </div>
         {view === "board" ? (
@@ -312,6 +321,10 @@ export function IncidentsPage() {
           rowKey={(incident) => incident.id}
           rowClassName={(incident) => `alarm-row alarm-row--${incident.severity.toLowerCase()}`}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
+          onTableKeyDown={(event) => {
+            if (view === "list") onKeyDown(event);
+          }}
+          selectedKey={selectedIncident?.id}
           emptyTitle={t("incidents.noResults")}
           loading={incidents.loading}
           error={incidents.error}

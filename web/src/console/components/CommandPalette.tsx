@@ -39,14 +39,27 @@ export function CommandPalette({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setOpen((current) => !current);
+        return;
+      }
+      // "/" opens the palette when not already typing (Jira convention).
+      if (event.key === "/" && !typing && !open) {
+        event.preventDefault();
+        setOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [open]);
 
   const commands = useMemo<Command[]>(() => {
     const nav: Command[] = [

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useI18n } from "../../i18n/I18nProvider";
 import { FormField } from "../ui/FormField";
 import { severityLabelKey } from "../labels";
@@ -7,8 +7,10 @@ import type { Asset } from "../../types";
 const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
 /**
- * CreateIncidentForm: native incident creation inside a dialog. No demo
- * defaults, required validation on every field, i18n severity options.
+ * CreateIncidentForm: native incident creation inside a dialog in Jira's
+ * create-issue anatomy: a context (site) switcher above the fields, required
+ * markers on every field, and a footer of cancel/create actions. Choosing a
+ * site filters the asset list to that site.
  */
 export function CreateIncidentForm(props: {
   assets: Asset[];
@@ -22,18 +24,28 @@ export function CreateIncidentForm(props: {
   }) => void;
 }) {
   const { t } = useI18n();
+  const sites = useMemo(
+    () => [...new Set(props.assets.map((asset) => asset.site_id))],
+    [props.assets],
+  );
+  const [siteID, setSiteID] = useState(sites[0] ?? "");
   const [assetID, setAssetID] = useState("");
   const [summary, setSummary] = useState("");
   const [severity, setSeverity] = useState("");
   const [touched, setTouched] = useState(false);
 
-  const asset = props.assets.find((item) => item.id === assetID);
+  const siteAssets = useMemo(
+    () => props.assets.filter((asset) => asset.site_id === siteID),
+    [props.assets, siteID],
+  );
+  const asset = siteAssets.find((item) => item.id === assetID);
   const errors = {
+    site: !siteID ? t("form.required") : undefined,
     asset: !assetID ? t("form.required") : undefined,
     summary: summary.trim().length < 3 ? t("form.required") : undefined,
     severity: !severity ? t("form.required") : undefined,
   };
-  const valid = !errors.asset && !errors.summary && !errors.severity;
+  const valid = !errors.site && !errors.asset && !errors.summary && !errors.severity;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -49,6 +61,27 @@ export function CreateIncidentForm(props: {
 
   return (
     <form className="create-incident-form" onSubmit={submit}>
+      <div className="dialog-context-row">
+        <span className="eyebrow">{t("site.switcherLabel")}</span>
+        <select
+          aria-label={t("site.switcherLabel")}
+          value={siteID}
+          onChange={(event) => {
+            setSiteID(event.target.value);
+            setAssetID("");
+          }}
+        >
+          {sites.length === 0 ? (
+            <option value="">{t("form.selectSite")}</option>
+          ) : (
+            sites.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
       <FormField label={t("form.asset")} htmlFor="incident-asset" required error={touched ? errors.asset : undefined}>
         <select
           id="incident-asset"
@@ -57,9 +90,11 @@ export function CreateIncidentForm(props: {
           required
         >
           <option value="" disabled>
-            {t("form.selectAsset")}
+            {siteAssets.length === 0
+              ? t("form.selectAssetForSite")
+              : t("form.selectAsset")}
           </option>
-          {props.assets.map((item) => (
+          {siteAssets.map((item) => (
             <option key={item.id} value={item.id}>
               {item.tag} · {item.name}
             </option>

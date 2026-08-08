@@ -30,7 +30,7 @@ export function GlobalBar({ principal }: { principal?: Principal }) {
         >
           <MagnifyingGlass size={14} aria-hidden="true" />
           <span>{t("cmd.placeholder")}</span>
-          <kbd>⌘K</kbd>
+          <kbd>/</kbd>
         </button>
         <div className="global-bar-right">
           <SiteSwitcher siteIds={principal?.site_ids ?? []} value={siteId} onChange={setSiteId} />

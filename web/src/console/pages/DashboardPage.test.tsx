@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { DashboardPage } from "./DashboardPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
@@ -110,10 +110,11 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("Operations overview")).toBeTruthy();
     // Annunciator strip links to the incident queue.
     expect(screen.getByRole("link", { name: /open incidents/i })).toBeTruthy();
-    // Open incident row visible, resolved one excluded.
+    // Recommended tab shows the open incident row, resolved one excluded.
     expect(screen.getByText("Pump vibration")).toBeTruthy();
     expect(screen.queryByText("Resolved bearing noise")).toBeNull();
-    // My queue shows the in-progress execution.
+    // Assigned tab shows the in-progress execution.
+    fireEvent.click(screen.getByRole("tab", { name: /assigned to me/i }));
     expect(screen.getByText("Shaft alignment check")).toBeTruthy();
   });
 
