@@ -30,7 +30,7 @@ export function Overview({
   onRetry: () => void;
 }) {
   const { t } = useI18n();
-  const open = incidents.filter((incident) => incident.state !== "RESOLVED");
+  const open = incidents.filter((incident) => incident.status !== "RESOLVED");
   const inProgress = executions.filter((execution) => execution.state === "IN_PROGRESS");
   const critical = assets.filter((asset) => asset.criticality?.rating === "A");
 

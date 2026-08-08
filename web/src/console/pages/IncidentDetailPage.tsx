@@ -16,10 +16,10 @@ import { Skeleton } from "../ui/Skeleton";
 import { GatedButton } from "../ui/GatedButton";
 import { ActivityFeed, type ActivityEntry } from "../components/ActivityFeed";
 import {
-  severityTone,
-  severityLabelKey,
-  incidentStateTone,
-  incidentStateLabelKey,
+  priorityTone,
+  priorityLabelKey,
+  incidentStatusTone,
+  incidentStatusLabelKey,
 } from "../labels";
 import type { Execution } from "../../types";
 
@@ -143,7 +143,7 @@ export function IncidentDetailPage() {
                   {t("incident.createExecution")}
                 </button>
               )}
-              {value.state !== "RESOLVED" && (
+              {value.status !== "RESOLVED" && (
                 <GatedButton
                   allowed={canResolve}
                   reason={permissionReason}
@@ -153,7 +153,7 @@ export function IncidentDetailPage() {
                   {t("incident.resolve")}
                 </GatedButton>
               )}
-              {value.state !== "RESOLVED" && (
+              {value.status !== "RESOLVED" && (
                 <GatedButton
                   allowed={canRecommend}
                   reason={permissionReason}
@@ -188,7 +188,7 @@ export function IncidentDetailPage() {
                 },
                 {
                   key: "state",
-                  header: t("incident.state"),
+                  header: t("incident.status"),
                   render: (execution) => (
                     <StatusBadge
                       tone={
@@ -238,12 +238,12 @@ export function IncidentDetailPage() {
                   </Link>
                 </div>
                 <div>
-                  <span className="eyebrow">{t("dashboard.table.severity")}</span>
-                  <StatusBadge tone={severityTone(value.severity)} label={t(severityLabelKey(value.severity))} />
+                  <span className="eyebrow">{t("incident.priority")}</span>
+                  <StatusBadge tone={priorityTone(value.priority)} label={t(priorityLabelKey(value.priority))} />
                 </div>
                 <div>
-                  <span className="eyebrow">{t("incident.state")}</span>
-                  <StatusBadge tone={incidentStateTone(value.state)} label={t(incidentStateLabelKey(value.state))} />
+                  <span className="eyebrow">{t("incident.status")}</span>
+                  <StatusBadge tone={incidentStatusTone(value.status)} label={t(incidentStatusLabelKey(value.status))} />
                 </div>
                 <div>
                   <span className="eyebrow">{t("incident.detected")}</span>

@@ -5,7 +5,7 @@ import { useI18n } from "../../i18n/I18nProvider";
 import type { Incident } from "../../types";
 import { RelativeTime } from "../ui/RelativeTime";
 import { Skeleton } from "../ui/Skeleton";
-import { severityLabelKey } from "../labels";
+import { priorityLabelKey } from "../labels";
 
 const SEVERITY_ICONS = {
   CRITICAL: { Icon: WarningOctagon, className: "sev-critical" },
@@ -14,10 +14,11 @@ const SEVERITY_ICONS = {
   LOW: { Icon: Info, className: "sev-low" },
 } as const;
 
-const COLUMNS: Array<{ state: Incident["state"]; labelKey: "incident.state.open" | "incident.state.inProgress" | "incident.state.resolved" }> = [
-  { state: "OPEN", labelKey: "incident.state.open" },
-  { state: "IN_PROGRESS", labelKey: "incident.state.inProgress" },
-  { state: "RESOLVED", labelKey: "incident.state.resolved" },
+const COLUMNS: Array<{ state: Incident["status"]; labelKey: "incident.status.open" | "incident.status.inProgress" | "incident.status.resolved" | "incident.status.closed" }> = [
+  { state: "OPEN", labelKey: "incident.status.open" },
+  { state: "IN_PROGRESS", labelKey: "incident.status.inProgress" },
+  { state: "RESOLVED", labelKey: "incident.status.resolved" },
+  { state: "CLOSED", labelKey: "incident.status.closed" },
 ];
 
 export function IncidentBoard(props: {
@@ -31,7 +32,7 @@ export function IncidentBoard(props: {
   return (
     <div className="board" role="list" aria-label={t("incidents.view.board")}>
       {COLUMNS.map((column) => {
-        const items = props.incidents.filter((incident) => incident.state === column.state);
+        const items = props.incidents.filter((incident) => incident.status === column.state);
         return (
           <div className="board-column" key={column.state} role="listitem">
             <div className="board-column-heading">
@@ -65,15 +66,15 @@ function BoardCard(props: {
   t: ReturnType<typeof useI18n>["t"];
 }) {
   const { incident, locale, t } = props;
-  const severity = SEVERITY_ICONS[incident.severity] ?? SEVERITY_ICONS.LOW;
+  const severity = SEVERITY_ICONS[incident.priority] ?? SEVERITY_ICONS.LOW;
   const SeverityIcon = severity.Icon;
   return (
     <Link
       to={`/incidents/${incident.id}`}
-      className={`board-card board-card--${incident.severity.toLowerCase()}`}
+      className={`board-card board-card--${incident.priority.toLowerCase()}`}
     >
       <div className="board-card-top">
-        <SeverityIcon size={14} weight="fill" className={severity.className} aria-label={t(severityLabelKey(incident.severity))} />
+        <SeverityIcon size={14} weight="fill" className={severity.className} aria-label={t(priorityLabelKey(incident.priority))} />
         <span className="mono">{incident.number}</span>
       </div>
       <span className="board-card-summary">{incident.summary}</span>

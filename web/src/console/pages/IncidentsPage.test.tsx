@@ -17,8 +17,8 @@ const fixtures = vi.hoisted(() => ({
     asset_tag: "P-302",
     number: "IN-1",
     summary: "Pump vibration",
-    severity: "HIGH",
-    state: "OPEN",
+    priority: "HIGH",
+    status: "OPEN",
     detected_at: new Date().toISOString(),
     version: 1
   },
@@ -29,8 +29,8 @@ const fixtures = vi.hoisted(() => ({
     asset_tag: "P-304",
     number: "IN-2",
     summary: "Bearing temperature",
-    severity: "MEDIUM",
-    state: "IN_PROGRESS",
+    priority: "MEDIUM",
+    status: "IN_PROGRESS",
     detected_at: new Date().toISOString(),
     version: 1
   },
@@ -41,8 +41,8 @@ const fixtures = vi.hoisted(() => ({
     asset_tag: "P-305",
     number: "IN-3",
     summary: "Resolved noise",
-    severity: "LOW",
-    state: "RESOLVED",
+    priority: "LOW",
+    status: "RESOLVED",
     detected_at: new Date().toISOString(),
     version: 1
   }
@@ -62,7 +62,10 @@ vi.mock("../../api", () => ({
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" }
       ]
     }),
-    createIncident: vi.fn().mockResolvedValue({ id: "new1", number: "IN-9" })
+    createIncident: vi.fn().mockResolvedValue({ id: "new1", number: "IN-9" }),
+    teams: vi.fn().mockResolvedValue({ items: [{ id: "t1", name: "Facilities" }] }),
+    people: vi.fn().mockResolvedValue({ items: [{ id: "p1", display_name: "Tester" }] }),
+    uploadIncidentAttachment: vi.fn().mockResolvedValue({ id: "att1" })
   }
 }));
 
@@ -198,15 +201,18 @@ describe("IncidentsPage", () => {
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText(/asset/i), { target: { value: "a1" } });
     fireEvent.change(within(dialog).getByLabelText(/summary/i), { target: { value: "High vibration on bearing" } });
-    fireEvent.change(within(dialog).getByLabelText(/severity/i), { target: { value: "HIGH" } });
+    fireEvent.change(within(dialog).getByLabelText(/priority/i), { target: { value: "HIGH" } });
     fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
     await waitFor(() =>
-      expect(api.createIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith({
-        site_id: "s1",
-        asset_id: "a1",
-        summary: "High vibration on bearing",
-        severity: "HIGH"
-      }),
+      expect(api.createIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+        expect.objectContaining({
+          site_id: "s1",
+          asset_id: "a1",
+          summary: "High vibration on bearing",
+          priority: "HIGH",
+          status: "OPEN"
+        }),
+      ),
     );
     expect(screen.getByText("Incident created")).toBeTruthy();
   });

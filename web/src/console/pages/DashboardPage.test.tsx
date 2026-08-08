@@ -24,8 +24,8 @@ vi.mock("../../api", () => ({
           asset_tag: "P-302",
           number: "IN-1",
           summary: "Pump vibration",
-          severity: "HIGH",
-          state: "OPEN",
+          priority: "HIGH",
+          status: "OPEN",
           detected_at: new Date().toISOString(),
           version: 1
         },
@@ -36,8 +36,8 @@ vi.mock("../../api", () => ({
           asset_tag: "P-302",
           number: "IN-2",
           summary: "Resolved bearing noise",
-          severity: "LOW",
-          state: "RESOLVED",
+          priority: "LOW",
+          status: "RESOLVED",
           detected_at: new Date().toISOString(),
           version: 1
         }

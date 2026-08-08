@@ -6,7 +6,7 @@ import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
 import { RelativeTime } from "../ui/RelativeTime";
 import { StatusBadge, type Tone } from "../ui/StatusBadge";
-import { severityTone, severityLabelKey, incidentStateTone, incidentStateLabelKey } from "../labels";
+import { priorityTone, priorityLabelKey, incidentStatusTone, incidentStatusLabelKey } from "../labels";
 import type { Asset, Execution, Incident } from "../../types";
 
 type ForYouTab = "recommended" | "assigned" | "starred" | "viewed";
@@ -115,7 +115,7 @@ export function ForYouTabs({
   }, [tab]);
 
   const open = useMemo(
-    () => incidents.filter((incident) => incident.state !== "RESOLVED"),
+    () => incidents.filter((incident) => incident.status !== "RESOLVED"),
     [incidents],
   );
   const inProgress = useMemo(
@@ -199,7 +199,7 @@ function RecommendedQueue({
   return (
     <ul className="queue-list" role="list">
       {incidents.map((incident) => {
-        const Icon = SEVERITY_ICONS[incident.severity] ?? Info;
+        const Icon = SEVERITY_ICONS[incident.priority] ?? Info;
         return (
           <li key={incident.id} role="listitem">
             <Link
@@ -215,16 +215,16 @@ function RecommendedQueue({
                 })
               }
             >
-              <span className={`alarm-edge alarm-edge--${incident.severity.toLowerCase()}`} aria-hidden="true" />
-              <Icon size={15} weight="fill" className={`sev-${incident.severity.toLowerCase()}`} aria-hidden="true" />
+              <span className={`alarm-edge alarm-edge--${incident.priority.toLowerCase()}`} aria-hidden="true" />
+              <Icon size={15} weight="fill" className={`sev-${incident.priority.toLowerCase()}`} aria-hidden="true" />
               <span className="queue-row-key mono">{incident.number}</span>
               <span className="queue-row-main">
                 <strong>{incident.summary}</strong>
                 <small>
                   {incident.asset_tag ?? t("dashboard.table.asset")}
                   <span className="queue-row-breadcrumb">
-                    <StatusBadge tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />
-                    <StatusBadge tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />
+                    <StatusBadge tone={priorityTone(incident.priority)} label={t(priorityLabelKey(incident.priority))} />
+                    <StatusBadge tone={incidentStatusTone(incident.status)} label={t(incidentStatusLabelKey(incident.status))} />
                   </span>
                 </small>
               </span>

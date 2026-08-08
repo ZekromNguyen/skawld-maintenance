@@ -1,5 +1,6 @@
 import type {
   Asset,
+  Attachment,
   Demonstration,
   EvaluationSummary,
   Execution,
@@ -9,11 +10,13 @@ import type {
   Incident,
   ListResponse,
   Measurement,
+  Person,
   Principal,
   Problem,
   Recommendation,
   ShiftHandover,
   Step,
+  Team,
   WorkflowApplicability,
   WorkflowVersion
 } from "./types";
@@ -138,13 +141,54 @@ export const api = {
     site_id: string;
     asset_id: string;
     summary: string;
-    severity: string;
+    details?: string;
+    priority: string;
+    status?: string;
+    assignee_id?: string;
+    reporter_id?: string;
+    team_id?: string;
+    occurred_at?: string;
   }) =>
     command<Incident>("/incidents", {
       ...value,
       source_of_truth: "OWNED_BY_SKAWLD",
       detected_at: new Date().toISOString()
     }),
+  teams: () => request<{ items: Team[] }>("/teams"),
+  people: () => request<{ items: Person[] }>("/people"),
+  listAttachments: (entityKind: string, entityId: string) =>
+    request<{ items: Attachment[] }>(
+      `/attachments?entity_kind=${encodeURIComponent(entityKind)}&entity_id=${encodeURIComponent(entityId)}`
+    ),
+  uploadIncidentAttachment: async (incidentId: string, siteId: string, file: File) => {
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const checksum = Array.from(new Uint8Array(digest))
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    const manifest = await command<Attachment>("/attachments", {
+      site_id: siteId,
+      entity_kind: "INCIDENT",
+      entity_id: incidentId,
+      client_event_id: crypto.randomUUID(),
+      original_filename: file.name,
+      declared_mime: file.type || "video/mp4",
+      size_bytes: file.size,
+      checksum_sha256: checksum
+    });
+    const upload = await fetch(manifest.upload_url!, {
+      method: "PUT",
+      headers: manifest.upload_headers ?? {},
+      body: file
+    });
+    if (!upload.ok) {
+      throw new ApiError({ status: upload.status, title: "Upload failed", detail: `Upload failed with status ${upload.status}` });
+    }
+    return command<Attachment>(`/attachments/${manifest.id}/complete`, {});
+  },
+  closeIncident: (incidentID: string, expectedVersion: number) =>
+    command<Incident>(`/incidents/${incidentID}/close`, { expected_version: expectedVersion }),
+  reopenIncident: (incidentID: string, expectedVersion: number) =>
+    command<Incident>(`/incidents/${incidentID}/reopen`, { expected_version: expectedVersion }),
   execution: (id: string) => request<Execution>(`/executions/${id}`),
   createExecution: (incidentID: string) =>
     command<Execution>(`/incidents/${incidentID}/executions`, {

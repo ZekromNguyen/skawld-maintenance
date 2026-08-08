@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SavedViews } from "./SavedViews";
 import { I18nProvider } from "../../i18n/I18nProvider";
 
-const views = [{ id: "v1", name: "My critical queue", severity: "CRITICAL", query: "" }];
+const views = [{ id: "v1", name: "My critical queue", priority: "CRITICAL", query: "" }];
 
 function renderViews(props: {
   onSave: () => void;

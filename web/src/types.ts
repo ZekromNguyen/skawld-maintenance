@@ -27,6 +27,9 @@ export type Asset = {
   criticality?: Criticality;
 };
 
+export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "REOPENED";
+export type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
 export type Incident = {
   id: string;
   site_id: string;
@@ -34,10 +37,41 @@ export type Incident = {
   asset_tag?: string;
   number: string;
   summary: string;
-  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  state: "OPEN" | "IN_PROGRESS" | "RESOLVED";
+  details?: string;
+  priority: Priority;
+  status: IncidentStatus;
+  assignee_id?: string;
+  assignee_name?: string;
+  reporter_id?: string;
+  reporter_name?: string;
+  team_id?: string;
+  team_name?: string;
+  occurred_at?: string;
   detected_at: string;
+  resolved_at?: string;
+  time_to_complete_seconds?: number;
   version: number;
+  attachments?: Attachment[];
+};
+
+export type Team = { id: string; name: string };
+export type Person = { id: string; display_name: string };
+
+export type Attachment = {
+  id: string;
+  organization_id: string;
+  site_id: string;
+  entity_kind: "EXECUTION" | "OBSERVATION" | "INCIDENT" | "DOCUMENT_REVISION";
+  entity_id: string;
+  original_filename: string;
+  declared_mime: string;
+  verified_mime?: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  state: string;
+  upload_url?: string;
+  upload_headers?: Record<string, string>;
+  download_url?: string;
 };
 
 export type Step = {

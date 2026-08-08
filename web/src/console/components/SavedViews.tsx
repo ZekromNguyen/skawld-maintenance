@@ -4,7 +4,7 @@ import { useI18n } from "../../i18n/I18nProvider";
 export interface SavedView {
   id: string;
   name: string;
-  severity: string;
+  priority: string;
   query: string;
 }
 

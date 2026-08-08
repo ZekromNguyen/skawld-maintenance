@@ -12,8 +12,8 @@ const OPEN_HIGH: Incident = {
   asset_tag: "P-302",
   number: "IN-1",
   summary: "Pump vibration",
-  severity: "HIGH",
-  state: "OPEN",
+  priority: "HIGH",
+  status: "OPEN",
   detected_at: new Date(Date.now() - 60_000).toISOString(),
   version: 1,
 };
@@ -24,8 +24,8 @@ const RESOLVED_LOW: Incident = {
   asset_tag: "P-305",
   number: "IN-3",
   summary: "Resolved noise",
-  severity: "LOW",
-  state: "RESOLVED",
+  priority: "LOW",
+  status: "RESOLVED",
   detected_at: new Date().toISOString(),
   version: 1,
 };
@@ -120,7 +120,7 @@ describe("ForYouTabs", () => {
       "skawld.incidents.savedViews",
       JSON.stringify([
         { id: "v1", name: "My critical queue", severity: "CRITICAL", query: "" },
-        { id: "v2", name: "Pump focus", severity: "HIGH", query: "pump" },
+        { id: "v2", name: "Pump focus", priority: "HIGH", query: "pump" },
       ]),
     );
     renderTabs();

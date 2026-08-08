@@ -23,8 +23,8 @@ vi.mock("../../api", () => ({
       asset_tag: "P-302",
       number: "IN-1042",
       summary: "High vibration on pump",
-      severity: "HIGH",
-      state: "OPEN",
+      priority: "HIGH",
+      status: "OPEN",
       detected_at: new Date().toISOString(),
       version: 1
     }),

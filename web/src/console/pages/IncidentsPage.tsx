@@ -14,19 +14,19 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
-import { CreateIncidentForm } from "../components/CreateIncidentForm";
+import { CreateIncidentForm, type CreateIncidentValue } from "../components/CreateIncidentForm";
 import { IncidentBoard } from "../components/IncidentBoard";
 import { SavedViews, type SavedView } from "../components/SavedViews";
 import {
-  severityTone,
-  severityLabelKey,
-  incidentStateTone,
-  incidentStateLabelKey,
+  priorityTone,
+  priorityLabelKey,
+  incidentStatusTone,
+  incidentStatusLabelKey,
 } from "../labels";
 import type { Incident } from "../../types";
 
-type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ALL";
-const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
+type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "ALL";
+const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ALL"];
 
 type ViewMode = "list" | "board";
 const VIEW_STORAGE_KEY = "skawld.incidents.view";
@@ -71,8 +71,10 @@ export function IncidentsPage() {
   const { data: principal } = usePrincipal();
   const incidents = usePaginatedList((params) => api.incidents(params), []);
   const assets = useQuery(() => api.assets().then((list) => list.items));
+  const teams = useQuery(() => api.teams().then((list) => list.items));
+  const people = useQuery(() => api.people().then((list) => list.items));
   const [tab, setTab] = useState<StateTab>("OPEN");
-  const [severity, setSeverity] = useState("ALL");
+  const [priority, setPriority] = useState("ALL");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>(initialView);
   const [showForm, setShowForm] = useState(false);
@@ -82,7 +84,7 @@ export function IncidentsPage() {
       {
         id: "my-critical",
         name: t("incidents.views.myCritical"),
-        severity: "CRITICAL",
+        priority: "CRITICAL",
         query: "",
       },
     ]),
@@ -108,7 +110,7 @@ export function IncidentsPage() {
         ? crypto.randomUUID()
         : String(Date.now()),
       name: t("incidents.views.defaultName"),
-      severity,
+      priority,
       query,
     };
     const updated = [...savedViews, next];
@@ -120,7 +122,7 @@ export function IncidentsPage() {
   function applyView(id: string) {
     const view = savedViews.find((item) => item.id === id);
     if (!view) return;
-    setSeverity(view.severity);
+    setPriority(view.priority);
     setQuery(view.query);
     setActiveViewId(id);
   }
@@ -133,8 +135,13 @@ export function IncidentsPage() {
   }
 
   const create = useCommand(
-    (value: { site_id: string; asset_id: string; summary: string; severity: string }) =>
-      api.createIncident(value),
+    async (value: CreateIncidentValue) => {
+      const incident = await api.createIncident(value);
+      for (const file of value.files) {
+        await api.uploadIncidentAttachment(incident.id, value.site_id, file);
+      }
+      return incident;
+    },
     {
       successMessage: t("incidents.create.success"),
       onSuccess: (incident) => navigate(`/incidents/${incident.id}`),
@@ -144,7 +151,7 @@ export function IncidentsPage() {
   const filtered = useMemo(() => {
     const items = incidents.items;
     return items
-      .filter((incident) => severity === "ALL" || incident.severity === severity)
+      .filter((incident) => priority === "ALL" || incident.priority === priority)
       .filter((incident) => {
         if (!query.trim()) return true;
         const q = query.trim().toLowerCase();
@@ -154,10 +161,10 @@ export function IncidentsPage() {
           (incident.asset_tag ?? "").toLowerCase().includes(q)
         );
       });
-  }, [incidents.items, severity, query]);
+  }, [incidents.items, priority, query]);
 
   const rows = useMemo(
-    () => filtered.filter((incident) => tab === "ALL" || incident.state === tab),
+    () => filtered.filter((incident) => tab === "ALL" || incident.status === tab),
     [filtered, tab],
   );
 
@@ -170,9 +177,10 @@ export function IncidentsPage() {
   const counts = useMemo(() => {
     const items = filtered;
     return {
-      OPEN: items.filter((i) => i.state === "OPEN").length,
-      IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
-      RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
+      OPEN: items.filter((i) => i.status === "OPEN").length,
+      IN_PROGRESS: items.filter((i) => i.status === "IN_PROGRESS").length,
+      RESOLVED: items.filter((i) => i.status === "RESOLVED").length,
+      CLOSED: items.filter((i) => i.status === "CLOSED").length,
       ALL: items.length,
     } as Record<StateTab, number>;
   }, [filtered]);
@@ -210,7 +218,7 @@ export function IncidentsPage() {
                   className={`tab${tab === state ? " active" : ""}`}
                   onClick={() => setTab(state)}
                 >
-                  {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
+                  {state === "ALL" ? t("incidents.tabs.all") : t(incidentStatusLabelKey(state))}
                   <span className="count">{counts[state]}</span>
                 </button>
               ))}
@@ -225,15 +233,15 @@ export function IncidentsPage() {
           />
           <select
             aria-label={t("incidents.filter.severity")}
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value)}
+            value={priority}
+            onChange={(event) => setPriority(event.target.value)}
             className="incident-severity-filter"
           >
             <option value="ALL">{t("incidents.tabs.all")}</option>
-            <option value="LOW">{t(severityLabelKey("LOW"))}</option>
-            <option value="MEDIUM">{t(severityLabelKey("MEDIUM"))}</option>
-            <option value="HIGH">{t(severityLabelKey("HIGH"))}</option>
-            <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
+            <option value="LOW">{t(priorityLabelKey("LOW"))}</option>
+            <option value="MEDIUM">{t(priorityLabelKey("MEDIUM"))}</option>
+            <option value="HIGH">{t(priorityLabelKey("HIGH"))}</option>
+            <option value="CRITICAL">{t(priorityLabelKey("CRITICAL"))}</option>
           </select>
           <div className="view-toggle" role="group" aria-label={t("incidents.view.label")}>
             <button
@@ -299,17 +307,17 @@ export function IncidentsPage() {
               key: "severity",
               header: t("dashboard.table.severity"),
               render: (incident) => (
-                <StatusBadge tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />
+                <StatusBadge tone={priorityTone(incident.priority)} label={t(priorityLabelKey(incident.priority))} />
               ),
-              sortValue: (i) => i.severity,
+              sortValue: (i) => i.priority,
             },
             {
               key: "state",
               header: t("dashboard.table.state"),
               render: (incident) => (
-                <StatusBadge tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />
+                <StatusBadge tone={incidentStatusTone(incident.status)} label={t(incidentStatusLabelKey(incident.status))} />
               ),
-              sortValue: (i) => i.state,
+              sortValue: (i) => i.status,
             },
             {
               key: "age",
@@ -319,7 +327,7 @@ export function IncidentsPage() {
           ]}
           rows={rows}
           rowKey={(incident) => incident.id}
-          rowClassName={(incident) => `alarm-row alarm-row--${incident.severity.toLowerCase()}`}
+          rowClassName={(incident) => `alarm-row alarm-row--${incident.priority.toLowerCase()}`}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
           onTableKeyDown={(event) => {
             if (view === "list") onKeyDown(event);
@@ -350,6 +358,9 @@ export function IncidentsPage() {
         >
           <CreateIncidentForm
             assets={assets.data ?? []}
+            people={people.data ?? []}
+            teams={teams.data ?? []}
+            principal={principal}
             pending={create.pending}
             onCancel={() => setShowForm(false)}
             onCreate={(value) => void create.run(value)}
