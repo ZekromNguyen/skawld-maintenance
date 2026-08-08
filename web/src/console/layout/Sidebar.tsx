@@ -12,10 +12,8 @@ import {
   Gauge,
   type Icon,
 } from "@phosphor-icons/react";
-import { Moon, Sun } from "@phosphor-icons/react";
 import { useI18n } from "../../i18n/I18nProvider";
-import { useTheme } from "../../theme/ThemeProvider";
-import type { Locale, MessageKey } from "../../i18n/messages";
+import type { MessageKey } from "../../i18n/messages";
 import type { Principal } from "../../types";
 import { can, type PermissionKey } from "../permissions";
 
@@ -62,8 +60,7 @@ const SECTIONS: Array<{ heading: MessageKey; items: NavItem[] }> = [
  * principals lacking the required permission (report:write for Records).
  */
 export function Sidebar({ principal }: { principal?: Principal }) {
-  const { t, locale, setLocale } = useI18n();
-  const { theme, toggleTheme } = useTheme();
+  const { t } = useI18n();
   const location = useLocation();
 
   return (
@@ -104,22 +101,6 @@ export function Sidebar({ principal }: { principal?: Principal }) {
         })}
       </nav>
       <div className="sidebar-footer">
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={toggleTheme}
-          aria-label={theme === "light" ? t("theme.switchToDark") : t("theme.switchToLight")}
-        >
-          {theme === "light" ? <Moon size={14} aria-hidden="true" /> : <Sun size={14} aria-hidden="true" />}
-          {theme === "light" ? t("theme.switchToDark") : t("theme.switchToLight")}
-        </button>
-        <label className="lang-switch">
-          <span className="eyebrow">{t("lang.label")}</span>
-          <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-            <option value="en">English</option>
-            <option value="vi">Tiếng Việt</option>
-          </select>
-        </label>
         <div className="safety-boundary">
           <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
           <strong>{t("sidebar.advisoryOnly")}</strong>
