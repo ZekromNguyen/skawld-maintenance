@@ -502,6 +502,8 @@ const en = {
   "workbench.startSuccess": "Execution started",
   "workbench.stepComplete": "Step completed",
   "workbench.reportDrafted": "Report drafted",
+  "workbench.lotoActive": "LOTO ACTIVE - intrusive step gated",
+  "workbench.lotoBody": "A locked-out step is blocking progress. Clear the gate before continuing.",
 
   "error.unableToLoad": "Unable to load maintenance data",
   "error.commandFailed": "Command failed",
@@ -1172,6 +1174,8 @@ const vi: Record<MessageKey, string> = {
   "workbench.startSuccess": "Đã bắt đầu quy trình",
   "workbench.stepComplete": "Đã hoàn thành bước",
   "workbench.reportDrafted": "Đã tạo báo cáo nháp",
+  "workbench.lotoActive": "LOTO ĐANG KÍCH HOẠT - bước xâm nhập bị khóa",
+  "workbench.lotoBody": "Một bước khóa an toàn đang chặn tiến độ. Hãy giải phóng khóa trước khi tiếp tục.",
 
   "error.unableToLoad": "Không thể tải dữ liệu bảo trì",
   "error.commandFailed": "Lệnh thất bại",

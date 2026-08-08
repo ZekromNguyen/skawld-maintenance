@@ -114,4 +114,40 @@ describe("ExecutionWorkbenchPage", () => {
     expect(screen.queryByRole("button", { name: "Complete" })).toBeNull();
     expect(screen.queryByText("Draft report")).toBeNull();
   });
+
+  it("shows no LOTO banner when no step is blocked", async () => {
+    renderWorkbench();
+    await screen.findByText("Apply LOTO");
+    expect(screen.queryByText(/LOTO ACTIVE/)).toBeNull();
+  });
+
+  it("surfaces a LOTO banner when a step is blocked", async () => {
+    (api.execution as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "ex2",
+      incident_id: "inc1",
+      asset_id: "a1",
+      asset_tag: "P-302",
+      purpose: "Isolation verification",
+      state: "IN_PROGRESS",
+      version: 1,
+      steps: [
+        {
+          id: "s9",
+          key: "loto",
+          sequence: 1,
+          title: "Release lockout",
+          state: "BLOCKED",
+          risk_level: "SAFETY_SIGNIFICANT",
+          blocked_reason: "Tagout tag not signed",
+          version: 1
+        }
+      ],
+      measurements: [],
+      observations: [],
+      actions: []
+    });
+    renderWorkbench();
+    expect(await screen.findByText(/LOTO ACTIVE/)).toBeTruthy();
+    expect(screen.getByText(/blocking progress/)).toBeTruthy();
+  });
 });

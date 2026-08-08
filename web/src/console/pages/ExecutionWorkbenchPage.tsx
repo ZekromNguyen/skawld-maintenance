@@ -153,9 +153,20 @@ export function ExecutionWorkbenchPage() {
             </Link>
           ) : null}
         </div>
-        <div style={{ display: "grid", gap: 16 }}>
-          <StepRail steps={value.steps} onToggle={handleStepToggle} canWrite={canWrite} />
-          <div style={{ display: "grid", gap: 16 }}>
+        <div className="workbench-layout">
+          <div className="workbench-steps">
+            {value.steps.some((step) => step.state === "BLOCKED") && (
+              <div className="loto-banner" role="status">
+                <span className="loto-banner-dot" aria-hidden="true" />
+                <div>
+                  <strong>{t("workbench.lotoActive")}</strong>
+                  <p>{t("workbench.lotoBody")}</p>
+                </div>
+              </div>
+            )}
+            <StepRail steps={value.steps} onToggle={handleStepToggle} canWrite={canWrite} />
+          </div>
+          <div className="workbench-rail" style={{ display: "grid", gap: 16 }}>
             <div className="panel">
               <div className="panel-heading">
                 <h2>{t("execution.measurements")}</h2>
