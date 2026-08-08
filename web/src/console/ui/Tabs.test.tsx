@@ -51,3 +51,41 @@ describe("Tabs", () => {
     expect(calls).toEqual(["b"]);
   });
 });
+
+describe("Tabs keyboard edges", () => {
+  it("wraps around at the ends and supports Home/End", () => {
+    const onChange = (() => {}) as (id: string) => void;
+    render(
+      <Tabs
+        label="edge"
+        tabs={[{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }]}
+        active="a"
+        onChange={onChange}
+      />,
+    );
+    const first = screen.getByRole("tab", { name: "A" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "C" }));
+    fireEvent.keyDown(screen.getByRole("tab", { name: "C" }), { key: "End" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "C" }));
+    fireEvent.keyDown(screen.getByRole("tab", { name: "C" }), { key: "Home" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "A" }));
+  });
+
+  it("activates the current tab on Enter", () => {
+    const calls: string[] = [];
+    render(
+      <Tabs
+        label="enter"
+        tabs={[{ id: "a", label: "A" }, { id: "b", label: "B" }]}
+        active="a"
+        onChange={(id) => calls.push(id)}
+      />,
+    );
+    const first = screen.getByRole("tab", { name: "A" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "Enter" });
+    expect(calls).toEqual(["a"]);
+  });
+});

@@ -2,9 +2,16 @@ import type { KeyboardEvent } from "react";
 
 export type TabItem = { id: string; label: string; count?: number };
 
+/** Stable panel id for a tablist label; callers stamp it on the tabpanel. */
+export function tabPanelId(label: string): string {
+  return `tabpanel-${label.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+}
+
 /**
  * Tabs: WAI-ARIA tabs with roving tabindex and arrow-key navigation.
- * Arrow keys move focus without activating; Enter/Space activates.
+ * Arrow keys activate the neighboring tab (automatic activation);
+ * Home/End jump to the first/last; Enter/Space activate. Callers must
+ * stamp `panelId` on the tabpanel container they render below.
  */
 export function Tabs({
   label,
@@ -17,7 +24,7 @@ export function Tabs({
   active: string;
   onChange: (id: string) => void;
 }) {
-  const panelId = `tabpanel-${label.replace(/\s+/g, "-")}`;
+  const panelId = tabPanelId(label);
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, id: string) => {
     const index = tabs.findIndex((tab) => tab.id === id);

@@ -7,7 +7,7 @@ import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
-import { Tabs } from "../ui/Tabs";
+import { Tabs, tabPanelId } from "../ui/Tabs";
 import { executionStateLabelKey, executionStateTone } from "../labels";
 import type { Execution } from "../../types";
 
@@ -42,7 +42,12 @@ export function ExecutionsPage() {
           active={filter}
           onChange={(id) => setFilter(id as StateFilter)}
         />
-        <DataTable<Execution>
+        <div
+          id={tabPanelId(t("executions.state"))}
+          role="tabpanel"
+          aria-labelledby={`${tabPanelId(t("executions.state"))}-${filter}`}
+        >
+          <DataTable<Execution>
           columns={[
             {
               key: "purpose",
@@ -101,6 +106,7 @@ export function ExecutionsPage() {
           error={executions.error}
           onRetry={() => void executions.refetch()}
         />
+        </div>
         {executions.hasMore ? (
           <button
             type="button"

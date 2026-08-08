@@ -12,7 +12,7 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
-import { Tabs } from "../ui/Tabs";
+import { Tabs, tabPanelId } from "../ui/Tabs";
 import { CreateIncidentForm } from "../components/CreateIncidentForm";
 import {
   severityTone,
@@ -135,7 +135,12 @@ export function IncidentsPage() {
           </select>
         </div>
         <p className="section-lead">{t("incidents.filter.searchHint")}</p>
-        <DataTable<Incident>
+        <div
+          id={tabPanelId(t("nav.incidents"))}
+          role="tabpanel"
+          aria-labelledby={`${tabPanelId(t("nav.incidents"))}-${tab}`}
+        >
+          <DataTable<Incident>
           columns={[
             {
               key: "number",
@@ -187,6 +192,7 @@ export function IncidentsPage() {
           error={incidents.error}
           onRetry={() => void incidents.refetch()}
         />
+        </div>
         {incidents.hasMore ? (
           <button
             type="button"
