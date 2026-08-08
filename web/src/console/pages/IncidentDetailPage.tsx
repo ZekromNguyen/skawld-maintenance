@@ -238,7 +238,13 @@ export function IncidentDetailPage() {
             </>
           }
         />
-        <div className="incident-subtitle mono">{value.number}</div>
+        <div className="incident-subtitle">
+          <span className="mono">{value.number}</span>
+          <span className="incident-pills" aria-label={t("incident.facts")}>
+            <StatusBadge tone={priorityTone(value.priority)} label={t(priorityLabelKey(value.priority))} />
+            <StatusBadge tone={incidentStatusTone(value.status)} label={t(incidentStatusLabelKey(value.status))} />
+          </span>
+        </div>
         <div className="detail-layout">
           <div className="detail-main" style={{ display: "grid", gap: 16 }}>
             <div className="panel">

@@ -161,12 +161,17 @@ func currentPrincipal(w http.ResponseWriter, r *http.Request) {
 		permissions = append(permissions, string(permission))
 	}
 	sort.Strings(permissions)
+	roles := make([]string, 0, len(principal.Roles))
+	for _, role := range principal.Roles {
+		roles = append(roles, string(role))
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":               principal.ID,
 		"external_subject": principal.ExternalSubject,
 		"display_name":     principal.DisplayName,
 		"organization_id":  principal.OrganizationID,
 		"site_ids":         principal.SiteIDs,
+		"roles":            roles,
 		"permissions":      permissions,
 	})
 }

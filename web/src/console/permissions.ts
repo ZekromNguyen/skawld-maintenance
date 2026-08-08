@@ -40,6 +40,13 @@ export function can(
   return list.every((permission) => hasPermission(principal, permission));
 }
 
+export function canAny(
+  principal: Pick<Principal, "permissions"> | undefined,
+  candidates: PermissionKey[],
+): boolean {
+  return candidates.some((permission) => hasPermission(principal, permission));
+}
+
 export type RoleFocus =
   | "admin"
   | "supervisor"

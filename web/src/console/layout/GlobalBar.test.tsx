@@ -8,35 +8,22 @@ import { SiteProvider } from "../state/SiteContext";
 
 vi.mock("../../api", () => ({ api: {} }));
 
-function renderBar() {
+function renderBar(permissions: string[] = [], roles: string[] = []) {
+  const principal = {
+    id: "p1",
+    display_name: "Tester",
+    organization_id: "o1",
+    site_ids: ["s1"],
+    roles,
+    permissions,
+  };
   return render(
     <ThemeProvider>
       <I18nProvider>
-        <SiteProvider
-          principal={{
-            id: "p1",
-            display_name: "Tester",
-            organization_id: "o1",
-            site_ids: ["s1"],
-            permissions: [],
-          }}
-        >
+        <SiteProvider principal={principal}>
           <MemoryRouter initialEntries={["/"]}>
             <Routes>
-              <Route
-                path="*"
-                element={
-                  <GlobalBar
-                    principal={{
-                      id: "p1",
-                      display_name: "Tester",
-                      organization_id: "o1",
-                      site_ids: ["s1"],
-                      permissions: [],
-                    }}
-                  />
-                }
-              />
+              <Route path="*" element={<GlobalBar principal={principal} />} />
             </Routes>
           </MemoryRouter>
         </SiteProvider>
@@ -55,5 +42,22 @@ describe("GlobalBar", () => {
     renderBar();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(screen.getByText("Commands")).toBeTruthy();
+  });
+  it("hides the Create menu without create permissions", () => {
+    renderBar();
+    expect(screen.queryByRole("button", { name: /Create/ })).toBeNull();
+  });
+  it("shows gated Create items for a supervisor", () => {
+    renderBar(["incident:create", "asset:create"], ["Maintenance Supervisor"]);
+    fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+    expect(screen.getByRole("menuitem", { name: "New incident" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "New asset" })).toBeTruthy();
+  });
+  it("opens the avatar menu with roles and profile", () => {
+    renderBar([], ["Technician"]);
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByText("Technician")).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Profile" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeTruthy();
   });
 });

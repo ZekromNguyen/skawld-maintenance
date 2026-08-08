@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
@@ -21,6 +21,14 @@ export function AssetsPage() {
   const { data: principal } = usePrincipal();
   const assets = usePaginatedList((params) => api.assets(params), []);
   const [showForm, setShowForm] = useState(false);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get("create") === "1") {
+      setShowForm(true);
+      params.delete("create");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
   const canCreate = principal?.permissions.includes("asset:create") ?? false;
   const siteIDs = principal?.site_ids ?? [];
 

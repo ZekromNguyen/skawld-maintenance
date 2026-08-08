@@ -16,11 +16,17 @@ import {
 import { useI18n } from "../../i18n/I18nProvider";
 import type { MessageKey } from "../../i18n/messages";
 import type { Principal } from "../../types";
-import { can, focusRole, type PermissionKey } from "../permissions";
+import { can, canAny, focusRole, type PermissionKey } from "../permissions";
 import { FOCUS_CONFIG } from "../dashboardFocus";
 import { useSite } from "../state/SiteContext";
 
-type NavItem = { to: string; key: MessageKey; icon: Icon; permission?: PermissionKey };
+type NavItem = {
+  to: string;
+  key: MessageKey;
+  icon: Icon;
+  permission?: PermissionKey;
+  anyPermission?: PermissionKey[];
+};
 
 const PRIMARY: NavItem[] = [
   { to: "/", key: "nav.overview", icon: House },
@@ -33,8 +39,8 @@ const CROSS_LINKS: NavItem[] = [
   { to: "/assets", key: "nav.assets", icon: Cube },
   { to: "/knowledge", key: "nav.knowledge", icon: Books },
   { to: "/search", key: "nav.search", icon: MagnifyingGlass },
-  { to: "/reports", key: "nav.reports", icon: FileText, permission: "report:write" },
-  { to: "/quality", key: "nav.quality", icon: Gauge },
+  { to: "/reports", key: "nav.reports", icon: FileText, anyPermission: ["report:write", "report:approve"] },
+  { to: "/quality", key: "nav.quality", icon: Gauge, permission: "recommendation:review" },
   { to: "/demonstrations", key: "nav.demonstrations", icon: Play },
   { to: "/workflows", key: "nav.workflows", icon: GitBranch },
 ];
@@ -59,13 +65,6 @@ export function Sidebar({ principal }: { principal?: Principal }) {
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-mark">S</span>
-        <span>
-          <strong>Skawld</strong>
-          <small>Maintenance Intelligence</small>
-        </span>
-      </div>
       <nav aria-label={t("nav.mainNavigation")}>
         <span className="nav-section">{t("sidebar.primary")}</span>
         {PRIMARY.map((item) => {
@@ -115,7 +114,9 @@ export function Sidebar({ principal }: { principal?: Principal }) {
         ))}
 
         <span className="nav-section">{t("sidebar.crossLinks")}</span>
-        {CROSS_LINKS.filter((item) => can(principal, item.permission)).map((item) => {
+        {CROSS_LINKS.filter(
+          (item) => can(principal, item.permission) && (!item.anyPermission || canAny(principal, item.anyPermission)),
+        ).map((item) => {
           const IconComponent = item.icon;
           const active = isActive(location.pathname, item.to);
           return (
@@ -132,28 +133,12 @@ export function Sidebar({ principal }: { principal?: Principal }) {
         })}
       </nav>
       <div className="sidebar-footer">
-        <span className="nav-section">{t("sidebar.customize")}</span>
         <div className="safety-boundary">
           <span className="eyebrow">{t("sidebar.safetyBoundary")}</span>
           <strong>{t("sidebar.advisoryOnly")}</strong>
           <p>{t("sidebar.noControl")}</p>
         </div>
-        <button className="logout-button" onClick={() => signOut()}>
-          {t("nav.signOut")}
-        </button>
       </div>
     </aside>
   );
-}
-
-// Submit a POST form so the browser follows the full 303 -> Keycloak -> SPA
-// redirect chain natively. fetch-based logout cannot cross the Keycloak
-// redirect without CORS, leaving the page frozen until the fallback fires.
-function signOut() {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = "/auth/logout";
-  form.style.display = "none";
-  document.body.appendChild(form);
-  form.submit();
 }

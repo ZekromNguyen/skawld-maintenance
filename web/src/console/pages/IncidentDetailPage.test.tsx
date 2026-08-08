@@ -58,7 +58,7 @@ describe("IncidentDetailPage", () => {
   it("renders incident facts and actions", async () => {
     renderDetail();
     expect(await screen.findByText("High vibration on pump")).toBeTruthy();
-    expect(screen.getByText("High")).toBeTruthy();
+    expect(screen.getAllByText("High").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Create execution" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Resolve incident" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Generate evidence-backed recommendation" })).toBeTruthy();

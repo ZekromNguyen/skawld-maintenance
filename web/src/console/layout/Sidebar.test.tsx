@@ -10,13 +10,13 @@ function renderSidebar(entry: string, sites: string[] = ["s1"]) {
   return render(
     <ThemeProvider>
       <I18nProvider>
-        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, permissions: [] }}>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, roles: [], permissions: [] }}>
         <MemoryRouter initialEntries={[entry]}>
           <Routes>
             <Route path="/incidents/:incidentId" element={<div>detail</div>} />
             <Route path="*" element={<div>page</div>} />
           </Routes>
-          <Sidebar principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, permissions: [] }} />
+          <Sidebar principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, roles: [], permissions: [] }} />
         </MemoryRouter>
         </SiteProvider>
       </I18nProvider>
@@ -39,6 +39,7 @@ function renderSidebarWithPermissions(permissions: string[], sites: string[] = [
               display_name: "T",
               organization_id: "o1",
               site_ids: sites,
+              roles: [],
               permissions,
             }}
           />
@@ -50,13 +51,11 @@ function renderSidebarWithPermissions(permissions: string[], sites: string[] = [
 }
 
 describe("Sidebar", () => {
-  it("renders brand and Jira-style grouped navigation", () => {
+  it("renders Jira-style grouped navigation", () => {
     renderSidebar("/");
-    expect(screen.getByText("Skawld")).toBeTruthy();
     expect(screen.getByText("Primary")).toBeTruthy();
     expect(screen.getByText("Recommended")).toBeTruthy();
     expect(screen.getByText("Cross-links")).toBeTruthy();
-    expect(screen.getByText("Customize")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Incident execution" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Executions" })).toBeTruthy();
   });
@@ -81,6 +80,18 @@ describe("Sidebar", () => {
   it("hides Reports for a manager (no report:write)", () => {
     renderSidebarWithPermissions(["handover:accept", "recommendation:review"]);
     expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
+  });
+
+  it("shows Reports for an approver (report:approve only)", () => {
+    renderSidebarWithPermissions(["report:approve"]);
+    expect(screen.getByRole("link", { name: "Reports" })).toBeTruthy();
+  });
+
+  it("gates Quality on recommendation:review", () => {
+    renderSidebarWithPermissions(["execution:write"]);
+    expect(screen.queryByRole("link", { name: "AI quality & safety" })).toBeNull();
+    renderSidebarWithPermissions(["recommendation:review"]);
+    expect(screen.getByRole("link", { name: "AI quality & safety" })).toBeTruthy();
   });
 
   it("lists recent sites only when the principal has more than one", () => {

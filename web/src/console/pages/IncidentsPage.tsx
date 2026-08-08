@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { Kanban, Rows } from "@phosphor-icons/react";
+import { Kanban, MagnifyingGlass, Rows } from "@phosphor-icons/react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePaginatedList } from "../usePaginatedList";
@@ -14,11 +14,11 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
+import { initials, avatarColor } from "../ui/avatar";
 import { CreateIncidentForm, type CreateIncidentValue } from "../components/CreateIncidentForm";
 import { IncidentBoard } from "../components/IncidentBoard";
 import { SavedViews, type SavedView } from "../components/SavedViews";
 import {
-  priorityTone,
   priorityLabelKey,
   incidentStatusTone,
   incidentStatusLabelKey,
@@ -89,10 +89,14 @@ export function IncidentsPage() {
       },
     ]),
   );
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   useEffect(() => {
-    if (params.get("create") === "1") setShowForm(true);
-  }, [params]);
+    if (params.get("create") === "1") {
+      setShowForm(true);
+      params.delete("create");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
 
   function switchView(next: ViewMode) {
@@ -224,13 +228,16 @@ export function IncidentsPage() {
               ))}
             </div>
           )}
-          <input
-            aria-label={t("incidents.filter.search")}
-            placeholder={t("incidents.filter.search")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="incident-search"
-          />
+          <div className="search-field">
+            <MagnifyingGlass size={13} className="search-icon" aria-hidden="true" />
+            <input
+              aria-label={t("incidents.filter.search")}
+              placeholder={t("incidents.filter.search")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="incident-search"
+            />
+          </div>
           <select
             aria-label={t("incidents.filter.severity")}
             value={priority}
@@ -307,7 +314,13 @@ export function IncidentsPage() {
               key: "severity",
               header: t("dashboard.table.severity"),
               render: (incident) => (
-                <StatusBadge tone={priorityTone(incident.priority)} label={t(priorityLabelKey(incident.priority))} />
+                <span className="priority-cell">
+                  <span
+                    className={`priority-dot priority-dot--${incident.priority.toLowerCase()}`}
+                    aria-hidden="true"
+                  />
+                  {t(priorityLabelKey(incident.priority))}
+                </span>
               ),
               sortValue: (i) => i.priority,
             },
@@ -322,7 +335,21 @@ export function IncidentsPage() {
             {
               key: "assignee",
               header: t("incident.assignee"),
-              render: (incident) => incident.assignee_name ?? "—",
+              render: (incident) =>
+                incident.assignee_name ? (
+                  <span className="assignee-cell">
+                    <span
+                      className="assignee-avatar"
+                      style={{ backgroundColor: avatarColor(incident.assignee_name) }}
+                      aria-hidden="true"
+                    >
+                      {initials(incident.assignee_name)}
+                    </span>
+                    {incident.assignee_name}
+                  </span>
+                ) : (
+                  "—"
+                ),
               sortValue: (i) => i.assignee_name ?? "",
             },
             {
@@ -369,6 +396,7 @@ export function IncidentsPage() {
           onOpenChange={setShowForm}
           title={t("form.createIncident")}
           footer={null}
+          wide
         >
           <CreateIncidentForm
             assets={assets.data ?? []}

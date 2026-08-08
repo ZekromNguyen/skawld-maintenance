@@ -6,6 +6,7 @@ import type { Incident } from "../../types";
 import { RelativeTime } from "../ui/RelativeTime";
 import { Skeleton } from "../ui/Skeleton";
 import { priorityLabelKey } from "../labels";
+import { initials, avatarColor } from "../ui/avatar";
 
 const SEVERITY_ICONS = {
   CRITICAL: { Icon: WarningOctagon, className: "sev-critical" },
@@ -80,6 +81,16 @@ function BoardCard(props: {
       <span className="board-card-summary">{incident.summary}</span>
       <div className="board-card-meta">
         {incident.asset_tag ? <span className="board-card-asset">{incident.asset_tag}</span> : null}
+        {incident.assignee_name ? (
+          <span
+            className="board-avatar"
+            style={{ backgroundColor: avatarColor(incident.assignee_name) }}
+            title={incident.assignee_name}
+            aria-label={incident.assignee_name}
+          >
+            {initials(incident.assignee_name)}
+          </span>
+        ) : null}
         <RelativeTime time={incident.detected_at} locale={locale} />
       </div>
     </Link>

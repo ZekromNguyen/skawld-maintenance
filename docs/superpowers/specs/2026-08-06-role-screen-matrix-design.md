@@ -69,9 +69,13 @@ designers and testers have one authoritative reference.
 
 ## Role × screen matrix
 
-Read access to all cluster A screens is universal (every role holds the six
+Read access to most cluster A screens is universal (every role holds the six
 read permissions: asset, incident, execution, knowledge, demonstration,
-workflow). Differences are actions plus cluster B visibility.
+workflow). Two surfaces are exceptions because their list/summary endpoints
+require a write-tier permission: the Reports library (list requires
+`report:write` OR `report:approve`) and the Quality summary (requires
+`recommendation:review`). The console route guards and nav gating mirror
+these checks.
 
 | Screen | Admin | Supervisor | Sr. Tech | Technician | Manager |
 |---|---|---|---|---|---|
@@ -79,13 +83,13 @@ workflow). Differences are actions plus cluster B visibility.
 | Incidents | create + resolve | create + resolve | create (no resolve) | view only | view only |
 | Executions | all + write | all + write | write + verify prereq | write | view only |
 | Asset criticality | approve | approve | view | view | view |
-| Reports | write + approve | write + approve | write (draft) | write (draft) | view |
+| Reports | write + approve | write + approve | write (draft) | write (draft) | — (no access) |
 | Knowledge | write + approve | write + approve | review only | view | view |
 | Handover | write + accept | write + accept | write | write | write + accept |
 | Demonstrations | capture + review | capture + review | capture + review | capture | review only |
 | Workflows | review + publish | review (no publish) | review | view | view |
 | Recommendations | run + review | run + review | run only | run | review only |
-| Quality | full | full | view | view | view |
+| Quality | full | full | — (no access) | — (no access) | view |
 | Users & roles | manage | view | — | — | — |
 | Orgs & sites | manage | view | — | — | — |
 | Recommendations queue | review | review | — | — | review |

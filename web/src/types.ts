@@ -3,6 +3,7 @@ export type Principal = {
   display_name: string;
   organization_id: string;
   site_ids: string[];
+  roles?: string[];
   permissions: string[];
 };
 

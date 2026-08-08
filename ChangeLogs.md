@@ -4,6 +4,23 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-08 — Jira-style console chrome and per-role authorization screens
+
+- Restyled the console top bar into a Jira-like app frame: the brand moved
+  from the sidebar into the header, the command-palette trigger is a centered
+  search field, and a permission-gated "Create" menu (New incident / New
+  asset) deep-links to the existing create dialogs via `?create=1`.
+- Added an avatar account menu (initials, roles, Profile, Theme, Sign out)
+  and a new `/account` page showing identity, role badges, and the
+  principal's real permissions grouped by area, plus a demo role preview
+  switcher for the five pilot roles. Preview overlays the role's permission
+  mirror for navigation only; the API still enforces real permissions.
+- Added explicit authorization screens: `/me` now returns `roles`, and
+  `AuthorizedRoute` renders a Jira-style lock screen (roles + missing
+  permission) instead of a failing fetch when a route is out of scope.
+  Sidebar nav gating now mirrors backend enforcement: Reports requires
+  `report:write` OR `report:approve`, Quality requires `recommendation:review`.
+
 ### 2026-08-05 — RP-initiated logout, id_token-bound web sessions, console sign-out, login-loop fix
 
 - Web sessions now persist the OIDC `id_token` (migration `00011` adds a
