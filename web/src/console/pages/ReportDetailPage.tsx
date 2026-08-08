@@ -9,11 +9,11 @@ import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { ConfirmDialog } from "../feedback/ConfirmDialog";
 import { StatusBadge } from "../ui/StatusBadge";
-import { EmptyState } from "../ui/EmptyState";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
 import { GatedButton } from "../ui/GatedButton";
 import { EvidenceLinks } from "../components/EvidenceLinks";
+import { ReportContentList, type ReportContentKind } from "../components/ReportContentList";
 import { reportStateTone, reportStateLabelKey } from "../labels";
 
 /**
@@ -67,7 +67,7 @@ export function ReportDetailPage() {
 
   const value = report.data;
   const requiresReview = value.structured_content.requires_human_review === true;
-  const sections: Array<{ key: string; label: string; items: string[] }> = [
+  const sections: Array<{ key: ReportContentKind; label: string; items: typeof value.structured_content.measurements }> = [
     { key: "measurements", label: t("report.measurements"), items: value.structured_content.measurements },
     { key: "observations", label: t("report.observations"), items: value.structured_content.observations },
     { key: "actions", label: t("report.actions"), items: value.structured_content.actions },
@@ -133,14 +133,8 @@ export function ReportDetailPage() {
           {sections.map((section) => (
             <div className="panel" key={section.key}>
               <div className="panel-heading"><h2>{section.label}</h2></div>
-              <div style={{ padding: 16, display: "grid", gap: 8 }}>
-                {section.items.length > 0 ? (
-                  section.items.map((item, index) => (
-                    <div key={index} style={{ fontSize: 13 }}>{item}</div>
-                  ))
-                ) : (
-                  <EmptyState title={t("report.none")} />
-                )}
+              <div style={{ padding: 16 }}>
+                <ReportContentList kind={section.key} items={section.items} emptyTitle={t("report.none")} />
               </div>
             </div>
           ))}

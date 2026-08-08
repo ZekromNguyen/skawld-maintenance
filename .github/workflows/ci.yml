@@ -51,7 +51,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
         run: |
-          SITE_ID=$(docker compose exec -T postgres psql -U skawld_app -d skawld -Atc "
+          SITE_ID=$(docker compose exec -T postgres psql -U skawld_app -d skawld -Atqc "
             WITH o AS (
               INSERT INTO organizations (id, name, source_of_truth, version, created_at, updated_at)
               VALUES (gen_random_uuid(), 'CI Import Organization', 'OWNED_BY_SKAWLD', 1, now(), now())
