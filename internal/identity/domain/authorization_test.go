@@ -160,6 +160,7 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 			"execution:prerequisite:verify",
 			"recommendation:review", "recommendation:run", "report:approve",
 			"report:write", "workflow:publish", "workflow:review",
+			"monitoring:read", "monitoring:configure",
 		),
 		RoleMaintenanceSupervisor: matrixSet(read,
 			"asset:create", "asset:criticality:approve", "attachment:write",
@@ -168,7 +169,7 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 			"incident:create", "incident:resolve", "integration:external:import",
 			"knowledge:approve", "knowledge:write", "execution:prerequisite:verify",
 			"recommendation:review", "recommendation:run", "report:approve",
-			"report:write", "workflow:review",
+			"report:write", "workflow:review", "monitoring:read",
 		),
 		RoleSeniorTechnician: matrixSet(read,
 			"attachment:write", "demonstration:capture", "demonstration:review",
@@ -182,7 +183,7 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 		),
 		RoleManager: matrixSet(read,
 			"demonstration:review", "handover:accept", "handover:write",
-			"recommendation:review", "recommendation:run",
+			"recommendation:review", "recommendation:run", "monitoring:read",
 		),
 	}
 	for role, want := range expected {

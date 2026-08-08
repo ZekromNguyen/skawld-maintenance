@@ -22,7 +22,9 @@ export type PermissionKey =
   | "report:approve"
   | "report:write"
   | "workflow:publish"
-  | "workflow:review";
+  | "workflow:review"
+  | "monitoring:read"
+  | "monitoring:configure";
 
 export function hasPermission(
   principal: Pick<Principal, "permissions"> | undefined,

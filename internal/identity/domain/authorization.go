@@ -46,6 +46,8 @@ const (
 	PermissionWorkflowPublish      Permission = "workflow:publish"
 	PermissionReportApprove        Permission = "report:approve"
 	PermissionExternalImport       Permission = "integration:external:import"
+	PermissionMonitoringRead       Permission = "monitoring:read"
+	PermissionMonitoringConfigure  Permission = "monitoring:configure"
 )
 
 type RiskLevel int
@@ -124,6 +126,8 @@ func PermissionsForRole(role Role) []Permission {
 			PermissionWorkflowPublish,
 			PermissionReportApprove,
 			PermissionExternalImport,
+			PermissionMonitoringRead,
+			PermissionMonitoringConfigure,
 		)
 	case RoleMaintenanceSupervisor:
 		return append(read,
@@ -147,6 +151,7 @@ func PermissionsForRole(role Role) []Permission {
 			PermissionWorkflowReview,
 			PermissionReportApprove,
 			PermissionExternalImport,
+			PermissionMonitoringRead,
 		)
 	case RoleSeniorTechnician:
 		return append(read,
@@ -177,6 +182,7 @@ func PermissionsForRole(role Role) []Permission {
 			PermissionHandoverWrite,
 			PermissionHandoverAccept,
 			PermissionDemonstrationReview,
+			PermissionMonitoringRead,
 		)
 	default:
 		return nil
