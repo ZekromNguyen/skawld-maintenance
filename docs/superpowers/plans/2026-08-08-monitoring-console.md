@@ -18,6 +18,7 @@
 - Every new i18n string needs both `en` and `vi` entries in `web/src/i18n/messages.ts` (`const en`, then `const vi: Record<MessageKey, string>`).
 - No new frontend chart library: sparklines are inline SVG only.
 - `internal/monitoring` must not import `internal/platform/httpserver` or any `web` package (enforced by `internal/architecture/imports_test.go`).
+- Postgres-backed tests are `*_integration_test.go` gated by `TEST_DATABASE_URL` (`t.Skip` when unset), per `internal/evaluation/adapter/postgres/store_integration_test.go`. Run them with `TEST_DATABASE_URL` set and migrations applied.
 - All timestamps UTC; store `numeric` values for metrics.
 
 ---
@@ -356,7 +357,7 @@ git commit -m "feat: add monitoring domain with threshold evaluation and catalog
 
 **Files:**
 - Create: `internal/monitoring/adapter/postgres/store.go`
-- Create: `internal/monitoring/adapter/postgres/store_test.go` (contract test against the store interface; follow the pattern in `internal/skawld/anthropic_structured_provider_contract_test.go` for test-main package layout if a separate test package is needed — the codebase uses `_test` in the same package with a live pool helper; verify how existing postgres adapters are tested, e.g. `internal/evaluation/adapter/postgres/store_test.go`, and mirror it)
+- Create: `internal/monitoring/adapter/postgres/store_integration_test.go` (integration test gated by the `TEST_DATABASE_URL` env var, mirroring `internal/evaluation/adapter/postgres/store_integration_test.go`: `t.Skip("TEST_DATABASE_URL is not set")` when unset, same-package `_test`, live pool from `pgxpool.New`)
 
 **Interfaces:**
 - Consumes: `internal/monitoring/domain` (Task 2).
@@ -372,12 +373,12 @@ git commit -m "feat: add monitoring domain with threshold evaluation and catalog
   - `func (s Store) ResolveAlerts(ctx context.Context, orgID, siteID, key string, dimensions map[string]any) error` (resolves open WARN+CRIT for that key)
   - `func (s Store) ListAlerts(ctx context.Context, orgID string, openOnly bool) ([]AlertEvent, error)`
 
-- [ ] **Step 1: Write the failing contract test** (`store_test.go`) — assert: upserting the same (org, site, key, dimensions, granularity, day) twice keeps one row with the newer value; `OpenAlert` twice leaves one open row; `ResolveAlerts` sets `resolved_at`; `ListThresholds` returns org rows and site overrides.
+- [ ] **Step 1: Write the failing integration test** (`store_integration_test.go`) — gate on `TEST_DATABASE_URL`, create a fresh org + site, then assert: upserting the same (org, site, key, dimensions, granularity, day) twice keeps one row with the newer value; `OpenAlert` twice leaves one open row; `ResolveAlerts` sets `resolved_at`; `ListThresholds` returns org rows and site overrides.
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `go test ./internal/monitoring/adapter/postgres/ -run TestStore -v`
-Expected: FAIL — store not implemented.
+Expected: FAIL — store not implemented (compile error or missing methods). Without `TEST_DATABASE_URL` the integration test skips, so set it from the compose-up Postgres (CI sets `postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable` after `go run ./cmd/migrate up`).
 
 - [ ] **Step 3: Write the implementation** (`store.go`) — skeleton with exact SQL:
 
@@ -445,7 +446,7 @@ Implement the remaining methods with straightforward SQL:
 
 - [ ] **Step 4: Run to verify they pass**
 
-Run: `go test ./internal/monitoring/adapter/postgres/ -v`
+Run: `TEST_DATABASE_URL=postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable go test ./internal/monitoring/adapter/postgres/ -v` (Postgres from `make compose-up`, migrations applied)
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -462,7 +463,7 @@ git commit -m "feat: add monitoring store with metrics, thresholds, and alerts"
 **Files:**
 - Create: `internal/monitoring/adapter/river/collectors.go`
 - Create: `internal/monitoring/adapter/river/workers.go`
-- Create: `internal/monitoring/adapter/river/collectors_test.go`
+- Create: `internal/monitoring/adapter/river/collectors_integration_test.go`
 
 **Interfaces:**
 - Consumes: `Store` (Task 3), `monitoringdomain` (Task 2).
@@ -474,12 +475,12 @@ git commit -m "feat: add monitoring store with metrics, thresholds, and alerts"
   - `type SnapshotArgs struct{}` with `Kind() string` → `"monitoring.snapshot"`.
   - `type DailyRollupArgs struct{}` with `Kind() string` → `"monitoring.daily_rollup"`.
 
-- [ ] **Step 1: Write failing tests** (`collectors_test.go`) with a seeded pool: an org with one site; insert one incident `detected_at` 3 days ago and `resolved_at` 1 day ago (for `ops.mttr_hours` = 48) and one open incident 2 days old (for `ops.incident_max_age_hours` = 48, backlog bucket 24h = 1); insert a `river.job` row with state `retryable` in queue `foundation` and one `cancelled`; insert `monitoring_backup_runs` SUCCESS `completed_at` 12 hours ago; insert a `domain_events` row with `event_type = 'execution.step.blocked'`. Assert after `CollectDaily`: `ops.mttr_hours` row exists ≈ 48; `ops.incident_max_age_hours` ≥ 48; `ops.loto_blocked_count` = 1. After `CollectSnapshot`: `sys.worker_retry_count` = 1, `sys.backup_freshness_hours` ≈ 12, `sys.health_ready` = 1. Also assert a CRIT alert opens when a `sys.worker_failed_count` row is collected with value 1.
+- [ ] **Step 1: Write failing tests** (`collectors_integration_test.go`) gated on `TEST_DATABASE_URL` with a seeded pool: create an org with one site; insert one incident `detected_at` 3 days ago and `resolved_at` 1 day ago (for `ops.mttr_hours` = 48) and one open incident 2 days old (for `ops.incident_max_age_hours` = 48, backlog bucket 24h = 1); insert a `river.job` row with state `retryable` in queue `foundation` and one `cancelled` (the `river` schema exists after `cmd/migrate` applies River migrations, as CI does); insert `monitoring_backup_runs` SUCCESS `completed_at` 12 hours ago; insert a `domain_events` row with `event_type = 'execution.step.blocked'` (columns per `events.Append` in `internal/platform/events/outbox.go`). Assert after `CollectDaily`: `ops.mttr_hours` row exists ≈ 48; `ops.incident_max_age_hours` ≥ 48; `ops.loto_blocked_count` = 1. After `CollectSnapshot`: `sys.worker_retry_count` = 1, `sys.backup_freshness_hours` ≈ 12, `sys.health_ready` = 1. Also assert a CRIT alert opens when a `sys.worker_failed_count` row is collected with value 1.
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `go test ./internal/monitoring/adapter/river/ -run TestCollect -v`
-Expected: FAIL.
+Run: `TEST_DATABASE_URL=postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable go test ./internal/monitoring/adapter/river/ -run TestCollect -v`
+Expected: FAIL (compile error or missing methods).
 
 - [ ] **Step 3: Write the implementation**
 
@@ -543,7 +544,7 @@ func (*SnapshotWorker) Timeout(*river.Job[SnapshotArgs]) time.Duration { return 
 
 - [ ] **Step 4: Run to verify they pass**
 
-Run: `go test ./internal/monitoring/adapter/river/ -v`
+Run: `TEST_DATABASE_URL=postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable go test ./internal/monitoring/adapter/river/ -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
