@@ -51,7 +51,9 @@ func TestListIncidentsEnvelope(t *testing.T) {
 		Incidents: incidentapp.Service{
 			Store: &listIncidentStore{},
 		},
-		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{
+			"def-1": {ID: "def-1", EntityType: "incident", Key: "po_number", Label: "PO Number", FieldType: "TEXT", Status: "ACTIVE"},
+		}}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?page_size=1", nil)
 	recorder := httptest.NewRecorder()
@@ -60,15 +62,19 @@ func TestListIncidentsEnvelope(t *testing.T) {
 		t.Fatalf("status = %d, want 200", recorder.Code)
 	}
 	var body struct {
-		Items      []incidentapp.Incident `json:"items"`
-		NextCursor *string                `json:"next_cursor"`
-		HasMore    bool                   `json:"has_more"`
+		Items        []incidentapp.Incident      `json:"items"`
+		NextCursor   *string                     `json:"next_cursor"`
+		HasMore      bool                        `json:"has_more"`
+		CustomFields []customfieldapp.Definition `json:"custom_fields"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(body.Items) != 1 || !body.HasMore || body.NextCursor == nil || *body.NextCursor == "" {
 		t.Fatalf("unexpected envelope: %+v", body)
+	}
+	if len(body.CustomFields) != 1 || body.CustomFields[0].Key != "po_number" {
+		t.Fatalf("unexpected custom_fields: %+v", body.CustomFields)
 	}
 }
 
@@ -81,9 +87,10 @@ func TestListIncidentsRejectsInvalidPageSize(t *testing.T) {
 		},
 	}
 	handler := New(Dependencies{
-		Logger:    slog.New(slog.DiscardHandler),
-		Auth:      fakeAuth{principal: principal},
-		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+		Logger:       slog.New(slog.DiscardHandler),
+		Auth:         fakeAuth{principal: principal},
+		Incidents:    incidentapp.Service{Store: &listIncidentStore{}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?page_size=0", nil)
 	recorder := httptest.NewRecorder()
@@ -102,9 +109,10 @@ func TestListIncidentsRejectsMalformedCursor(t *testing.T) {
 		},
 	}
 	handler := New(Dependencies{
-		Logger:    slog.New(slog.DiscardHandler),
-		Auth:      fakeAuth{principal: principal},
-		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+		Logger:       slog.New(slog.DiscardHandler),
+		Auth:         fakeAuth{principal: principal},
+		Incidents:    incidentapp.Service{Store: &listIncidentStore{}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents?cursor=bm90LWEtY3Vyc29y", nil)
 	recorder := httptest.NewRecorder()
@@ -123,9 +131,10 @@ func TestListIncidentsForbiddenWithoutPermission(t *testing.T) {
 		},
 	}
 	handler := New(Dependencies{
-		Logger:    slog.New(slog.DiscardHandler),
-		Auth:      fakeAuth{principal: principal},
-		Incidents: incidentapp.Service{Store: &listIncidentStore{}},
+		Logger:       slog.New(slog.DiscardHandler),
+		Auth:         fakeAuth{principal: principal},
+		Incidents:    incidentapp.Service{Store: &listIncidentStore{}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/incidents", nil)
 	recorder := httptest.NewRecorder()
@@ -184,11 +193,13 @@ func TestGetIncidentIncludesAttachments(t *testing.T) {
 		},
 	}
 	handler := New(Dependencies{
-		Logger:       slog.New(slog.DiscardHandler),
-		Auth:         fakeAuth{principal: principal},
-		Incidents:    incidentapp.Service{Store: &listIncidentStore{}},
-		Attachments:  attachmentapp.Service{Store: &listAttachmentStore{}},
-		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{}}},
+		Logger:      slog.New(slog.DiscardHandler),
+		Auth:        fakeAuth{principal: principal},
+		Incidents:   incidentapp.Service{Store: &listIncidentStore{}},
+		Attachments: attachmentapp.Service{Store: &listAttachmentStore{}},
+		CustomFields: customfieldapp.Service{Store: &stubFieldStore{definitions: map[string]customfieldapp.Definition{
+			"def-1": {ID: "def-1", EntityType: "incident", Key: "po_number", Label: "PO Number", FieldType: "TEXT", Status: "ACTIVE"},
+		}}},
 	})
 	request := httptest.NewRequest(http.MethodGet,
 		"/api/v1/incidents/00000000-0000-0000-0000-00000000000c", nil)
@@ -198,13 +209,17 @@ func TestGetIncidentIncludesAttachments(t *testing.T) {
 		t.Fatalf("status = %d, want 200", recorder.Code)
 	}
 	var body struct {
-		ID          string                     `json:"id"`
-		Attachments []attachmentapp.Attachment `json:"attachments"`
+		ID           string                      `json:"id"`
+		Attachments  []attachmentapp.Attachment  `json:"attachments"`
+		CustomFields []customfieldapp.Definition `json:"custom_fields"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(body.Attachments) != 1 || body.Attachments[0].OriginalFilename != "clip.mp4" {
 		t.Fatalf("unexpected attachments: %#v", body.Attachments)
+	}
+	if len(body.CustomFields) != 1 || body.CustomFields[0].Key != "po_number" {
+		t.Fatalf("unexpected custom_fields: %+v", body.CustomFields)
 	}
 }
