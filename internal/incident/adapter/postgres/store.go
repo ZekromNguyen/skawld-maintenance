@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -93,31 +94,48 @@ func (s Store) Create(
 			SourceOfTruth:  integrationdomain.SourceOfTruth(command.SourceOfTruth),
 			ExternalSystem: command.ExternalSystem, ExternalID: command.ExternalID,
 			ExternalVersion: command.ExternalVersion, OccurredAt: occurredAt,
-			DetectedAt: command.DetectedAt,
+			DetectedAt: command.DetectedAt, CustomValues: command.CustomValues,
 		})
 		if err != nil {
 			return outcome{}, errors.Join(incidentapp.ErrInvalid, err)
+		}
+		customValues, err := json.Marshal(command.CustomValues)
+		if err != nil {
+			return outcome{}, err
 		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO incidents (
 				id, organization_id, site_id, asset_id, number, summary, details, priority,
 				status, source_of_truth, external_system, external_id, external_version,
 				occurred_at, detected_at, version, created_by, assignee_id, reporter_id, team_id,
-				created_at, updated_at
+				custom_values, created_at, updated_at
 			) VALUES (
 				$1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, nullif($7, ''), $8,
 				$9, $10, nullif($11, ''), nullif($12, ''), nullif($13, ''),
 				$14, $15, $16, $17::uuid, nullif($18, '')::uuid, $19::uuid, nullif($20, '')::uuid,
-				$21, $21
+				$21::jsonb, $22, $22
 			)
 		`, incident.ID, incident.OrganizationID, incident.SiteID, incident.AssetID,
 			incident.Number, incident.Summary, incident.Details, incident.Priority,
 			incident.Status, incident.SourceOfTruth, incident.ExternalSystem,
 			incident.ExternalID, incident.ExternalVersion, incident.OccurredAt,
 			incident.DetectedAt, incident.Version, principal.ID, incident.AssigneeID,
-			incident.ReporterID, incident.TeamID, now)
+			incident.ReporterID, incident.TeamID, customValues, now)
 		if err != nil {
 			return outcome{}, fmt.Errorf("insert incident: %w", err)
+		}
+		for definitionID, value := range command.CustomValues {
+			encoded, err := json.Marshal(value)
+			if err != nil {
+				return outcome{}, err
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO custom_value_history (
+					incident_id, field_definition_id, principal_id, value_before, value_after, changed_at
+				) VALUES ($1::uuid, $2::uuid, $3::uuid, NULL, $4::jsonb, $5)
+			`, incident.ID, definitionID, principal.ID, encoded, now); err != nil {
+				return outcome{}, err
+			}
 		}
 		response := mapIncident(incident, assetTag)
 		if err := appendEvent(ctx, tx, s.IDs.New(), incident.OrganizationID,
@@ -176,6 +194,20 @@ func (s Store) List(
 	args := []any{
 		principal.OrganizationID, principal.SiteIDs,
 		filter.SiteID, filter.AssetID, filter.Status,
+	}
+	if len(filter.CustomFields) > 0 {
+		defIDs := make([]string, 0, len(filter.CustomFields))
+		for defID := range filter.CustomFields {
+			defIDs = append(defIDs, defID)
+		}
+		sort.Strings(defIDs)
+		for _, defID := range defIDs {
+			filterValue := filter.CustomFields[defID]
+			keyArg := len(args) + 1
+			valueArg := len(args) + 2
+			args = append(args, defID, filterValue)
+			query += fmt.Sprintf(" AND i.custom_values ? $%d::text AND i.custom_values->>$%d::text = $%d", keyArg, keyArg, valueArg)
+		}
 	}
 	if filter.Cursor != "" {
 		cut := strings.LastIndex(filter.Cursor, "|")
@@ -366,6 +398,115 @@ func (s Store) Close(
 	return result.Value, result.Replay, nil
 }
 
+func (s Store) UpdateCustomValues(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command incidentapp.UpdateCustomValues,
+) (incidentapp.Incident, bool, error) {
+	hash, err := idempotency.HashRequest(command)
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	scope := "incident.custom_values.v1:" + incidentID
+	type outcome struct {
+		Value  incidentapp.Incident
+		Replay bool
+	}
+	result, err := database.InTx(ctx, s.Pool, pgx.TxOptions{}, func(tx pgx.Tx) (outcome, error) {
+		now := s.Clock.Now()
+		record, err := s.Idempotency.Begin(ctx, tx, principal.ID, scope, key, hash, now)
+		if err != nil {
+			return outcome{}, err
+		}
+		if record.Replay {
+			var replay incidentapp.Incident
+			if err := json.Unmarshal(record.ResponseBody, &replay); err != nil {
+				return outcome{}, err
+			}
+			return outcome{Value: replay, Replay: true}, nil
+		}
+		incident, assetTag, err := loadIncidentForUpdate(ctx, tx, principal, incidentID)
+		if err != nil {
+			return outcome{}, err
+		}
+		if incident.Version != command.ExpectedVersion {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		before := mapIncident(incident, assetTag)
+
+		previous := incident.CustomValues
+		if previous == nil {
+			previous = map[string]any{}
+		}
+		merged := make(map[string]any, len(previous)+len(command.CustomValues))
+		for defID, value := range previous {
+			merged[defID] = value
+		}
+		for defID, value := range command.CustomValues {
+			merged[defID] = value
+		}
+		encoded, err := json.Marshal(merged)
+		if err != nil {
+			return outcome{}, err
+		}
+		newVersion := incident.Version + 1
+		tag, err := tx.Exec(ctx, `
+			UPDATE incidents
+			SET custom_values = $2::jsonb, version = $3, updated_at = $4
+			WHERE id = $1::uuid AND version = $5
+		`, incident.ID, encoded, newVersion, now, command.ExpectedVersion)
+		if err != nil {
+			return outcome{}, err
+		}
+		if tag.RowsAffected() != 1 {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		for defID, value := range command.CustomValues {
+			encodedValue, err := json.Marshal(value)
+			if err != nil {
+				return outcome{}, err
+			}
+			beforeEncoded, err := json.Marshal(previous[defID])
+			if err != nil {
+				return outcome{}, err
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO custom_value_history (
+					incident_id, field_definition_id, principal_id, value_before, value_after, changed_at
+				) VALUES ($1::uuid, $2::uuid, $3::uuid, $4::jsonb, $5::jsonb, $6)
+			`, incident.ID, defID, principal.ID, beforeEncoded, encodedValue, now); err != nil {
+				return outcome{}, err
+			}
+		}
+		incident.CustomValues = merged
+		incident.Version = newVersion
+		response := mapIncident(incident, assetTag)
+		if err := appendEvent(ctx, tx, s.IDs.New(), incident.OrganizationID,
+			"IncidentCustomValuesUpdated", incident.ID, incident.Version, response, now); err != nil {
+			return outcome{}, err
+		}
+		if err := s.Audit.Append(ctx, tx, audit.Event{
+			ID: s.IDs.New(), OrganizationID: incident.OrganizationID, SiteID: incident.SiteID,
+			ActorID: principal.ID, Action: "incident.custom_values.updated", EntityKind: "incident",
+			EntityID: incident.ID, Before: before, After: response, OccurredAt: now,
+		}); err != nil {
+			return outcome{}, err
+		}
+		body, _ := json.Marshal(response)
+		if err := s.Idempotency.Complete(
+			ctx, tx, principal.ID, scope, key, http.StatusOK, body, now,
+		); err != nil {
+			return outcome{}, err
+		}
+		return outcome{Value: response}, nil
+	})
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	return result.Value, result.Replay, nil
+}
+
 func (s Store) Reopen(
 	ctx context.Context,
 	principal identitydomain.Principal,
@@ -453,7 +594,8 @@ const incidentSelect = `
 		coalesce(i.details, ''),
 		coalesce(i.assignee_id::text, ''), coalesce(assignee.display_name, ''),
 		coalesce(i.reporter_id::text, ''), coalesce(reporter.display_name, ''),
-		coalesce(i.team_id::text, ''), coalesce(team.name, '')
+		coalesce(i.team_id::text, ''), coalesce(team.name, ''),
+		i.custom_values
 	FROM incidents i
 	JOIN assets a ON a.id = i.asset_id
 	LEFT JOIN principals assignee ON assignee.id = i.assignee_id
@@ -467,6 +609,7 @@ type scanner interface {
 
 func scanIncident(row scanner) (incidentapp.Incident, error) {
 	var value incidentapp.Incident
+	var rawCustom []byte
 	err := row.Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.AssetID,
 		&value.AssetTag, &value.Number, &value.Summary, &value.Priority,
@@ -475,9 +618,16 @@ func scanIncident(row scanner) (incidentapp.Incident, error) {
 		&value.DetectedAt, &value.ResolvedAt, &value.ResolutionSummary,
 		&value.Version, &value.Details, &value.AssigneeID, &value.AssigneeName,
 		&value.ReporterID, &value.ReporterName, &value.TeamID, &value.TeamName,
+		&rawCustom,
 	)
 	if err != nil {
 		return incidentapp.Incident{}, err
+	}
+	value.CustomValues = map[string]any{}
+	if len(rawCustom) > 0 {
+		if err := json.Unmarshal(rawCustom, &value.CustomValues); err != nil {
+			return incidentapp.Incident{}, err
+		}
 	}
 	value.TimeToCompleteSeconds = timeToCompleteSeconds(value.DetectedAt, value.ResolvedAt)
 	return value, nil
@@ -490,6 +640,7 @@ func loadIncidentForUpdate(
 	incidentID string,
 ) (incidentdomain.Incident, string, error) {
 	var value incidentapp.Incident
+	var rawCustom []byte
 	err := tx.QueryRow(ctx, incidentSelect+`
 		WHERE i.id = $1::uuid AND i.organization_id = $2::uuid
 		FOR UPDATE OF i
@@ -501,6 +652,7 @@ func loadIncidentForUpdate(
 		&value.DetectedAt, &value.ResolvedAt, &value.ResolutionSummary,
 		&value.Version, &value.Details, &value.AssigneeID, &value.AssigneeName,
 		&value.ReporterID, &value.ReporterName, &value.TeamID, &value.TeamName,
+		&rawCustom,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return incidentdomain.Incident{}, "", incidentapp.ErrNotFound
@@ -510,6 +662,12 @@ func loadIncidentForUpdate(
 	}
 	if !principal.CanAccessSite(value.OrganizationID, value.SiteID) {
 		return incidentdomain.Incident{}, "", incidentapp.ErrForbidden
+	}
+	customValues := map[string]any{}
+	if len(rawCustom) > 0 {
+		if err := json.Unmarshal(rawCustom, &customValues); err != nil {
+			return incidentdomain.Incident{}, "", err
+		}
 	}
 	return incidentdomain.Incident{
 		ID: value.ID, OrganizationID: value.OrganizationID, SiteID: value.SiteID,
@@ -521,7 +679,8 @@ func loadIncidentForUpdate(
 		ExternalSystem: value.ExternalSystem, ExternalID: value.ExternalID,
 		ExternalVersion: value.ExternalVersion, OccurredAt: value.OccurredAt,
 		DetectedAt: value.DetectedAt, ResolvedAt: value.ResolvedAt,
-		ResolutionSummary: value.ResolutionSummary, Version: value.Version,
+		ResolutionSummary: value.ResolutionSummary, CustomValues: customValues,
+		Version: value.Version,
 	}, value.AssetTag, nil
 }
 
@@ -536,6 +695,7 @@ func mapIncident(value incidentdomain.Incident, assetTag string) incidentapp.Inc
 		ExternalID: value.ExternalID, ExternalVersion: value.ExternalVersion,
 		OccurredAt: value.OccurredAt, DetectedAt: value.DetectedAt,
 		ResolvedAt: value.ResolvedAt, ResolutionSummary: value.ResolutionSummary,
+		CustomValues:          value.CustomValues,
 		TimeToCompleteSeconds: timeToCompleteSeconds(value.DetectedAt, value.ResolvedAt),
 		Version:               value.Version,
 	}

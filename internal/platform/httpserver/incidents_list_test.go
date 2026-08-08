@@ -143,6 +143,11 @@ func (*listIncidentStore) Reopen(
 ) (incidentapp.Incident, bool, error) {
 	return incidentapp.Incident{}, false, nil
 }
+func (*listIncidentStore) UpdateCustomValues(
+	context.Context, identitydomain.Principal, string, string, incidentapp.UpdateCustomValues,
+) (incidentapp.Incident, bool, error) {
+	return incidentapp.Incident{}, false, nil
+}
 
 type listAttachmentStore struct{}
 

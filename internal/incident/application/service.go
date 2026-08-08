@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
@@ -33,6 +34,7 @@ type CreateIncident struct {
 	ExternalVersion string     `json:"external_version,omitempty"`
 	OccurredAt      *time.Time `json:"occurred_at,omitempty"`
 	DetectedAt      time.Time  `json:"detected_at"`
+	CustomValues    map[string]any `json:"custom_values,omitempty"`
 }
 
 type ResolveIncident struct {
@@ -74,15 +76,17 @@ type Incident struct {
 	ResolvedAt            *time.Time `json:"resolved_at,omitempty"`
 	ResolutionSummary     string     `json:"resolution_summary,omitempty"`
 	TimeToCompleteSeconds *int64     `json:"time_to_complete_seconds,omitempty"`
+	CustomValues          map[string]any `json:"custom_values,omitempty"`
 	Version               int64      `json:"version"`
 }
 
 type Filter struct {
-	SiteID   string
-	AssetID  string
-	Status   string
-	PageSize int
-	Cursor   string
+	SiteID       string
+	AssetID      string
+	Status       string
+	CustomFields map[string]string
+	PageSize     int
+	Cursor       string
 }
 
 type Store interface {
@@ -92,10 +96,27 @@ type Store interface {
 	Resolve(context.Context, identitydomain.Principal, string, string, ResolveIncident) (Incident, bool, error)
 	Close(context.Context, identitydomain.Principal, string, string, CloseIncident) (Incident, bool, error)
 	Reopen(context.Context, identitydomain.Principal, string, string, ReopenIncident) (Incident, bool, error)
+	UpdateCustomValues(context.Context, identitydomain.Principal, string, string, UpdateCustomValues) (Incident, bool, error)
+}
+
+// Fields resolves and validates custom field values against the tenant's
+// field definitions before they reach the store.
+type Fields interface {
+	Definitions(ctx context.Context, organizationID, entityType string) ([]customfieldapp.Definition, error)
+	ResolveAndValidate(ctx context.Context, organizationID, entityType string, values map[string]any) (map[string]any, error)
+	ResolveKeys(ctx context.Context, organizationID, entityType string, keys []string) (map[string]customfieldapp.Definition, error)
+}
+
+// UpdateCustomValues merges the given definition-id-keyed values into the
+// incident's custom_values map, subject to the optimistic lock.
+type UpdateCustomValues struct {
+	ExpectedVersion int64          `json:"expected_version"`
+	CustomValues    map[string]any `json:"custom_values"`
 }
 
 type Service struct {
-	Store Store
+	Store  Store
+	Fields Fields
 }
 
 func (s Service) Create(
@@ -112,6 +133,16 @@ func (s Service) Create(
 		strings.TrimSpace(command.Summary) == "" || command.DetectedAt.IsZero() ||
 		!validPriority(command.Priority) {
 		return Incident{}, false, ErrInvalid
+	}
+	if len(command.CustomValues) > 0 {
+		if s.Fields == nil {
+			return Incident{}, false, errors.Join(ErrInvalid, errors.New("custom fields are not configured"))
+		}
+		normalized, err := s.Fields.ResolveAndValidate(ctx, principal.OrganizationID, "incident", command.CustomValues)
+		if err != nil {
+			return Incident{}, false, errors.Join(ErrInvalid, err)
+		}
+		command.CustomValues = normalized
 	}
 	return s.Store.Create(ctx, principal, key, command)
 }
@@ -150,6 +181,24 @@ func (s Service) List(
 			return nil, "", ErrInvalid
 		}
 		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	if len(filter.CustomFields) > 0 {
+		if s.Fields == nil {
+			return nil, "", errors.Join(ErrInvalid, errors.New("custom fields are not configured"))
+		}
+		keys := make([]string, 0, len(filter.CustomFields))
+		for key := range filter.CustomFields {
+			keys = append(keys, key)
+		}
+		resolved, err := s.Fields.ResolveKeys(ctx, principal.OrganizationID, "incident", keys)
+		if err != nil {
+			return nil, "", errors.Join(ErrInvalid, err)
+		}
+		byID := make(map[string]string, len(filter.CustomFields))
+		for key, value := range filter.CustomFields {
+			byID[resolved[key].ID] = value
+		}
+		filter.CustomFields = byID
 	}
 	items, hasMore, err := s.Store.List(ctx, principal, filter)
 	if err != nil {
@@ -206,6 +255,31 @@ func (s Service) Reopen(
 		return Incident{}, false, ErrInvalid
 	}
 	return s.Store.Reopen(ctx, principal, key, incidentID, command)
+}
+
+func (s Service) UpdateCustomValues(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command UpdateCustomValues,
+) (Incident, bool, error) {
+	if !principal.Has(identitydomain.PermissionIncidentCreate) {
+		return Incident{}, false, ErrForbidden
+	}
+	if !validKey(key) || command.ExpectedVersion <= 0 {
+		return Incident{}, false, ErrInvalid
+	}
+	if len(command.CustomValues) > 0 {
+		if s.Fields == nil {
+			return Incident{}, false, errors.Join(ErrInvalid, errors.New("custom fields are not configured"))
+		}
+		normalized, err := s.Fields.ResolveAndValidate(ctx, principal.OrganizationID, "incident", command.CustomValues)
+		if err != nil {
+			return Incident{}, false, errors.Join(ErrInvalid, err)
+		}
+		command.CustomValues = normalized
+	}
+	return s.Store.UpdateCustomValues(ctx, principal, key, incidentID, command)
 }
 
 func validKey(key string) bool {

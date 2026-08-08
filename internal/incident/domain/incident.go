@@ -45,6 +45,7 @@ type Incident struct {
 	DetectedAt        time.Time
 	ResolvedAt        *time.Time
 	ResolutionSummary string
+	CustomValues      map[string]any
 	Version           int64
 }
 
