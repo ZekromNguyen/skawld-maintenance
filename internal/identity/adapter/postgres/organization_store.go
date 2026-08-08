@@ -84,6 +84,15 @@ func (s OrganizationStore) Create(
 		if err != nil {
 			return txResult{}, fmt.Errorf("insert bootstrap administrator membership: %w", err)
 		}
+		for _, teamName := range []string{"Facilities", "Electrical", "HVAC"} {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO teams (id, organization_id, name, created_at)
+				VALUES ($1::uuid, $2::uuid, $3, $4)
+				ON CONFLICT (organization_id, name) DO NOTHING
+			`, s.IDs.New(), organization.ID, teamName, now); err != nil {
+				return txResult{}, fmt.Errorf("seed default team %q: %w", teamName, err)
+			}
+		}
 
 		result := application.CreateOrganizationResult{
 			ID:            organization.ID,
