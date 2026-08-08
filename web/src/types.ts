@@ -110,6 +110,8 @@ export type Evidence = {
   id: string;
   kind: string;
   source_id: string;
+  document_id?: string;
+  revision_id?: string;
   revision?: string;
   title: string;
   locator: string;
