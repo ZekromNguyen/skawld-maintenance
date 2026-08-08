@@ -26,7 +26,8 @@ const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
 
 /**
  * IncidentsPage: filterable incident queue with native creation inside a
- * proper dialog. Client-side filter/sort; creation navigates to the detail.
+ * proper dialog. Server-side state/severity filtering; search applies to the
+ * loaded page; creation navigates to the detail.
  */
 export function IncidentsPage() {
   const { t, locale } = useI18n();
@@ -132,6 +133,7 @@ export function IncidentsPage() {
             <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
           </select>
         </div>
+        <p className="section-lead">{t("incidents.filter.searchHint")}</p>
         <DataTable<Incident>
           columns={[
             {

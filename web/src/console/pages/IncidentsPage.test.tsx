@@ -176,7 +176,7 @@ it("shows load more and appends the next page", async () => {
 });
 
 describe("IncidentsPage server-side filters", () => {
-  it("refetches with the selected severity", async () => {
+  it("refetches with the selected severity and filters rows", async () => {
     renderPage();
     await screen.findByText("Pump vibration");
     fireEvent.change(screen.getByLabelText(/severity/i), { target: { value: "HIGH" } });
@@ -184,6 +184,7 @@ describe("IncidentsPage server-side filters", () => {
       const calls = (api.incidents as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some(([opts]) => opts && opts.severity === "HIGH")).toBe(true);
     });
+    await waitFor(() => expect(screen.getByText("Pump vibration")).toBeTruthy());
   });
 
   it("shows truthful tab counts from the summary endpoint", async () => {
