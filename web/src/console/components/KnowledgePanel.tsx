@@ -65,13 +65,22 @@ export function KnowledgePanel({
               if (!effective) return "—";
               return (
                 <span className="revision-chips">
-                  {document.revisions.map((revision) => (
-                    <StatusBadge
-                      key={revision.id}
-                      tone={approvalTone(revision.approval_status)}
-                      label={`${revision.revision} · ${approvalLabelKey(revision.approval_status) ? t(approvalLabelKey(revision.approval_status)!) : revision.approval_status}${revision.id === effective.id ? ` · ${t("knowledge.effective")}` : ""}`}
-                    />
-                  ))}
+                  {document.revisions.map((revision) => {
+                    const statusLabel = approvalLabelKey(revision.approval_status)
+                      ? t(approvalLabelKey(revision.approval_status)!)
+                      : revision.approval_status;
+                    const marker =
+                      revision.id === effective.id
+                        ? ` · ${revision.approval_status === "APPROVED" ? t("knowledge.effective") : t("knowledge.draftMarker")}`
+                        : "";
+                    return (
+                      <StatusBadge
+                        key={revision.id}
+                        tone={approvalTone(revision.approval_status)}
+                        label={`${revision.revision} · ${statusLabel}${marker}`}
+                      />
+                    );
+                  })}
                 </span>
               );
             }
