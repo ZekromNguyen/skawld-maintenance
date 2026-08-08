@@ -23,6 +23,7 @@ import (
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
 	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
+	monitoringpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/monitoring/adapter/postgres"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/buildinfo"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/idempotency"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
@@ -61,6 +62,7 @@ type Dependencies struct {
 	Workflows       workflowapp.Service
 	Evaluations     evaluationapp.Service
 	IntegrationSink integrationapp.ProjectionSink
+	Monitoring      monitoringpostgres.Store
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -106,6 +108,7 @@ func New(dependencies Dependencies) http.Handler {
 		mountDemonstrationRoutes(api, dependencies.Demonstrations)
 		mountWorkflowRoutes(api, dependencies.Workflows)
 		mountEvaluationRoutes(api, dependencies.Evaluations)
+		mountMonitoringRoutes(api, dependencies.Monitoring)
 		mountIntegrationRoutes(api, dependencies.IntegrationSink)
 		mountSummaryRoutes(api, dependencies.Database)
 	})
