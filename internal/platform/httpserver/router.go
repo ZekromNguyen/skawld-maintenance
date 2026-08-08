@@ -107,6 +107,7 @@ func New(dependencies Dependencies) http.Handler {
 		mountWorkflowRoutes(api, dependencies.Workflows)
 		mountEvaluationRoutes(api, dependencies.Evaluations)
 		mountIntegrationRoutes(api, dependencies.IntegrationSink)
+		mountSummaryRoutes(api, dependencies.Database)
 	})
 	return router
 }
