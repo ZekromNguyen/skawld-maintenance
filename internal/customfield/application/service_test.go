@@ -176,3 +176,50 @@ func TestResolveKeys(t *testing.T) {
 		t.Fatalf("unknown key must be ErrValidation, got %v", err)
 	}
 }
+
+func TestUpdateVersionMismatchConflicts(t *testing.T) {
+	store := &fakeStore{definitions: map[string]domain.Definition{}, byKey: map[string]domain.Definition{}}
+	store.definitions["def-1"] = domain.Definition{
+		ID: "def-1", OrganizationID: "o1", EntityType: "incident", Key: "po",
+		Label: "PO", FieldType: domain.FieldTypeText, Status: domain.StatusActive, Version: 3,
+	}
+	s := newService(store)
+	_, err := s.Update(context.Background(), admin(), "def-1", UpdateDefinition{
+		Label: "New", FieldType: "TEXT", Config: domain.Config{}, SortOrder: 1, ExpectedVersion: 2,
+	})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected version mismatch must be ErrConflict, got %v", err)
+	}
+}
+
+func TestUpdatePreservesRetiredAt(t *testing.T) {
+	now := time.Unix(0, 0).UTC()
+	store := &fakeStore{definitions: map[string]domain.Definition{}, byKey: map[string]domain.Definition{}}
+	store.definitions["def-1"] = domain.Definition{
+		ID: "def-1", OrganizationID: "o1", EntityType: "incident", Key: "po",
+		Label: "PO", FieldType: domain.FieldTypeText, Status: domain.StatusRetired,
+		Version: 2, RetiredAt: &now,
+	}
+	s := newService(store)
+	updated, err := s.Update(context.Background(), admin(), "def-1", UpdateDefinition{
+		Label: "PO (legacy)", FieldType: "TEXT", Config: domain.Config{}, SortOrder: 1, ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("label change on retired field must pass: %v", err)
+	}
+	if updated.RetiredAt == nil || !updated.RetiredAt.Equal(now) {
+		t.Fatalf("update must preserve retired_at, got %+v", updated.RetiredAt)
+	}
+}
+
+func TestResolveAndValidateRejectsRetiredField(t *testing.T) {
+	store := &fakeStore{definitions: map[string]domain.Definition{}, byKey: map[string]domain.Definition{}}
+	store.definitions["def-1"] = domain.Definition{
+		ID: "def-1", Key: "po_number", EntityType: "incident", Label: "PO",
+		FieldType: domain.FieldTypeText, Status: domain.StatusRetired,
+	}
+	s := newService(store)
+	if _, err := s.ResolveAndValidate(context.Background(), "o1", "incident", map[string]any{"po_number": "x"}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("value for retired field must be ErrValidation, got %v", err)
+	}
+}

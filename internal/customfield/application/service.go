@@ -81,16 +81,7 @@ func (s Service) ListByEntity(ctx context.Context, principal identitydomain.Prin
 	if !principal.Has(identitydomain.PermissionIncidentRead) {
 		return nil, ErrForbidden
 	}
-	items, err := s.Store.ListByEntity(ctx, principal.OrganizationID, entityType)
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].SortOrder < items[j].SortOrder })
-	out := make([]Definition, 0, len(items))
-	for _, item := range items {
-		out = append(out, toView(item))
-	}
-	return out, nil
+	return s.list(ctx, principal.OrganizationID, entityType)
 }
 
 func (s Service) Create(ctx context.Context, principal identitydomain.Principal, command CreateDefinition) (Definition, error) {
@@ -158,7 +149,7 @@ func (s Service) Update(ctx context.Context, principal identitydomain.Principal,
 		Label: command.Label, Description: command.Description,
 		FieldType: fieldType, Config: config, Status: current.Status,
 		SortOrder: command.SortOrder, Version: current.Version + 1,
-		CreatedAt: current.CreatedAt,
+		CreatedAt: current.CreatedAt, RetiredAt: current.RetiredAt,
 	})
 	if err != nil {
 		return Definition{}, errors.Join(ErrInvalid, err)
@@ -205,6 +196,10 @@ func (s Service) History(ctx context.Context, principal identitydomain.Principal
 // permission check; it is the internal helper used to render incident
 // responses with their custom_fields section.
 func (s Service) Definitions(ctx context.Context, organizationID, entityType string) ([]Definition, error) {
+	return s.list(ctx, organizationID, entityType)
+}
+
+func (s Service) list(ctx context.Context, organizationID, entityType string) ([]Definition, error) {
 	items, err := s.Store.ListByEntity(ctx, organizationID, entityType)
 	if err != nil {
 		return nil, err
