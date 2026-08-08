@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api, type ListOptions } from "../../api";
 import { useQuery } from "../useQuery";
@@ -37,8 +37,14 @@ export function ReportsPage() {
     [reports.data, history],
   );
 
+  // Reset appended history only when the filter changes, not on every data
+  // arrival — otherwise the load-more button flickers on each refetch.
+  const lastFilterKey = useRef(stateFilter);
   useEffect(() => {
-    setHistory([]);
+    if (lastFilterKey.current !== stateFilter) {
+      setHistory([]);
+      lastFilterKey.current = stateFilter;
+    }
     setNextCursor(reports.data?.next_cursor ?? null);
   }, [reports.data, stateFilter]);
 

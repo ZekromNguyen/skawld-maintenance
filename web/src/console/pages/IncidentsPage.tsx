@@ -199,6 +199,9 @@ export function IncidentsPage() {
             style={{ marginTop: 12 }}
           >
             {t("common.loadMore")}
+            {incidents.items.length > 0 && summary.data
+              ? ` · ${incidents.items.length} / ${summary.data.total_incidents}`
+              : ""}
           </button>
         ) : null}
         <Dialog
