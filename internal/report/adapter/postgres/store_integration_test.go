@@ -260,3 +260,79 @@ func TestReportListPagination(t *testing.T) {
 		t.Fatalf("len(scoped) = %d, want 0 for foreign site", len(scoped))
 	}
 }
+
+func TestListReportsExposesIncidentNumberAndAssetTag(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	now := time.Now().UTC().Truncate(time.Second)
+	organizationID, siteID := uuid.NewString(), uuid.NewString()
+	principalID, assetID, incidentID, executionID := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	statements := []struct {
+		sql  string
+		args []any
+	}{
+		{`INSERT INTO organizations (id, name, source_of_truth, version, created_at, updated_at)
+		  VALUES ($1::uuid, 'Report Identity', 'OWNED_BY_SKAWLD', 1, $2, $2)`,
+			[]any{organizationID, now}},
+		{`INSERT INTO sites (id, organization_id, code, name, timezone, status, version, created_at, updated_at)
+		  VALUES ($1::uuid, $2::uuid, 'RI', 'Report Identity Site', 'UTC', 'ACTIVE', 1, $3, $3)`,
+			[]any{siteID, organizationID, now}},
+		{`INSERT INTO principals (id, external_subject, display_name, status, created_at, updated_at)
+		  VALUES ($1::uuid, $1, 'Identity Technician', 'ACTIVE', $2, $2)`,
+			[]any{principalID, now}},
+		{`INSERT INTO assets (id, organization_id, site_id, tag, name, asset_class, status, source_of_truth, attributes, version, created_at, updated_at)
+		  VALUES ($1::uuid, $2::uuid, $3::uuid, 'P-302', 'Identity Pump', 'CENTRIFUGAL_PUMP', 'ACTIVE', 'OWNED_BY_SKAWLD', '{}'::jsonb, 1, $4, $4)`,
+			[]any{assetID, organizationID, siteID, now}},
+		{`INSERT INTO incidents (id, organization_id, site_id, asset_id, number, summary, severity, state, source_of_truth, occurred_at, detected_at, created_by, created_at, updated_at)
+		  VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 'IN-1042', 'High vibration', 'HIGH', 'OPEN', 'OWNED_BY_SKAWLD', $5, $5, $6::uuid, $5, $5)`,
+			[]any{incidentID, organizationID, siteID, assetID, now, principalID}},
+		{`INSERT INTO maintenance_executions (id, organization_id, site_id, asset_id, incident_id, purpose, state, assigned_to, version, created_by, created_at, updated_at)
+		  VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid, 'Identity report execution', 'ASSIGNED', $6::uuid, 1, $6::uuid, $7, $7)`,
+			[]any{executionID, organizationID, siteID, assetID, incidentID, principalID, now}},
+		{`INSERT INTO maintenance_reports
+			(id, organization_id, execution_id, site_id, revision, version, state,
+			 structured_content, evidence_snapshot, generated_by_kind, created_by,
+			 created_at, updated_at)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 1, 'DRAFT',
+			 '{}'::jsonb, '[]'::jsonb, 'HUMAN', $5::uuid, $6, $6)`,
+			[]any{uuid.NewString(), organizationID, executionID, siteID, principalID, now}},
+	}
+	for _, statement := range statements {
+		if _, err := pool.Exec(ctx, statement.sql, statement.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	store := reportpostgres.Store{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.Fixed{Time: now},
+		Audit: audit.Sink{}, Idempotency: idempotency.Store{},
+	}
+	principal := identitydomain.Principal{
+		ID: principalID, OrganizationID: organizationID, SiteIDs: []string{siteID},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionReportWrite: {},
+		},
+	}
+	items, _, err := store.List(ctx, principal, reportapp.ReportFilter{PageSize: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(items))
+	}
+	if items[0].IncidentNumber != "IN-1042" {
+		t.Fatalf("incident_number = %q, want IN-1042", items[0].IncidentNumber)
+	}
+	if items[0].AssetTag != "P-302" {
+		t.Fatalf("asset_tag = %q, want P-302", items[0].AssetTag)
+	}
+}

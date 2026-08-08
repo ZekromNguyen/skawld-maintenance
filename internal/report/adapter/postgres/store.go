@@ -280,24 +280,28 @@ func (s Store) List(
 	filter reportapp.ReportFilter,
 ) ([]reportapp.Report, bool, error) {
 	query := `
-		SELECT id::text, organization_id::text, site_id::text, execution_id::text,
-		       revision, version, state, structured_content, evidence_snapshot,
-		       coalesce(provider, ''), coalesce(model, ''),
-		       coalesce(model_version, ''), coalesce(prompt_version, ''),
-		       coalesce(input_sha256, ''), coalesce(output_sha256, ''),
-		       generated_by_kind, coalesce(submitted_by::text, ''), submitted_at,
-		       coalesce(approved_by::text, ''), approved_at, created_at, updated_at
-		FROM maintenance_reports
-		WHERE organization_id = $1::uuid
-		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR site_id = ANY($2::uuid[]))`
+		SELECT r.id::text, r.organization_id::text, r.site_id::text, r.execution_id::text,
+		       r.revision, r.version, r.state, r.structured_content, r.evidence_snapshot,
+		       coalesce(r.provider, ''), coalesce(r.model, ''),
+		       coalesce(r.model_version, ''), coalesce(r.prompt_version, ''),
+		       coalesce(r.input_sha256, ''), coalesce(r.output_sha256, ''),
+		       r.generated_by_kind, coalesce(r.submitted_by::text, ''), r.submitted_at,
+		       coalesce(r.approved_by::text, ''), r.approved_at, r.created_at, r.updated_at,
+		       coalesce(a.tag, ''), coalesce(i.number, '')
+		FROM maintenance_reports r
+		LEFT JOIN maintenance_executions e ON e.id = r.execution_id
+		LEFT JOIN assets a ON a.id = e.asset_id
+		LEFT JOIN incidents i ON i.id = e.incident_id
+		WHERE r.organization_id = $1::uuid
+		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR r.site_id = ANY($2::uuid[]))`
 	args := []any{principal.OrganizationID, principal.SiteIDs}
 	if filter.SiteID != "" {
 		args = append(args, filter.SiteID)
-		query += fmt.Sprintf(" AND site_id = $%d::uuid", len(args))
+		query += fmt.Sprintf(" AND r.site_id = $%d::uuid", len(args))
 	}
 	if len(filter.States) > 0 {
 		args = append(args, filter.States)
-		query += fmt.Sprintf(" AND state = ANY($%d::text[])", len(args))
+		query += fmt.Sprintf(" AND r.state = ANY($%d::text[])", len(args))
 	}
 	if filter.Cursor != "" {
 		cut := strings.LastIndex(filter.Cursor, "|")
@@ -305,10 +309,10 @@ func (s Store) List(
 			return nil, false, reportapp.ErrInvalid
 		}
 		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
-		query += fmt.Sprintf(" AND (created_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+		query += fmt.Sprintf(" AND (r.created_at, r.id) < ($%d, $%d::uuid)", len(args)-1, len(args))
 	}
 	args = append(args, filter.PageSize+1)
-	query += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", len(args))
+	query += fmt.Sprintf(" ORDER BY r.created_at DESC, r.id DESC LIMIT $%d", len(args))
 
 	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
@@ -327,6 +331,7 @@ func (s Store) List(
 			&value.InputSHA256, &value.OutputSHA256, &value.GeneratedBy,
 			&value.SubmittedBy, &value.SubmittedAt, &value.ApprovedBy,
 			&value.ApprovedAt, &value.CreatedAt, &value.UpdatedAt,
+			&value.AssetTag, &value.IncidentNumber,
 		); err != nil {
 			return nil, false, err
 		}

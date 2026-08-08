@@ -61,6 +61,8 @@ type Report struct {
 	ApprovedAt     *time.Time                 `json:"approved_at,omitempty"`
 	CreatedAt      time.Time                  `json:"created_at"`
 	UpdatedAt      time.Time                  `json:"updated_at"`
+	AssetTag       string                     `json:"asset_tag,omitempty"`
+	IncidentNumber string                     `json:"incident_number,omitempty"`
 }
 
 type ExecutionContext struct {
