@@ -220,6 +220,8 @@ paths:
       parameters:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
         - {in: query, name: q, schema: {type: string}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Assets in the principal's authorized scope.
@@ -227,9 +229,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/Asset"}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
     post:
@@ -295,7 +300,9 @@ paths:
       parameters:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
         - {in: query, name: asset_id, schema: {type: string, format: uuid}}
-        - {in: query, name: state, schema: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED]}}
+        - {in: query, name: status, schema: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, REOPENED]}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Incidents in the authorized scope.
@@ -303,8 +310,12 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/Incident"}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
     post:
       summary: Create an incident
       tags: [Incidents]
@@ -360,6 +371,100 @@ paths:
       responses:
         "200": {description: Incident resolved by an authorized actor.}
         "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents/{incidentID}/close:
+    post:
+      summary: Close a resolved incident
+      tags: [Incidents]
+      operationId: closeIncident
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IncidentID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200": {description: Incident closed by an authorized actor.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/incidents/{incidentID}/reopen:
+    post:
+      summary: Reopen a resolved or closed incident
+      tags: [Incidents]
+      operationId: reopenIncident
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {$ref: "#/components/parameters/IncidentID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version]
+              properties:
+                expected_version: {type: integer, format: int64, minimum: 1}
+      responses:
+        "200": {description: Incident reopened by an authorized actor.}
+        "409": {$ref: "#/components/responses/Problem"}
+  /api/v1/teams:
+    get:
+      summary: List organization teams
+      tags: [Teams]
+      operationId: listTeams
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      responses:
+        "200":
+          description: Teams in the organization.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, name]
+                      properties:
+                        id: {type: string, format: uuid}
+                        name: {type: string}
+  /api/v1/people:
+    get:
+      summary: List organization members
+      tags: [Teams]
+      operationId: listPeople
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      responses:
+        "200":
+          description: Members visible to the principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, display_name]
+                      properties:
+                        id: {type: string, format: uuid}
+                        display_name: {type: string}
   /api/v1/incidents/{incidentID}/executions:
     post:
       summary: Create a pump inspection execution
@@ -398,6 +503,8 @@ paths:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
         - {in: query, name: state, schema: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}}
         - {in: query, name: assigned_to, schema: {type: string, description: "Use me for the current mobile principal."}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Executions visible to the principal; field roles are constrained to their own assignments.
@@ -405,8 +512,12 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/Execution"}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
   /api/v1/executions/{executionID}:
@@ -567,6 +678,25 @@ paths:
       responses:
         "200": {description: Fully completed execution closed with an outcome summary.}
   /api/v1/attachments:
+    get:
+      summary: List attachments for an entity
+      tags: [Attachments]
+      operationId: listAttachments
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: entity_kind, required: true, schema: {type: string, enum: [EXECUTION, OBSERVATION, INCIDENT]}}
+        - {in: query, name: entity_id, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Attachments with signed download URLs.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Attachment"}}
     post:
       summary: Create an attachment manifest
       tags: [Attachments]
@@ -660,9 +790,21 @@ paths:
       security: [{sessionCookie: []}, {bearerAuth: []}]
       parameters:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Documents and revision lifecycle in authorized scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
+                properties:
+                  items: {type: array, items: {type: object}}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
     post:
       summary: Create controlled document metadata
       tags: [Knowledge]
@@ -896,6 +1038,47 @@ paths:
         - {$ref: "#/components/parameters/IdempotencyKey"}
       responses:
         "201": {description: Human-reviewable draft with exact evidence and model provenance.}
+  /api/v1/reports:
+    get:
+      summary: List reports with site/state filters and keyset pagination
+      tags: [Reports]
+      operationId: listMaintenanceReports
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, required: false, schema: {type: string, format: uuid}}
+        - {in: query, name: state, required: false, schema: {type: string, enum: [DRAFT, SUBMITTED, APPROVED, REJECTED]}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+      responses:
+        "200":
+          description: Paginated report library scoped to the principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, execution_id, revision, version, state, structured_content, created_at]
+                      properties:
+                        id: {type: string, format: uuid}
+                        execution_id: {type: string, format: uuid}
+                        site_id: {type: string, format: uuid}
+                        revision: {type: integer}
+                        version: {type: integer, format: int64}
+                        state: {type: string, enum: [DRAFT, SUBMITTED, APPROVED, REJECTED]}
+                        structured_content: {$ref: "#/components/schemas/ReportContent"}
+                        created_at: {type: string, format: date-time}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /api/v1/reports/{reportID}:
     get:
       summary: Get report draft or approved revision
@@ -952,6 +1135,46 @@ paths:
       requestBody: {$ref: "#/components/requestBodies/ExpectedVersion"}
       responses:
         "200": {description: Report approved by an authorized human.}
+  /api/v1/handovers:
+    get:
+      summary: List shift handovers with site/state filters and keyset pagination
+      tags: [Handovers]
+      operationId: listShiftHandovers
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: site_id, required: false, schema: {type: string, format: uuid}}
+        - {in: query, name: state, required: false, schema: {type: string, enum: [DRAFT, SUBMITTED, ACCEPTED, ACKNOWLEDGED]}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+      responses:
+        "200":
+          description: Paginated handover library scoped to the principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [id, site_id, shift_start, shift_end, state, version, structured_content]
+                      properties:
+                        id: {type: string, format: uuid}
+                        site_id: {type: string, format: uuid}
+                        shift_start: {type: string, format: date-time}
+                        shift_end: {type: string, format: date-time}
+                        state: {type: string, enum: [DRAFT, SUBMITTED, ACCEPTED, ACKNOWLEDGED]}
+                        version: {type: integer, format: int64}
+                        structured_content: {$ref: "#/components/schemas/HandoverContent"}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /api/v1/handovers/prepare-draft:
     post:
       summary: Prepare shift handover from current authorized records
@@ -1049,6 +1272,8 @@ paths:
       security: [{sessionCookie: []}, {bearerAuth: []}]
       parameters:
         - {in: query, name: site_id, schema: {type: string, format: uuid}}
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Demonstrations in the authorized organization/site scope.
@@ -1056,11 +1281,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items:
                     type: array
                     items: {$ref: "#/components/schemas/Demonstration"}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "403": {$ref: "#/components/responses/Problem"}
     post:
       summary: Start semantic demonstration capture
@@ -1257,6 +1485,9 @@ paths:
       tags: [Workflows]
       operationId: listWorkflowVersions
       security: [{sessionCookie: []}, {bearerAuth: []}]
+      parameters:
+        - {in: query, name: cursor, required: false, schema: {type: string}}
+        - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
       responses:
         "200":
           description: Workflow versions in authorized site scope.
@@ -1264,11 +1495,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                additionalProperties: false
+                required: [items, next_cursor, has_more]
                 properties:
                   items:
                     type: array
                     items: {$ref: "#/components/schemas/WorkflowVersion"}
+                  next_cursor: {type: [string, "null"]}
+                  has_more: {type: boolean}
         "403": {$ref: "#/components/responses/Problem"}
   /api/v1/workflows/applicable:
     get:
@@ -1464,6 +1698,43 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/EvaluationSummary"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /api/v1/integrations/imports:
+    post:
+      summary: Import an EAM/CMMS NDJSON asset snapshot
+      tags: [Integration]
+      operationId: runIntegrationImport
+      security: [{sessionCookie: []}, {bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [snapshot, system, instance, version]
+              properties:
+                snapshot:
+                  type: string
+                  format: binary
+                  description: NDJSON asset export, at most 10 MiB.
+                system: {type: string, minLength: 1}
+                instance: {type: string, minLength: 1}
+                version: {type: string, minLength: 1}
+      responses:
+        "200":
+          description: External asset projection summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [imported, next_cursor, complete]
+                properties:
+                  imported: {type: integer}
+                  next_cursor: {type: [string, "null"]}
+                  complete: {type: boolean}
+        "400": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
@@ -1681,7 +1952,7 @@ components:
               type: {type: string}
     Asset:
       type: object
-      required: [id, organization_id, site_id, tag, name, class, status, source_of_truth, version, components]
+      required: [id, organization_id, site_id, tag, name, class, status, source_of_truth, version, components, created_at]
       properties:
         id: {type: string, format: uuid}
         organization_id: {type: string, format: uuid}
@@ -1697,6 +1968,7 @@ components:
           type: string
           enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
         version: {type: integer, format: int64}
+        created_at: {type: string, format: date-time}
         components: {type: array, items: {type: object}}
         criticality: {$ref: "#/components/schemas/Criticality"}
     Criticality:
@@ -1726,12 +1998,17 @@ components:
     CreateIncident:
       type: object
       additionalProperties: false
-      required: [site_id, asset_id, summary, severity, source_of_truth, detected_at]
+      required: [site_id, asset_id, summary, priority, source_of_truth, detected_at]
       properties:
         site_id: {type: string, format: uuid}
         asset_id: {type: string, format: uuid}
         summary: {type: string, minLength: 1}
-        severity: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
+        details: {type: string}
+        priority: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
+        status: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, REOPENED]}
+        assignee_id: {type: string, format: uuid}
+        reporter_id: {type: string, format: uuid}
+        team_id: {type: string, format: uuid}
         source_of_truth:
           type: string
           enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
@@ -1742,7 +2019,7 @@ components:
         detected_at: {type: string, format: date-time}
     Incident:
       type: object
-      required: [id, organization_id, site_id, asset_id, number, summary, severity, state, source_of_truth, detected_at, version]
+      required: [id, organization_id, site_id, asset_id, number, summary, priority, status, source_of_truth, detected_at, version]
       properties:
         id: {type: string, format: uuid}
         organization_id: {type: string, format: uuid}
@@ -1751,16 +2028,29 @@ components:
         asset_tag: {type: string}
         number: {type: string}
         summary: {type: string}
-        severity: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
-        state: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED]}
+        details: {type: string}
+        priority: {type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL]}
+        status: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, REOPENED]}
+        assignee_id: {type: string, format: uuid}
+        assignee_name: {type: string}
+        reporter_id: {type: string, format: uuid}
+        reporter_name: {type: string}
+        team_id: {type: string, format: uuid}
+        team_name: {type: string}
         source_of_truth:
           type: string
           enum: [OWNED_BY_SKAWLD, EXTERNAL_REFERENCE]
+        occurred_at: {type: string, format: date-time}
         detected_at: {type: string, format: date-time}
+        resolved_at: {type: string, format: date-time}
+        time_to_complete_seconds: {type: integer, format: int64}
         version: {type: integer, format: int64}
+        attachments:
+          type: array
+          items: {$ref: "#/components/schemas/Attachment"}
     Execution:
       type: object
-      required: [id, organization_id, site_id, asset_id, purpose, state, version, steps, prerequisites, measurements, observations, actions, decisions]
+      required: [id, organization_id, site_id, asset_id, purpose, state, version, steps, prerequisites, measurements, observations, actions, decisions, updated_at]
       properties:
         id: {type: string, format: uuid}
         organization_id: {type: string, format: uuid}
@@ -1771,6 +2061,7 @@ components:
         purpose: {type: string}
         state: {type: string, enum: [ASSIGNED, IN_PROGRESS, COMPLETED]}
         version: {type: integer, format: int64}
+        updated_at: {type: string, format: date-time}
         steps:
           type: array
           items: {$ref: "#/components/schemas/ExecutionStep"}
@@ -1854,7 +2145,7 @@ components:
         original_filename: {type: string}
         declared_mime:
           type: string
-          enum: [image/jpeg, image/png, image/webp, audio/m4a, audio/mp4, audio/mpeg, audio/wav, application/pdf, text/plain]
+          enum: [image/jpeg, image/png, image/webp, audio/m4a, audio/mp4, audio/mpeg, audio/wav, video/mp4, video/webm, video/quicktime, application/pdf, text/plain]
         size_bytes: {type: integer, minimum: 1, maximum: 52428800}
         checksum_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
     Attachment:
@@ -1865,6 +2156,7 @@ components:
         site_id: {type: string, format: uuid}
         entity_kind: {type: string}
         entity_id: {type: string, format: uuid}
+        client_event_id: {type: string}
         original_filename: {type: string}
         declared_mime: {type: string}
         verified_mime: {type: string}
@@ -1878,6 +2170,7 @@ components:
           type: object
           additionalProperties: {type: string}
         upload_expires_at: {type: string, format: date-time}
+        download_url: {type: string, format: uri}
     DemonstrationEvent:
       type: object
       required:
