@@ -53,6 +53,10 @@ export function IncidentsPage() {
   const [params] = useSearchParams();
   useEffect(() => {
     if (params.get("create") === "1") setShowForm(true);
+    const fromParams = params.get("state");
+    if (fromParams && STATE_TABS.includes(fromParams as StateTab)) {
+      setTab(fromParams as StateTab);
+    }
   }, [params]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
 

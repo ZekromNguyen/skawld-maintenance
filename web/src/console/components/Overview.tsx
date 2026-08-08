@@ -106,7 +106,14 @@ export function Overview({
           </Link>
         </div>
         {inProgress.length === 0 ? (
-          <EmptyState title={t("dashboard.myQueueEmpty")} />
+          <EmptyState
+            title={t("dashboard.myQueueEmpty")}
+            action={
+              <Link to="/executions" className="primary-button">
+                {t("dashboard.viewAll")}
+              </Link>
+            }
+          />
         ) : (
           <DataTable<Execution>
             columns={[

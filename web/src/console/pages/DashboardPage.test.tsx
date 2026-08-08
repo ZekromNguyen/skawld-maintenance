@@ -197,3 +197,14 @@ describe("DashboardPage metrics from summary", () => {
     expect(api.assets).not.toHaveBeenCalled();
   });
 });
+
+describe("DashboardPage empty states", () => {
+  it("offers a call to action in the empty queue state", async () => {
+    (api.listExecutions as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [], next_cursor: null, has_more: false });
+    renderDashboard();
+    await screen.findByText("Operations overview");
+    const ctas = screen.getAllByRole("link", { name: /view all/i });
+    expect(ctas.length).toBeGreaterThanOrEqual(2);
+    expect(ctas.every((link) => link.getAttribute("href") === "/executions")).toBe(true);
+  });
+});

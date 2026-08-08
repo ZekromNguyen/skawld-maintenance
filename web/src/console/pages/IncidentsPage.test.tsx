@@ -198,3 +198,26 @@ describe("IncidentsPage server-side filters", () => {
     });
   });
 });
+
+describe("IncidentsPage deep links", () => {
+  it("opens the tab from the state query param", async () => {
+    const { unmount } = render(
+      <I18nProvider>
+        <PrincipalProvider>
+          <SiteProvider>
+            <ToastProvider>
+              <MemoryRouter initialEntries={["/incidents?state=RESOLVED"]}>
+                <IncidentsPage />
+              </MemoryRouter>
+            </ToastProvider>
+          </SiteProvider>
+        </PrincipalProvider>
+      </I18nProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("Pump vibration")).toBeNull();
+    });
+    expect(screen.getByText("Resolved noise")).toBeTruthy();
+    unmount();
+  });
+});
