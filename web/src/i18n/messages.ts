@@ -44,6 +44,7 @@ const en = {
   "admin.customFields.preview": "Preview",
   "admin.customFields.status": "Status",
   "admin.customFields.saveFailed": "Could not save the field.",
+  "admin.customFields.retireFailed": "Could not retire the field.",
 
   "nav.quality": "AI quality & safety",
   "nav.signOut": "Sign out",
@@ -851,6 +852,7 @@ const vi: Record<MessageKey, string> = {
   "admin.customFields.preview": "Xem trước",
   "admin.customFields.status": "Trạng thái",
   "admin.customFields.saveFailed": "Không thể lưu trường.",
+  "admin.customFields.retireFailed": "Không thể ngừng dùng trường.",
 
   "nav.quality": "Chất lượng và an toàn AI",
   "nav.signOut": "Đăng xuất",

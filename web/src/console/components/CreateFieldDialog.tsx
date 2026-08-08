@@ -266,10 +266,3 @@ export function CreateFieldDialog(props: {
     </Dialog>
   );
 }
-
-/** Kept for the page-level test seam: builds the create payload via the API. */
-export async function createFieldViaApi(
-  value: Parameters<typeof api.createFieldDefinition>[0],
-): Promise<CustomFieldDefinition> {
-  return api.createFieldDefinition(value);
-}

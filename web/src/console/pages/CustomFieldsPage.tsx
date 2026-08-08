@@ -31,7 +31,7 @@ export function CustomFieldsPage() {
 
   const save = useMutation(async (value: Parameters<typeof api.createFieldDefinition>[0], id?: string) => {
     if (id) {
-      await api.updateFieldDefinition(id, {
+      return api.updateFieldDefinition(id, {
         label: value.label,
         description: value.description,
         field_type: value.field_type,
@@ -39,9 +39,8 @@ export function CustomFieldsPage() {
         sort_order: value.sort_order,
         expected_version: editing?.version ?? 1,
       });
-      return;
     }
-    await api.createFieldDefinition(value);
+    return api.createFieldDefinition(value);
   });
   const retire = useMutation((id: string) => api.retireFieldDefinition(id));
   const openHistory = useMutation((id: string) =>
@@ -51,7 +50,7 @@ export function CustomFieldsPage() {
   async function handleSave(value: Parameters<typeof api.createFieldDefinition>[0]) {
     setDialogError(undefined);
     const result = await save.run(value, editing?.id);
-    if (save.error || result === undefined) {
+    if (result === undefined) {
       setDialogError(save.error ?? t("admin.customFields.saveFailed"));
       return;
     }
@@ -60,9 +59,15 @@ export function CustomFieldsPage() {
     void fields.refetch();
   }
 
+  const [retireError, setRetireError] = useState<string | undefined>(undefined);
   async function handleRetire() {
     if (!retiring) return;
-    await retire.run(retiring.id);
+    setRetireError(undefined);
+    const result = await retire.run(retiring.id);
+    if (result === undefined) {
+      setRetireError(retire.error ?? t("admin.customFields.retireFailed"));
+      return;
+    }
     setRetiring(undefined);
     void fields.refetch();
   }
@@ -71,7 +76,11 @@ export function CustomFieldsPage() {
     setHistory(field);
     setHistoryEntries(undefined);
     const items = await openHistory.run(field.id);
-    setHistoryEntries(items ?? []);
+    if (items === undefined) {
+      setHistoryEntries(undefined);
+      return;
+    }
+    setHistoryEntries(items);
   }
 
   if (fields.loading) return <div className="page-loading" aria-busy="true" />;
@@ -151,7 +160,9 @@ export function CustomFieldsPage() {
           open
           onOpenChange={() => setRetiring(undefined)}
           title={t("admin.customFields.retireConfirmTitle")}
-          message={t("admin.customFields.retireConfirm", { field: retiring.label })}
+          message={retireError
+            ? `${t("admin.customFields.retireConfirm", { field: retiring.label })} ${retireError}`
+            : t("admin.customFields.retireConfirm", { field: retiring.label })}
           confirmLabel={t("admin.customFields.retire")}
           pending={retire.pending}
           onConfirm={() => void handleRetire()}
@@ -164,7 +175,9 @@ export function CustomFieldsPage() {
           title={`${t("admin.customFields.history")}: ${history.label}`}
           footer={<button className="secondary-button" onClick={() => setHistory(undefined)}>{t("admin.customFields.close")}</button>}
         >
-          {historyEntries === undefined ? (
+          {openHistory.error ? (
+            <p className="form-error" role="alert">{openHistory.error}</p>
+          ) : historyEntries === undefined ? (
             <div className="page-loading" aria-busy="true" />
           ) : historyEntries.length === 0 ? (
             <p>{t("admin.customFields.historyEmpty")}</p>
@@ -172,7 +185,7 @@ export function CustomFieldsPage() {
             <ul className="history-list">
               {historyEntries.map((entry, index) => (
                 <li key={index} className="history-item">
-                  <span className="mono">{formatCustomValue({ field_type: "TEXT", config: {} }, entry.value_after)}</span>
+                  <span className="mono">{formatCustomValue(history, entry.value_after)}</span>
                   <time>{new Date(entry.changed_at).toLocaleString()}</time>
                 </li>
               ))}

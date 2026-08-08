@@ -119,3 +119,39 @@ describe("CustomFieldsPage", () => {
     expect(await screen.findByText("PO-42")).toBeTruthy();
   });
 });
+
+it("locks key and type when editing an existing field", async () => {
+  renderPage();
+  const row = (await screen.findByText("PO Number")).closest("tr") as HTMLTableRowElement;
+  fireEvent.click(within(row).getByRole("button", { name: /edit/i }));
+  const dialog = screen.getByRole("dialog");
+  expect((within(dialog).getByLabelText(/key/i) as HTMLInputElement).disabled).toBe(true);
+  expect((within(dialog).getByLabelText(/field type/i) as HTMLSelectElement).disabled).toBe(true);
+});
+
+it("updates a field through the edit dialog", async () => {
+  (api.updateFieldDefinition as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "def-1", label: "Purchase Order" });
+  renderPage();
+  const row = (await screen.findByText("PO Number")).closest("tr") as HTMLTableRowElement;
+  fireEvent.click(within(row).getByRole("button", { name: /edit/i }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText(/label/i), { target: { value: "Purchase Order" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /^edit$/i }));
+  await waitFor(() =>
+    expect(api.updateFieldDefinition as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      "def-1",
+      expect.objectContaining({ label: "Purchase Order", expected_version: 1 }),
+    ),
+  );
+});
+
+it("shows the generic save error when the API rejects creation", async () => {
+  (api.createFieldDefinition as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("boom"));
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: /new field/i }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText(/label/i), { target: { value: "Zone" } });
+  fireEvent.change(within(dialog).getByLabelText(/key/i), { target: { value: "zone" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /create/i }));
+  expect(await screen.findByText(/Could not save the field/)).toBeTruthy();
+});
