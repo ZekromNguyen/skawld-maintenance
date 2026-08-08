@@ -131,3 +131,14 @@ func TestListIncidentsForbiddenWithoutPermission(t *testing.T) {
 		t.Fatalf("status = %d, want 403", recorder.Code)
 	}
 }
+
+func (*listIncidentStore) Close(
+	context.Context, identitydomain.Principal, string, string, incidentapp.CloseIncident,
+) (incidentapp.Incident, bool, error) {
+	return incidentapp.Incident{}, false, nil
+}
+func (*listIncidentStore) Reopen(
+	context.Context, identitydomain.Principal, string, string, incidentapp.ReopenIncident,
+) (incidentapp.Incident, bool, error) {
+	return incidentapp.Incident{}, false, nil
+}

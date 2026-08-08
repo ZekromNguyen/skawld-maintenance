@@ -73,15 +73,26 @@ func (s Store) Create(
 			!principal.CanAccessSite(assetOrganizationID, assetSiteID) {
 			return outcome{}, incidentapp.ErrForbidden
 		}
+		reporterID := command.ReporterID
+		if reporterID == "" {
+			reporterID = principal.ID
+		}
+		occurredAt := command.OccurredAt
+		if occurredAt == nil {
+			occurredAt = &command.DetectedAt
+		}
 		incidentID := s.IDs.New()
 		number := fmt.Sprintf("INC-%s-%s", now.UTC().Format("20060102"), strings.ToUpper(incidentID[:8]))
 		incident, err := incidentdomain.New(incidentdomain.Incident{
 			ID: incidentID, OrganizationID: principal.OrganizationID,
 			SiteID: command.SiteID, AssetID: command.AssetID, Number: number,
-			Summary: command.Summary, Severity: incidentdomain.Severity(command.Severity),
+			Summary: command.Summary, Details: command.Details,
+			Priority: incidentdomain.Priority(command.Priority),
+			Status:   incidentdomain.Status(command.Status),
+			AssigneeID: command.AssigneeID, ReporterID: reporterID, TeamID: command.TeamID,
 			SourceOfTruth:  integrationdomain.SourceOfTruth(command.SourceOfTruth),
 			ExternalSystem: command.ExternalSystem, ExternalID: command.ExternalID,
-			ExternalVersion: command.ExternalVersion, OccurredAt: command.OccurredAt,
+			ExternalVersion: command.ExternalVersion, OccurredAt: occurredAt,
 			DetectedAt: command.DetectedAt,
 		})
 		if err != nil {
@@ -89,19 +100,22 @@ func (s Store) Create(
 		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO incidents (
-				id, organization_id, site_id, asset_id, number, summary, severity,
-				state, source_of_truth, external_system, external_id, external_version,
-				occurred_at, detected_at, version, created_by, created_at, updated_at
+				id, organization_id, site_id, asset_id, number, summary, details, priority,
+				status, source_of_truth, external_system, external_id, external_version,
+				occurred_at, detected_at, version, created_by, assignee_id, reporter_id, team_id,
+				created_at, updated_at
 			) VALUES (
-				$1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7,
-				$8, $9, nullif($10, ''), nullif($11, ''), nullif($12, ''),
-				$13, $14, $15, $16::uuid, $17, $17
+				$1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, nullif($7, ''), $8,
+				$9, $10, nullif($11, ''), nullif($12, ''), nullif($13, ''),
+				$14, $15, $16, $17::uuid, nullif($18, '')::uuid, $19::uuid, nullif($20, '')::uuid,
+				$21, $21
 			)
 		`, incident.ID, incident.OrganizationID, incident.SiteID, incident.AssetID,
-			incident.Number, incident.Summary, incident.Severity, incident.State,
-			incident.SourceOfTruth, incident.ExternalSystem, incident.ExternalID,
-			incident.ExternalVersion, incident.OccurredAt, incident.DetectedAt,
-			incident.Version, principal.ID, now)
+			incident.Number, incident.Summary, incident.Details, incident.Priority,
+			incident.Status, incident.SourceOfTruth, incident.ExternalSystem,
+			incident.ExternalID, incident.ExternalVersion, incident.OccurredAt,
+			incident.DetectedAt, incident.Version, principal.ID, incident.AssigneeID,
+			incident.ReporterID, incident.TeamID, now)
 		if err != nil {
 			return outcome{}, fmt.Errorf("insert incident: %w", err)
 		}
@@ -158,10 +172,10 @@ func (s Store) List(
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR i.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR i.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR i.asset_id = $4::uuid)
-		  AND (nullif($5, '') IS NULL OR i.state = $5)`
+		  AND (nullif($5, '') IS NULL OR i.status = $5)`
 	args := []any{
 		principal.OrganizationID, principal.SiteIDs,
-		filter.SiteID, filter.AssetID, filter.State,
+		filter.SiteID, filter.AssetID, filter.Status,
 	}
 	if filter.Cursor != "" {
 		cut := strings.LastIndex(filter.Cursor, "|")
@@ -238,10 +252,10 @@ func (s Store) Resolve(
 		}
 		tag, err := tx.Exec(ctx, `
 			UPDATE incidents
-			SET state = $2, resolved_at = $3, resolution_summary = $4,
+			SET status = $2, resolved_at = $3, resolution_summary = $4,
 			    version = $5, updated_at = $3
 			WHERE id = $1::uuid AND version = $6
-		`, incident.ID, incident.State, incident.ResolvedAt,
+		`, incident.ID, incident.Status, incident.ResolvedAt,
 			incident.ResolutionSummary, incident.Version, command.ExpectedVersion)
 		if err != nil {
 			return outcome{}, err
@@ -275,15 +289,176 @@ func (s Store) Resolve(
 	return result.Value, result.Replay, nil
 }
 
+func (s Store) Close(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command incidentapp.CloseIncident,
+) (incidentapp.Incident, bool, error) {
+	hash, err := idempotency.HashRequest(command)
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	scope := "incident.close.v1:" + incidentID
+	type outcome struct {
+		Value  incidentapp.Incident
+		Replay bool
+	}
+	result, err := database.InTx(ctx, s.Pool, pgx.TxOptions{}, func(tx pgx.Tx) (outcome, error) {
+		now := s.Clock.Now()
+		record, err := s.Idempotency.Begin(ctx, tx, principal.ID, scope, key, hash, now)
+		if err != nil {
+			return outcome{}, err
+		}
+		if record.Replay {
+			var replay incidentapp.Incident
+			if err := json.Unmarshal(record.ResponseBody, &replay); err != nil {
+				return outcome{}, err
+			}
+			return outcome{Value: replay, Replay: true}, nil
+		}
+		incident, assetTag, err := loadIncidentForUpdate(ctx, tx, principal, incidentID)
+		if err != nil {
+			return outcome{}, err
+		}
+		if incident.Version != command.ExpectedVersion {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		before := mapIncident(incident, assetTag)
+		if err := incident.Close(now); err != nil {
+			return outcome{}, errors.Join(incidentapp.ErrInvalid, err)
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE incidents
+			SET status = $2, resolved_at = $3, version = $4, updated_at = $5
+			WHERE id = $1::uuid AND version = $6
+		`, incident.ID, incident.Status, incident.ResolvedAt,
+			incident.Version, now, command.ExpectedVersion)
+		if err != nil {
+			return outcome{}, err
+		}
+		if tag.RowsAffected() != 1 {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		response := mapIncident(incident, assetTag)
+		if err := appendEvent(ctx, tx, s.IDs.New(), incident.OrganizationID,
+			"IncidentClosed", incident.ID, incident.Version, response, now); err != nil {
+			return outcome{}, err
+		}
+		if err := s.Audit.Append(ctx, tx, audit.Event{
+			ID: s.IDs.New(), OrganizationID: incident.OrganizationID, SiteID: incident.SiteID,
+			ActorID: principal.ID, Action: "incident.closed", EntityKind: "incident",
+			EntityID: incident.ID, Before: before, After: response, OccurredAt: now,
+		}); err != nil {
+			return outcome{}, err
+		}
+		body, _ := json.Marshal(response)
+		if err := s.Idempotency.Complete(
+			ctx, tx, principal.ID, scope, key, http.StatusOK, body, now,
+		); err != nil {
+			return outcome{}, err
+		}
+		return outcome{Value: response}, nil
+	})
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	return result.Value, result.Replay, nil
+}
+
+func (s Store) Reopen(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command incidentapp.ReopenIncident,
+) (incidentapp.Incident, bool, error) {
+	hash, err := idempotency.HashRequest(command)
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	scope := "incident.reopen.v1:" + incidentID
+	type outcome struct {
+		Value  incidentapp.Incident
+		Replay bool
+	}
+	result, err := database.InTx(ctx, s.Pool, pgx.TxOptions{}, func(tx pgx.Tx) (outcome, error) {
+		now := s.Clock.Now()
+		record, err := s.Idempotency.Begin(ctx, tx, principal.ID, scope, key, hash, now)
+		if err != nil {
+			return outcome{}, err
+		}
+		if record.Replay {
+			var replay incidentapp.Incident
+			if err := json.Unmarshal(record.ResponseBody, &replay); err != nil {
+				return outcome{}, err
+			}
+			return outcome{Value: replay, Replay: true}, nil
+		}
+		incident, assetTag, err := loadIncidentForUpdate(ctx, tx, principal, incidentID)
+		if err != nil {
+			return outcome{}, err
+		}
+		if incident.Version != command.ExpectedVersion {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		before := mapIncident(incident, assetTag)
+		if err := incident.Reopen(); err != nil {
+			return outcome{}, errors.Join(incidentapp.ErrInvalid, err)
+		}
+		tag, err := tx.Exec(ctx, `
+			UPDATE incidents
+			SET status = $2, resolved_at = NULL, resolution_summary = NULL,
+			    version = $3, updated_at = $4
+			WHERE id = $1::uuid AND version = $5
+		`, incident.ID, incident.Status, incident.Version, now, command.ExpectedVersion)
+		if err != nil {
+			return outcome{}, err
+		}
+		if tag.RowsAffected() != 1 {
+			return outcome{}, incidentapp.ErrVersionConflict
+		}
+		response := mapIncident(incident, assetTag)
+		if err := appendEvent(ctx, tx, s.IDs.New(), incident.OrganizationID,
+			"IncidentReopened", incident.ID, incident.Version, response, now); err != nil {
+			return outcome{}, err
+		}
+		if err := s.Audit.Append(ctx, tx, audit.Event{
+			ID: s.IDs.New(), OrganizationID: incident.OrganizationID, SiteID: incident.SiteID,
+			ActorID: principal.ID, Action: "incident.reopened", EntityKind: "incident",
+			EntityID: incident.ID, Before: before, After: response, OccurredAt: now,
+		}); err != nil {
+			return outcome{}, err
+		}
+		body, _ := json.Marshal(response)
+		if err := s.Idempotency.Complete(
+			ctx, tx, principal.ID, scope, key, http.StatusOK, body, now,
+		); err != nil {
+			return outcome{}, err
+		}
+		return outcome{Value: response}, nil
+	})
+	if err != nil {
+		return incidentapp.Incident{}, false, err
+	}
+	return result.Value, result.Replay, nil
+}
+
 const incidentSelect = `
 	SELECT
 		i.id::text, i.organization_id::text, i.site_id::text, i.asset_id::text,
-		a.tag, i.number, i.summary, i.severity, i.state, i.source_of_truth,
+		a.tag, i.number, i.summary, i.priority, i.status, i.source_of_truth,
 		coalesce(i.external_system, ''), coalesce(i.external_id, ''),
 		coalesce(i.external_version, ''), i.occurred_at, i.detected_at,
-		i.resolved_at, coalesce(i.resolution_summary, ''), i.version
+		i.resolved_at, coalesce(i.resolution_summary, ''), i.version,
+		coalesce(i.details, ''),
+		coalesce(i.assignee_id::text, ''), coalesce(assignee.display_name, ''),
+		coalesce(i.reporter_id::text, ''), coalesce(reporter.display_name, ''),
+		coalesce(i.team_id::text, ''), coalesce(team.name, '')
 	FROM incidents i
 	JOIN assets a ON a.id = i.asset_id
+	LEFT JOIN principals assignee ON assignee.id = i.assignee_id
+	LEFT JOIN principals reporter ON reporter.id = i.reporter_id
+	LEFT JOIN teams team ON team.id = i.team_id
 `
 
 type scanner interface {
@@ -294,13 +469,18 @@ func scanIncident(row scanner) (incidentapp.Incident, error) {
 	var value incidentapp.Incident
 	err := row.Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.AssetID,
-		&value.AssetTag, &value.Number, &value.Summary, &value.Severity,
-		&value.State, &value.SourceOfTruth, &value.ExternalSystem,
+		&value.AssetTag, &value.Number, &value.Summary, &value.Priority,
+		&value.Status, &value.SourceOfTruth, &value.ExternalSystem,
 		&value.ExternalID, &value.ExternalVersion, &value.OccurredAt,
 		&value.DetectedAt, &value.ResolvedAt, &value.ResolutionSummary,
-		&value.Version,
+		&value.Version, &value.Details, &value.AssigneeID, &value.AssigneeName,
+		&value.ReporterID, &value.ReporterName, &value.TeamID, &value.TeamName,
 	)
-	return value, err
+	if err != nil {
+		return incidentapp.Incident{}, err
+	}
+	value.TimeToCompleteSeconds = timeToCompleteSeconds(value.DetectedAt, value.ResolvedAt)
+	return value, nil
 }
 
 func loadIncidentForUpdate(
@@ -315,11 +495,12 @@ func loadIncidentForUpdate(
 		FOR UPDATE OF i
 	`, incidentID, principal.OrganizationID).Scan(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.AssetID,
-		&value.AssetTag, &value.Number, &value.Summary, &value.Severity,
-		&value.State, &value.SourceOfTruth, &value.ExternalSystem,
+		&value.AssetTag, &value.Number, &value.Summary, &value.Priority,
+		&value.Status, &value.SourceOfTruth, &value.ExternalSystem,
 		&value.ExternalID, &value.ExternalVersion, &value.OccurredAt,
 		&value.DetectedAt, &value.ResolvedAt, &value.ResolutionSummary,
-		&value.Version,
+		&value.Version, &value.Details, &value.AssigneeID, &value.AssigneeName,
+		&value.ReporterID, &value.ReporterName, &value.TeamID, &value.TeamName,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return incidentdomain.Incident{}, "", incidentapp.ErrNotFound
@@ -333,7 +514,9 @@ func loadIncidentForUpdate(
 	return incidentdomain.Incident{
 		ID: value.ID, OrganizationID: value.OrganizationID, SiteID: value.SiteID,
 		AssetID: value.AssetID, Number: value.Number, Summary: value.Summary,
-		Severity: incidentdomain.Severity(value.Severity), State: incidentdomain.State(value.State),
+		Details: value.Details, Priority: incidentdomain.Priority(value.Priority),
+		Status: incidentdomain.Status(value.Status), AssigneeID: value.AssigneeID,
+		ReporterID: value.ReporterID, TeamID: value.TeamID,
 		SourceOfTruth:  integrationdomain.SourceOfTruth(value.SourceOfTruth),
 		ExternalSystem: value.ExternalSystem, ExternalID: value.ExternalID,
 		ExternalVersion: value.ExternalVersion, OccurredAt: value.OccurredAt,
@@ -346,13 +529,24 @@ func mapIncident(value incidentdomain.Incident, assetTag string) incidentapp.Inc
 	return incidentapp.Incident{
 		ID: value.ID, OrganizationID: value.OrganizationID, SiteID: value.SiteID,
 		AssetID: value.AssetID, AssetTag: assetTag, Number: value.Number,
-		Summary: value.Summary, Severity: string(value.Severity), State: string(value.State),
+		Summary: value.Summary, Details: value.Details, Priority: string(value.Priority),
+		Status: string(value.Status), AssigneeID: value.AssigneeID,
+		ReporterID: value.ReporterID, TeamID: value.TeamID,
 		SourceOfTruth: string(value.SourceOfTruth), ExternalSystem: value.ExternalSystem,
 		ExternalID: value.ExternalID, ExternalVersion: value.ExternalVersion,
 		OccurredAt: value.OccurredAt, DetectedAt: value.DetectedAt,
 		ResolvedAt: value.ResolvedAt, ResolutionSummary: value.ResolutionSummary,
+		TimeToCompleteSeconds: timeToCompleteSeconds(value.DetectedAt, value.ResolvedAt),
 		Version: value.Version,
 	}
+}
+
+func timeToCompleteSeconds(detectedAt time.Time, resolvedAt *time.Time) *int64 {
+	if resolvedAt == nil {
+		return nil
+	}
+	seconds := int64(resolvedAt.Sub(detectedAt).Seconds())
+	return &seconds
 }
 
 func appendEvent(

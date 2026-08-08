@@ -34,7 +34,7 @@ func listIncidents(service incidentapp.Service) http.HandlerFunc {
 		filter := incidentapp.Filter{
 			SiteID:   r.URL.Query().Get("site_id"),
 			AssetID:  r.URL.Query().Get("asset_id"),
-			State:    r.URL.Query().Get("state"),
+			Status:  r.URL.Query().Get("status"),
 			PageSize: pageSize,
 			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
 		}

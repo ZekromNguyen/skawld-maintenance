@@ -139,7 +139,7 @@ func run(ctx context.Context) error {
 	if !ok {
 		incident, _, err = incidentStore.Create(ctx, principal, key("incident-1"), incidentapp.CreateIncident{
 			SiteID: siteID, AssetID: asset.ID, Summary: "High vibration on P-302 motor bearing",
-			Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+			Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 		})
 		if err != nil {
 			return fmt.Errorf("create incident: %w", err)

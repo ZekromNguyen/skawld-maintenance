@@ -21,7 +21,12 @@ type CreateIncident struct {
 	SiteID          string     `json:"site_id"`
 	AssetID         string     `json:"asset_id"`
 	Summary         string     `json:"summary"`
-	Severity        string     `json:"severity"`
+	Details         string     `json:"details,omitempty"`
+	Priority        string     `json:"priority"`
+	Status          string     `json:"status,omitempty"`
+	AssigneeID      string     `json:"assignee_id,omitempty"`
+	ReporterID      string     `json:"reporter_id,omitempty"`
+	TeamID          string     `json:"team_id,omitempty"`
 	SourceOfTruth   string     `json:"source_of_truth"`
 	ExternalSystem  string     `json:"external_system,omitempty"`
 	ExternalID      string     `json:"external_id,omitempty"`
@@ -35,31 +40,47 @@ type ResolveIncident struct {
 	ResolutionSummary string `json:"resolution_summary"`
 }
 
+type CloseIncident struct {
+	ExpectedVersion int64 `json:"expected_version"`
+}
+
+type ReopenIncident struct {
+	ExpectedVersion int64 `json:"expected_version"`
+}
+
 type Incident struct {
-	ID                string     `json:"id"`
-	OrganizationID    string     `json:"organization_id"`
-	SiteID            string     `json:"site_id"`
-	AssetID           string     `json:"asset_id"`
-	AssetTag          string     `json:"asset_tag,omitempty"`
-	Number            string     `json:"number"`
-	Summary           string     `json:"summary"`
-	Severity          string     `json:"severity"`
-	State             string     `json:"state"`
-	SourceOfTruth     string     `json:"source_of_truth"`
-	ExternalSystem    string     `json:"external_system,omitempty"`
-	ExternalID        string     `json:"external_id,omitempty"`
-	ExternalVersion   string     `json:"external_version,omitempty"`
-	OccurredAt        *time.Time `json:"occurred_at,omitempty"`
-	DetectedAt        time.Time  `json:"detected_at"`
-	ResolvedAt        *time.Time `json:"resolved_at,omitempty"`
-	ResolutionSummary string     `json:"resolution_summary,omitempty"`
-	Version           int64      `json:"version"`
+	ID                     string     `json:"id"`
+	OrganizationID         string     `json:"organization_id"`
+	SiteID                 string     `json:"site_id"`
+	AssetID                string     `json:"asset_id"`
+	AssetTag               string     `json:"asset_tag,omitempty"`
+	Number                 string     `json:"number"`
+	Summary                string     `json:"summary"`
+	Details                string     `json:"details,omitempty"`
+	Priority               string     `json:"priority"`
+	Status                 string     `json:"status"`
+	AssigneeID             string     `json:"assignee_id,omitempty"`
+	AssigneeName           string     `json:"assignee_name,omitempty"`
+	ReporterID             string     `json:"reporter_id,omitempty"`
+	ReporterName           string     `json:"reporter_name,omitempty"`
+	TeamID                 string     `json:"team_id,omitempty"`
+	TeamName               string     `json:"team_name,omitempty"`
+	SourceOfTruth          string     `json:"source_of_truth"`
+	ExternalSystem         string     `json:"external_system,omitempty"`
+	ExternalID             string     `json:"external_id,omitempty"`
+	ExternalVersion        string     `json:"external_version,omitempty"`
+	OccurredAt             *time.Time `json:"occurred_at,omitempty"`
+	DetectedAt             time.Time  `json:"detected_at"`
+	ResolvedAt             *time.Time `json:"resolved_at,omitempty"`
+	ResolutionSummary      string     `json:"resolution_summary,omitempty"`
+	TimeToCompleteSeconds  *int64     `json:"time_to_complete_seconds,omitempty"`
+	Version                int64      `json:"version"`
 }
 
 type Filter struct {
 	SiteID   string
 	AssetID  string
-	State    string
+	Status   string
 	PageSize int
 	Cursor   string
 }
@@ -69,6 +90,8 @@ type Store interface {
 	Get(context.Context, identitydomain.Principal, string) (Incident, error)
 	List(context.Context, identitydomain.Principal, Filter) ([]Incident, bool, error)
 	Resolve(context.Context, identitydomain.Principal, string, string, ResolveIncident) (Incident, bool, error)
+	Close(context.Context, identitydomain.Principal, string, string, CloseIncident) (Incident, bool, error)
+	Reopen(context.Context, identitydomain.Principal, string, string, ReopenIncident) (Incident, bool, error)
 }
 
 type Service struct {
@@ -86,7 +109,8 @@ func (s Service) Create(
 		return Incident{}, false, ErrForbidden
 	}
 	if !validKey(key) || strings.TrimSpace(command.AssetID) == "" ||
-		strings.TrimSpace(command.Summary) == "" || command.DetectedAt.IsZero() {
+		strings.TrimSpace(command.Summary) == "" || command.DetectedAt.IsZero() ||
+		!validPriority(command.Priority) {
 		return Incident{}, false, ErrInvalid
 	}
 	return s.Store.Create(ctx, principal, key, command)
@@ -154,7 +178,46 @@ func (s Service) Resolve(
 	return s.Store.Resolve(ctx, principal, key, incidentID, command)
 }
 
+func (s Service) Close(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command CloseIncident,
+) (Incident, bool, error) {
+	if !principal.Has(identitydomain.PermissionIncidentResolve) {
+		return Incident{}, false, ErrForbidden
+	}
+	if !validKey(key) || command.ExpectedVersion <= 0 {
+		return Incident{}, false, ErrInvalid
+	}
+	return s.Store.Close(ctx, principal, key, incidentID, command)
+}
+
+func (s Service) Reopen(
+	ctx context.Context,
+	principal identitydomain.Principal,
+	key, incidentID string,
+	command ReopenIncident,
+) (Incident, bool, error) {
+	if !principal.Has(identitydomain.PermissionIncidentResolve) {
+		return Incident{}, false, ErrForbidden
+	}
+	if !validKey(key) || command.ExpectedVersion <= 0 {
+		return Incident{}, false, ErrInvalid
+	}
+	return s.Store.Reopen(ctx, principal, key, incidentID, command)
+}
+
 func validKey(key string) bool {
 	length := len(strings.TrimSpace(key))
 	return length >= 8 && length <= 200
+}
+
+func validPriority(priority string) bool {
+	switch priority {
+	case "LOW", "MEDIUM", "HIGH", "CRITICAL":
+		return true
+	default:
+		return false
+	}
 }

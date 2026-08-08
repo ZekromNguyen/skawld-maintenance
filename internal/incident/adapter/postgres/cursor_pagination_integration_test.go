@@ -62,7 +62,7 @@ func TestIncidentListCursorPagination(t *testing.T) {
 		if _, _, err := store.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
 			SiteID: siteID, AssetID: assetID,
 			Summary:  "Vibration " + string(rune('0'+index)),
-			Severity: "MEDIUM", SourceOfTruth: "OWNED_BY_SKAWLD",
+			Priority: "MEDIUM", SourceOfTruth: "OWNED_BY_SKAWLD",
 			DetectedAt: now.Add(time.Duration(index) * time.Second),
 		}); err != nil {
 			t.Fatal(err)
@@ -90,6 +90,39 @@ func TestIncidentListCursorPagination(t *testing.T) {
 	}
 	if len(seen) != 3 {
 		t.Fatalf("distinct incidents across pages = %d, want 3", len(seen))
+	}
+
+	// The reporter defaults to the creating principal and the date defaults
+	// to the detection time; a resolved incident exposes completion time.
+	created, _, err := store.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
+		SiteID: siteID, AssetID: assetID,
+		Summary: "Reporter default", Priority: "LOW",
+		SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ReporterID != principalID {
+		t.Fatalf("reporter = %q, want principal %q", created.ReporterID, principalID)
+	}
+	if created.OccurredAt == nil || !created.OccurredAt.Equal(now) {
+		t.Fatalf("occurred_at = %v, want detection time", created.OccurredAt)
+	}
+	if created.TimeToCompleteSeconds != nil {
+		t.Fatalf("open incident must not have completion time, got %v", *created.TimeToCompleteSeconds)
+	}
+	_, _, err = store.Resolve(ctx, principal, uuid.NewString(), created.ID, incidentapp.ResolveIncident{
+		ExpectedVersion: created.Version, ResolutionSummary: "Verified fixed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := store.Get(ctx, principal, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Status != "RESOLVED" || resolved.TimeToCompleteSeconds == nil {
+		t.Fatalf("resolved incident missing completion time: %#v", resolved)
 	}
 }
 
