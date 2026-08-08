@@ -5,6 +5,7 @@ import { useQuery } from "../useQuery";
 import { usePrincipal } from "../usePrincipal";
 import { useSite } from "../state/SiteContext";
 import { useI18n } from "../../i18n/I18nProvider";
+import type { MessageKey } from "../../i18n/messages";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
 import { EmptyState } from "../ui/EmptyState";
@@ -67,6 +68,10 @@ function writeRecent(query: string) {
   }
 }
 
+type Scope = "ALL" | "DOCUMENT" | "INCIDENT";
+
+const SCOPES: Scope[] = ["ALL", "DOCUMENT", "INCIDENT"];
+
 export function SearchPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -76,6 +81,7 @@ export function SearchPage() {
   const { siteId } = useSite();
   const [input, setInput] = useState(query);
   const [recent, setRecent] = useState<string[]>(() => readRecent());
+  const [scope, setScope] = useState<Scope>("ALL");
 
   useEffect(() => {
     setInput(query);
@@ -97,18 +103,25 @@ export function SearchPage() {
     navigate(value ? `/search?q=${encodeURIComponent(value)}` : "/search");
   };
 
+  const scopedItems = useMemo(() => {
+    const items = results.data?.items ?? [];
+    if (scope === "ALL") return items;
+    const wanted = scope.toLowerCase();
+    return items.filter((item) => item.kind.toLowerCase().includes(wanted));
+  }, [results.data, scope]);
+
   const groups = useMemo(() => {
     const map = new Map<string, Evidence[]>();
-    for (const item of results.data?.items ?? []) {
+    for (const item of scopedItems) {
       const key = item.authority || t("search.unknownAuthority");
       const bucket = map.get(key) ?? [];
       bucket.push(item);
       map.set(key, bucket);
     }
     return [...map.entries()];
-  }, [results.data, t]);
+  }, [scopedItems, t]);
 
-  const hasData = (results.data?.items.length ?? 0) > 0;
+  const hasData = scopedItems.length > 0;
 
   return (
     <PageTrailProvider trail={[]}>
@@ -125,6 +138,21 @@ export function SearchPage() {
           />
           <button className="primary-button" type="submit">{t("search.submit")}</button>
         </form>
+        {query ? (
+          <div className="incident-tabs" role="tablist" aria-label={t("search.scope")}>
+            {SCOPES.map((option) => (
+              <button
+                key={option}
+                role="tab"
+                aria-selected={scope === option}
+                className={`tab${scope === option ? " active" : ""}`}
+                onClick={() => setScope(option)}
+              >
+                {t(`search.scope.${option.toLowerCase()}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {!query && recent.length > 0 ? (
           <div className="panel" style={{ marginBottom: 14 }}>
             <div className="panel-heading"><h2>{t("search.recent")}</h2></div>

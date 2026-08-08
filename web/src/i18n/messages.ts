@@ -132,6 +132,10 @@ const en = {
   "search.empty": "Type a query to search the knowledge base.",
   "search.noResults": "No results for “{query}”. Try different terms.",
   "search.recent": "Recent searches",
+  "search.scope": "Search scope",
+  "search.scope.all": "All",
+  "search.scope.document": "Documents",
+  "search.scope.incident": "Incidents",
   "search.score": "Score",
   "search.unknownAuthority": "Other sources",
 
@@ -785,6 +789,10 @@ const vi: Record<MessageKey, string> = {
   "search.empty": "Nhập truy vấn để tìm kiếm cơ sở tri thức.",
   "search.noResults": "Không có kết quả cho “{query}”. Hãy thử từ khóa khác.",
   "search.recent": "Tìm kiếm gần đây",
+  "search.scope": "Phạm vi tìm kiếm",
+  "search.scope.all": "Tất cả",
+  "search.scope.document": "Tài liệu",
+  "search.scope.incident": "Sự cố",
   "search.score": "Điểm",
   "search.unknownAuthority": "Nguồn khác",
 

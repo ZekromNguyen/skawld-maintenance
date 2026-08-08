@@ -97,4 +97,20 @@ describe("SearchPage affordances", () => {
     renderPage("/search?q=zzzz");
     expect(await screen.findByText(/zzzz/i)).toBeTruthy();
   });
+
+  it("filters results by scope", async () => {
+    (api.searchKnowledge as ReturnType<typeof vi.fn>).mockResolvedValue({
+      retrieval_run_id: "rr1",
+      items: [
+        { id: "e1", kind: "DOCUMENT", source_id: "d9", title: "LOTO Procedure for P-302", locator: "sop/loto", authority: "SITE_APPROVED", content: "Apply lockout before inspection.", content_sha256: "x", score: { rrf_score: 0.94 } },
+        { id: "e2", kind: "INCIDENT", source_id: "i7", title: "Pump vibration incident", locator: "inc/7", authority: "SITE_APPROVED", content: "Vibration readings above threshold.", content_sha256: "y", score: { rrf_score: 0.5 } }
+      ]
+    });
+    renderPage("/search?q=loto");
+    await screen.findByRole("link", { name: /loto procedure/i });
+    expect(screen.getByRole("link", { name: /pump vibration incident/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: /incidents/i }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: /loto procedure/i })).toBeNull());
+    expect(screen.getByRole("link", { name: /pump vibration incident/i })).toBeTruthy();
+  });
 });
