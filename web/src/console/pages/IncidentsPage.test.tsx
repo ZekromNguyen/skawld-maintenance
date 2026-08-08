@@ -179,12 +179,15 @@ describe("IncidentsPage server-side filters", () => {
   it("refetches with the selected severity and filters rows", async () => {
     renderPage();
     await screen.findByText("Pump vibration");
+    fireEvent.click(screen.getByRole("tab", { name: /all/i }));
+    await waitFor(() => expect(screen.getByText("Bearing temperature")).toBeTruthy());
     fireEvent.change(screen.getByLabelText(/severity/i), { target: { value: "HIGH" } });
     await waitFor(() => {
       const calls = (api.incidents as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some(([opts]) => opts && opts.severity === "HIGH")).toBe(true);
     });
-    await waitFor(() => expect(screen.getByText("Pump vibration")).toBeTruthy());
+    await waitFor(() => expect(screen.queryByText("Bearing temperature")).toBeNull());
+    expect(screen.getByText("Pump vibration")).toBeTruthy();
   });
 
   it("shows truthful tab counts from the summary endpoint", async () => {
