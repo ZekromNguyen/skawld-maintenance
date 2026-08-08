@@ -12,8 +12,18 @@ vi.mock("../../api", () => ({
     principal: vi.fn().mockResolvedValue({
       id: "p1",
       display_name: "Tester",
-      site_ids: [],
+      site_ids: ["s1"],
       permissions: ["incident:read"]
+    }),
+    summary: vi.fn().mockResolvedValue({
+      open_incidents: 3,
+      in_progress_incidents: 2,
+      resolved_incidents: 9,
+      total_incidents: 14,
+      by_severity: { LOW: 4, MEDIUM: 5, HIGH: 3, CRITICAL: 2 },
+      active_executions: 2,
+      critical_assets: 1,
+      pending_handovers: 1
     }),
     incidents: vi.fn().mockResolvedValue({
       items: [
@@ -170,5 +180,20 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     expect(await screen.findByText("Handovers & recommendations")).toBeTruthy();
+  });
+});
+
+describe("DashboardPage metrics from summary", () => {
+  it("renders metric card values from the summary endpoint", async () => {
+    renderDashboard();
+    expect(await screen.findByText("3")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not fetch all assets", async () => {
+    renderDashboard();
+    await screen.findByText("Operations overview");
+    expect(api.assets).not.toHaveBeenCalled();
   });
 });

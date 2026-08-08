@@ -160,6 +160,17 @@ export type EvaluationSummary = {
   generated_at: string;
 };
 
+export type DashboardSummary = {
+  open_incidents: number;
+  in_progress_incidents: number;
+  resolved_incidents: number;
+  total_incidents: number;
+  by_severity: { LOW: number; MEDIUM: number; HIGH: number; CRITICAL: number };
+  active_executions: number;
+  critical_assets: number;
+  pending_handovers: number;
+};
+
 export type MaintenanceReport = {
   id: string;
   execution_id: string;

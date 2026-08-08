@@ -1,5 +1,6 @@
 import type {
   Asset,
+  DashboardSummary,
   Demonstration,
   EvaluationSummary,
   Execution,
@@ -415,6 +416,8 @@ export const api = {
     command<unknown>(`/document-revisions/${revisionID}/ingestion`, {}),
   handovers: (options: ListOptions = {}) =>
     request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`),
+  summary: (siteID?: string) =>
+    request<DashboardSummary>(`/summary${siteID ? `?site_id=${siteID}` : ""}`),
   pendingHandovers: async () => {
     const options = { state: ["DRAFT", "SUBMITTED", "ACCEPTED"], page_size: 100 };
     const first = await request<ListPage<ShiftHandover>>(`/handovers${listQuery(options)}`);
