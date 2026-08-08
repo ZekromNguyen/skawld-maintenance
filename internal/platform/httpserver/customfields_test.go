@@ -200,3 +200,19 @@ func TestRetireFieldDefinitionHandlerConflict(t *testing.T) {
 		t.Fatalf("expected 409 for double retire, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestWriteFieldErrorValidation422(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeFieldError(rec, application.ErrValidation)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for ErrValidation, got %d", rec.Code)
+	}
+}
+
+func TestWriteFieldErrorForbidden403(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeFieldError(rec, application.ErrForbidden)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for ErrForbidden, got %d", rec.Code)
+	}
+}

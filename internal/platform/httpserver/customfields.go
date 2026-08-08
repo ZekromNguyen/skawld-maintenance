@@ -136,18 +136,14 @@ func fieldDefinitionHistory(service application.Service) http.HandlerFunc {
 }
 
 func writeFieldError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, application.ErrForbidden):
-		writeProblem(w, http.StatusForbidden, "Forbidden", "permission denied")
-	case errors.Is(err, application.ErrNotFound):
-		writeProblem(w, http.StatusNotFound, "Not Found", "field definition was not found")
-	case errors.Is(err, application.ErrValidation):
+	// ErrValidation is the one mapping the shared helper does not know;
+	// everything else delegates to writeDomainError so the common
+	// status/idempotency mapping cannot drift.
+	if errors.Is(err, application.ErrValidation) {
 		writeProblem(w, http.StatusUnprocessableEntity, "Unprocessable Entity", err.Error())
-	case errors.Is(err, application.ErrConflict):
-		writeProblem(w, http.StatusConflict, "Conflict", err.Error())
-	case errors.Is(err, application.ErrInvalid):
-		writeProblem(w, http.StatusBadRequest, "Invalid Request", err.Error())
-	default:
-		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", "request could not be completed")
+		return
 	}
+	writeDomainError(w, err,
+		application.ErrForbidden, application.ErrNotFound,
+		application.ErrInvalid, application.ErrConflict)
 }
