@@ -34,8 +34,8 @@ const HAPPY_FIXTURES = {
   principal: { id: "p1", display_name: "Dev Supervisor", organization_id: "o1", site_ids: ["s1"], permissions: ["incident:read", "incident:create", "execution:write"] },
   incidents: {
     items: [
-      { id: "i1", site_id: "s1", asset_id: "a1", asset_tag: "P-302", number: "IN-1", summary: "Pump vibration", severity: "HIGH", state: "OPEN", detected_at: new Date().toISOString(), version: 1 },
-      { id: "i2", site_id: "s1", asset_id: "a2", asset_tag: "P-304", number: "IN-2", summary: "Bearing temperature", severity: "MEDIUM", state: "IN_PROGRESS", detected_at: new Date().toISOString(), version: 1 },
+      { id: "i1", site_id: "s1", asset_id: "a1", asset_tag: "P-302", number: "IN-1", summary: "Pump vibration", priority: "HIGH", status: "OPEN", detected_at: new Date().toISOString(), version: 1 },
+      { id: "i2", site_id: "s1", asset_id: "a2", asset_tag: "P-304", number: "IN-2", summary: "Bearing temperature", priority: "MEDIUM", status: "IN_PROGRESS", detected_at: new Date().toISOString(), version: 1 },
     ],
     next_cursor: null,
     has_more: false,
