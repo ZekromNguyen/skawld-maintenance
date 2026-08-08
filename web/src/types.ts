@@ -182,6 +182,12 @@ export type MaintenanceReport = {
   prompt_version?: string;
 };
 
+export type HandoverListItem = {
+  title: string;
+  detail?: string;
+  severity?: string;
+};
+
 export type ShiftHandover = {
   id: string;
   site_id: string;
@@ -191,12 +197,12 @@ export type ShiftHandover = {
   version: number;
   structured_content: {
     summary: string;
-    open_incidents: string[];
-    active_executions: string[];
-    safety_concerns: string[];
-    follow_up: string[];
+    open_incidents: HandoverListItem[];
+    active_executions: HandoverListItem[];
+    safety_concerns: HandoverListItem[];
+    follow_up: HandoverListItem[];
     evidence_ids: string[];
-    unknowns: string[];
+    unknowns: HandoverListItem[];
     requires_human_review: boolean;
   };
   evidence: Evidence[];
