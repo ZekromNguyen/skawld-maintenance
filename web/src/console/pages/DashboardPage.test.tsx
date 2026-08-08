@@ -108,6 +108,8 @@ describe("DashboardPage", () => {
   it("renders real KPIs, my queue, and open incidents only", async () => {
     renderDashboard();
     expect(await screen.findByText("Operations overview")).toBeTruthy();
+    // Annunciator strip links to the incident queue.
+    expect(screen.getByRole("link", { name: /open incidents/i })).toBeTruthy();
     // Open incident row visible, resolved one excluded.
     expect(screen.getByText("Pump vibration")).toBeTruthy();
     expect(screen.queryByText("Resolved bearing noise")).toBeNull();

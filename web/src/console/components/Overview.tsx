@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { useI18n } from "../../i18n/I18nProvider";
-import { MetricCard } from "../ui/MetricCard";
+import { AnnunciatorStrip } from "./AnnunciatorStrip";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { EmptyState } from "../ui/EmptyState";
@@ -56,32 +56,38 @@ export function Overview({
 
   return (
     <>
-      <section className="metrics" aria-label={t("overview.operationalStatus")}>
-        <MetricCard
-          label={t("dashboard.openIncidents")}
-          value={String(open.length)}
-          to="/incidents"
-          tone="critical"
-        />
-        <MetricCard
-          label={t("dashboard.executionsInProgress")}
-          value={String(inProgress.length)}
-          to="/executions"
-          tone="medium"
-        />
-        <MetricCard
-          label={t("dashboard.criticalAssets")}
-          value={String(critical.length)}
-          to="/assets"
-          tone="high"
-        />
-        <MetricCard
-          label={t("dashboard.pendingHandovers")}
-          value={String(pendingHandoverCount)}
-          to="/handovers"
-          tone="info"
-        />
-      </section>
+      <AnnunciatorStrip
+        cells={[
+          {
+            key: "open-incidents",
+            label: t("dashboard.openIncidents"),
+            value: String(open.length),
+            tone: "critical",
+            to: "/incidents",
+          },
+          {
+            key: "in-progress",
+            label: t("dashboard.executionsInProgress"),
+            value: String(inProgress.length),
+            tone: "medium",
+            to: "/executions",
+          },
+          {
+            key: "critical-assets",
+            label: t("dashboard.criticalAssets"),
+            value: String(critical.length),
+            tone: "high",
+            to: "/assets",
+          },
+          {
+            key: "pending-handovers",
+            label: t("dashboard.pendingHandovers"),
+            value: String(pendingHandoverCount),
+            tone: "info",
+            to: "/handovers",
+          },
+        ]}
+      />
 
       <section className="panel" style={{ marginBottom: 20 }}>
         <div className="panel-heading">
