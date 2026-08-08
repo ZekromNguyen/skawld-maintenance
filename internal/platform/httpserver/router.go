@@ -14,6 +14,7 @@ import (
 	assetapp "github.com/ZekromNguyen/skawld-maintenance/internal/asset/application"
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	copilotapp "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/application"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	demonstrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/demonstration/application"
 	evaluationapp "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/application"
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
@@ -61,6 +62,7 @@ type Dependencies struct {
 	Demonstrations  demonstrationapp.Service
 	Workflows       workflowapp.Service
 	Evaluations     evaluationapp.Service
+	CustomFields    customfieldapp.Service
 	Teams           teamapp.Service
 	IntegrationSink integrationapp.ProjectionSink
 }
@@ -109,6 +111,7 @@ func New(dependencies Dependencies) http.Handler {
 		mountDemonstrationRoutes(api, dependencies.Demonstrations)
 		mountWorkflowRoutes(api, dependencies.Workflows)
 		mountEvaluationRoutes(api, dependencies.Evaluations)
+		mountCustomFieldRoutes(api, dependencies.CustomFields)
 		mountIntegrationRoutes(api, dependencies.IntegrationSink)
 	})
 	return router
