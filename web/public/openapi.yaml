@@ -305,7 +305,15 @@ paths:
         - {in: query, name: status, schema: {type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, REOPENED]}}
         - {in: query, name: cursor, required: false, schema: {type: string}}
         - {in: query, name: page_size, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
-        - {in: query, name: custom_field.<key>, required: false, schema: {type: string}, description: Exact-match filter on a tenant custom field by its key (e.g. custom_field.po_number=PO-42).}
+        - in: query
+          name: custom_field.<key>
+          required: false
+          schema: {type: string}
+          description: >-
+            Filter on a tenant custom field by its key (e.g.
+            custom_field.po_number=PO-42). NUMBER fields accept a range as
+            min:max with either bound optional (10:30, 10:, :30). TEXT and
+            SELECT filters are exact matches.
       responses:
         "200":
           description: Incidents in the authorized scope.

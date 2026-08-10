@@ -177,6 +177,26 @@ func TestListParsesOpenEndedNumberRanges(t *testing.T) {
 	}
 }
 
+func TestListParsesMinOnlyNumberRange(t *testing.T) {
+	store := &stubStore{items: []Incident{
+		{ID: "i1", Number: "INC-1", Summary: "s", DetectedAt: time.Unix(1, 0).UTC()},
+	}}
+	s := Service{
+		Store:  store,
+		Fields: fakeFields{types: map[string]string{"temperature": "NUMBER"}},
+	}
+	_, _, err := s.List(context.Background(), incidentPrincipal(), Filter{
+		CustomFields: map[string]string{"temperature": "10:"},
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	r := store.lastFilter.CustomFieldRanges["def-temperature"]
+	if r.Min == nil || *r.Min != 10 || r.Max != nil {
+		t.Fatalf("range = min %v max %v, want min 10, open max", r.Min, r.Max)
+	}
+}
+
 func TestListKeepsExactMatchForNonRangeValues(t *testing.T) {
 	store := &stubStore{items: []Incident{
 		{ID: "i1", Number: "INC-1", Summary: "s", DetectedAt: time.Unix(1, 0).UTC()},

@@ -381,4 +381,16 @@ func TestIncidentListNumberRangeFilterIntegration(t *testing.T) {
 	if len(matches) != 1 || matches[0].ID != created["cold"] {
 		t.Fatalf("open range list = %d items, want only cold", len(matches))
 	}
+
+	// Min-only 30: must match only the 35 value.
+	minOnly := 30.0
+	matches, _, err = store.List(ctx, principal, incidentapp.Filter{
+		CustomFieldRanges: map[string]incidentapp.CustomFieldRange{definitionID: {Min: &minOnly}},
+	})
+	if err != nil {
+		t.Fatalf("min-only range list: %v", err)
+	}
+	if len(matches) != 1 || matches[0].ID != created["hot"] {
+		t.Fatalf("min-only range list = %d items, want only hot", len(matches))
+	}
 }
