@@ -88,6 +88,7 @@ export type CustomFieldDefinition = {
   updated_at: string;
   retired_at?: string;
   has_values?: boolean;
+  incident_count?: number;
 };
 
 export type HistoryEntry = {

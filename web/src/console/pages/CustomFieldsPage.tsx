@@ -168,8 +168,14 @@ export function CustomFieldsPage() {
           onOpenChange={() => setRetiring(undefined)}
           title={t("admin.customFields.retireConfirmTitle")}
           message={retireError
-            ? `${t("admin.customFields.retireConfirm", { field: retiring.label })} ${retireError}`
-            : t("admin.customFields.retireConfirm", { field: retiring.label })}
+            ? `${t("admin.customFields.retireConfirmCount", {
+                field: retiring.label,
+                count: retiring.incident_count ?? 0,
+              })} ${retireError}`
+            : t("admin.customFields.retireConfirmCount", {
+                field: retiring.label,
+                count: retiring.incident_count ?? 0,
+              })}
           confirmLabel={t("admin.customFields.retire")}
           pending={retire.pending}
           onConfirm={() => void handleRetire()}

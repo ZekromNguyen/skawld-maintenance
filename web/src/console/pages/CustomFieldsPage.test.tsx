@@ -17,6 +17,7 @@ const FIELD = {
   status: "ACTIVE",
   sort_order: 1,
   version: 1,
+  incident_count: 4,
   created_at: "2026-08-09T00:00:00Z",
   updated_at: "2026-08-09T00:00:00Z",
 };
@@ -97,6 +98,7 @@ describe("CustomFieldsPage", () => {
     renderPage();
     const row = (await screen.findByText("PO Number")).closest("tr") as HTMLTableRowElement;
     fireEvent.click(within(row).getByRole("button", { name: /retire/i }));
+    expect(await screen.findByText(/holds values on 4 incidents/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /retire/i }));
     await waitFor(() =>
       expect(api.retireFieldDefinition as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("def-1"),
