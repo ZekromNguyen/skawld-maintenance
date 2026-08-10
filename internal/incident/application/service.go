@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,13 +82,19 @@ type Incident struct {
 	Version               int64      `json:"version"`
 }
 
+type CustomFieldRange struct {
+	Min *float64
+	Max *float64
+}
+
 type Filter struct {
-	SiteID       string
-	AssetID      string
-	Status       string
-	CustomFields map[string]string
-	PageSize     int
-	Cursor       string
+	SiteID            string
+	AssetID           string
+	Status            string
+	CustomFields      map[string]string
+	CustomFieldRanges map[string]CustomFieldRange
+	PageSize          int
+	Cursor            string
 }
 
 type Store interface {
@@ -195,10 +203,23 @@ func (s Service) List(
 			return nil, "", errors.Join(ErrInvalid, err)
 		}
 		byID := make(map[string]string, len(filter.CustomFields))
+		rangesByID := make(map[string]CustomFieldRange)
 		for key, value := range filter.CustomFields {
-			byID[resolved[key].ID] = value
+			def := resolved[key]
+			if def.FieldType == "NUMBER" {
+				r, isRange, err := parseNumberRange(value)
+				if err != nil {
+					return nil, "", errors.Join(ErrInvalid, err)
+				}
+				if isRange {
+					rangesByID[def.ID] = r
+					continue
+				}
+			}
+			byID[def.ID] = value
 		}
 		filter.CustomFields = byID
+		filter.CustomFieldRanges = rangesByID
 	}
 	items, hasMore, err := s.Store.List(ctx, principal, filter)
 	if err != nil {
@@ -209,6 +230,32 @@ func (s Service) List(
 	}
 	last := items[len(items)-1]
 	return items, keyset.Encode(last.DetectedAt, last.ID), nil
+}
+
+// parseNumberRange parses "min:max" (either bound optional) into a range.
+// Returns ok=false when the value is not a range at all; returns an error
+// when it looks like a range but has unparseable bounds.
+func parseNumberRange(value string) (CustomFieldRange, bool, error) {
+	lo, hi, found := strings.Cut(value, ":")
+	if !found {
+		return CustomFieldRange{}, false, nil
+	}
+	var r CustomFieldRange
+	if lo != "" {
+		v, err := strconv.ParseFloat(lo, 64)
+		if err != nil {
+			return CustomFieldRange{}, false, fmt.Errorf("invalid range lower bound %q", lo)
+		}
+		r.Min = &v
+	}
+	if hi != "" {
+		v, err := strconv.ParseFloat(hi, 64)
+		if err != nil {
+			return CustomFieldRange{}, false, fmt.Errorf("invalid range upper bound %q", hi)
+		}
+		r.Max = &v
+	}
+	return r, true, nil
 }
 
 func (s Service) Resolve(

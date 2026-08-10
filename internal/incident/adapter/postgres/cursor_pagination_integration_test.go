@@ -288,3 +288,97 @@ func TestIncidentCustomValuesIntegration(t *testing.T) {
 		t.Fatalf("filtered list = %d items, want 1 matching %s", len(matches), created.ID)
 	}
 }
+
+func TestIncidentListNumberRangeFilterIntegration(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	organizationID, siteID, principalID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	seedOrgSitePrincipal(t, ctx, pool, organizationID, siteID, principalID, now)
+	assetID := uuid.NewString()
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO assets (
+			id, organization_id, site_id, tag, name, asset_class,
+			status, source_of_truth, attributes, version, created_at, updated_at
+		) VALUES (
+			$1::uuid, $2::uuid, $3::uuid, 'P-303', 'Pump P-303', 'PUMP',
+			'ACTIVE', 'OWNED_BY_SKAWLD', '{}'::jsonb, 1, $4, $4
+		)
+	`, assetID, organizationID, siteID, now); err != nil {
+		t.Fatal(err)
+	}
+	var definitionID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO field_definitions (
+			organization_id, entity_type, key, label, field_type, config, status, version, created_at, updated_at
+		) VALUES (
+			$1::uuid, 'incident', 'temperature', 'Temperature', 'NUMBER',
+			'{"min": -40, "max": 200}'::jsonb, 'ACTIVE', 1, $2, $2
+		)
+		RETURNING id::text
+	`, organizationID, now).Scan(&definitionID); err != nil {
+		t.Fatal(err)
+	}
+
+	permissions := make(map[identitydomain.Permission]struct{})
+	for _, permission := range identitydomain.PermissionsForRole(identitydomain.RoleAdministrator) {
+		permissions[permission] = struct{}{}
+	}
+	principal := identitydomain.Principal{
+		ID: principalID, OrganizationID: organizationID,
+		SiteIDs: []string{siteID}, Permissions: permissions,
+	}
+	store := incidentpostgres.Store{
+		Pool: pool, IDs: id.UUID{}, Clock: clock.System{},
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+
+	values := map[string]float64{"cold": 15, "warm": 25, "hot": 35}
+	created := make(map[string]string, len(values))
+	for summary, v := range values {
+		incident, _, err := store.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
+			SiteID: siteID, AssetID: assetID,
+			Summary: summary, Priority: "MEDIUM",
+			SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+			CustomValues: map[string]any{definitionID: v},
+		})
+		if err != nil {
+			t.Fatalf("create %s: %v", summary, err)
+		}
+		created[summary] = incident.ID
+	}
+
+	// Range 20:30 must match only the 25 value.
+	min, max := 20.0, 30.0
+	matches, _, err := store.List(ctx, principal, incidentapp.Filter{
+		CustomFieldRanges: map[string]incidentapp.CustomFieldRange{definitionID: {Min: &min, Max: &max}},
+	})
+	if err != nil {
+		t.Fatalf("range list: %v", err)
+	}
+	if len(matches) != 1 || matches[0].ID != created["warm"] {
+		t.Fatalf("range list = %d items, want only warm", len(matches))
+	}
+
+	// Open-ended :20 must match only the 15 value.
+	openMax := 20.0
+	matches, _, err = store.List(ctx, principal, incidentapp.Filter{
+		CustomFieldRanges: map[string]incidentapp.CustomFieldRange{definitionID: {Max: &openMax}},
+	})
+	if err != nil {
+		t.Fatalf("open range list: %v", err)
+	}
+	if len(matches) != 1 || matches[0].ID != created["cold"] {
+		t.Fatalf("open range list = %d items, want only cold", len(matches))
+	}
+}

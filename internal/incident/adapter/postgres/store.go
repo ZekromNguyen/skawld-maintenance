@@ -217,6 +217,27 @@ func (s Store) List(
 			query += fmt.Sprintf(" AND i.custom_values ? $%d::text AND i.custom_values->>$%d::text = $%d", keyArg, keyArg, valueArg)
 		}
 	}
+	if len(filter.CustomFieldRanges) > 0 {
+		defIDs := make([]string, 0, len(filter.CustomFieldRanges))
+		for defID := range filter.CustomFieldRanges {
+			defIDs = append(defIDs, defID)
+		}
+		sort.Strings(defIDs)
+		for _, defID := range defIDs {
+			keyArg := len(args) + 1
+			args = append(args, defID)
+			query += fmt.Sprintf(" AND i.custom_values ? $%d::text", keyArg)
+			rangeFilter := filter.CustomFieldRanges[defID]
+			if rangeFilter.Min != nil {
+				args = append(args, *rangeFilter.Min)
+				query += fmt.Sprintf(" AND (i.custom_values->>$%d::text)::numeric >= $%d", keyArg, len(args))
+			}
+			if rangeFilter.Max != nil {
+				args = append(args, *rangeFilter.Max)
+				query += fmt.Sprintf(" AND (i.custom_values->>$%d::text)::numeric <= $%d", keyArg, len(args))
+			}
+		}
+	}
 	if filter.Cursor != "" {
 		cut := strings.LastIndex(filter.Cursor, "|")
 		if cut < 0 {
