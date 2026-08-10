@@ -2231,7 +2231,7 @@ components:
         version: {type: integer, format: int64}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
-        retired_at: {type: string, format: date-time, nullable: true}
+        retired_at: {type: [string, "null"], format: date-time}
         has_values: {type: boolean}
         incident_count: {type: integer}
     HistoryEntry:
