@@ -21,21 +21,21 @@ var (
 )
 
 type CreateIncident struct {
-	SiteID          string     `json:"site_id"`
-	AssetID         string     `json:"asset_id"`
-	Summary         string     `json:"summary"`
-	Details         string     `json:"details,omitempty"`
-	Priority        string     `json:"priority"`
-	Status          string     `json:"status,omitempty"`
-	AssigneeID      string     `json:"assignee_id,omitempty"`
-	ReporterID      string     `json:"reporter_id,omitempty"`
-	TeamID          string     `json:"team_id,omitempty"`
-	SourceOfTruth   string     `json:"source_of_truth"`
-	ExternalSystem  string     `json:"external_system,omitempty"`
-	ExternalID      string     `json:"external_id,omitempty"`
-	ExternalVersion string     `json:"external_version,omitempty"`
-	OccurredAt      *time.Time `json:"occurred_at,omitempty"`
-	DetectedAt      time.Time  `json:"detected_at"`
+	SiteID          string         `json:"site_id"`
+	AssetID         string         `json:"asset_id"`
+	Summary         string         `json:"summary"`
+	Details         string         `json:"details,omitempty"`
+	Priority        string         `json:"priority"`
+	Status          string         `json:"status,omitempty"`
+	AssigneeID      string         `json:"assignee_id,omitempty"`
+	ReporterID      string         `json:"reporter_id,omitempty"`
+	TeamID          string         `json:"team_id,omitempty"`
+	SourceOfTruth   string         `json:"source_of_truth"`
+	ExternalSystem  string         `json:"external_system,omitempty"`
+	ExternalID      string         `json:"external_id,omitempty"`
+	ExternalVersion string         `json:"external_version,omitempty"`
+	OccurredAt      *time.Time     `json:"occurred_at,omitempty"`
+	DetectedAt      time.Time      `json:"detected_at"`
 	CustomValues    map[string]any `json:"custom_values,omitempty"`
 }
 
@@ -53,33 +53,33 @@ type ReopenIncident struct {
 }
 
 type Incident struct {
-	ID                    string     `json:"id"`
-	OrganizationID        string     `json:"organization_id"`
-	SiteID                string     `json:"site_id"`
-	AssetID               string     `json:"asset_id"`
-	AssetTag              string     `json:"asset_tag,omitempty"`
-	Number                string     `json:"number"`
-	Summary               string     `json:"summary"`
-	Details               string     `json:"details,omitempty"`
-	Priority              string     `json:"priority"`
-	Status                string     `json:"status"`
-	AssigneeID            string     `json:"assignee_id,omitempty"`
-	AssigneeName          string     `json:"assignee_name,omitempty"`
-	ReporterID            string     `json:"reporter_id,omitempty"`
-	ReporterName          string     `json:"reporter_name,omitempty"`
-	TeamID                string     `json:"team_id,omitempty"`
-	TeamName              string     `json:"team_name,omitempty"`
-	SourceOfTruth         string     `json:"source_of_truth"`
-	ExternalSystem        string     `json:"external_system,omitempty"`
-	ExternalID            string     `json:"external_id,omitempty"`
-	ExternalVersion       string     `json:"external_version,omitempty"`
-	OccurredAt            *time.Time `json:"occurred_at,omitempty"`
-	DetectedAt            time.Time  `json:"detected_at"`
-	ResolvedAt            *time.Time `json:"resolved_at,omitempty"`
-	ResolutionSummary     string     `json:"resolution_summary,omitempty"`
-	TimeToCompleteSeconds *int64     `json:"time_to_complete_seconds,omitempty"`
+	ID                    string         `json:"id"`
+	OrganizationID        string         `json:"organization_id"`
+	SiteID                string         `json:"site_id"`
+	AssetID               string         `json:"asset_id"`
+	AssetTag              string         `json:"asset_tag,omitempty"`
+	Number                string         `json:"number"`
+	Summary               string         `json:"summary"`
+	Details               string         `json:"details,omitempty"`
+	Priority              string         `json:"priority"`
+	Status                string         `json:"status"`
+	AssigneeID            string         `json:"assignee_id,omitempty"`
+	AssigneeName          string         `json:"assignee_name,omitempty"`
+	ReporterID            string         `json:"reporter_id,omitempty"`
+	ReporterName          string         `json:"reporter_name,omitempty"`
+	TeamID                string         `json:"team_id,omitempty"`
+	TeamName              string         `json:"team_name,omitempty"`
+	SourceOfTruth         string         `json:"source_of_truth"`
+	ExternalSystem        string         `json:"external_system,omitempty"`
+	ExternalID            string         `json:"external_id,omitempty"`
+	ExternalVersion       string         `json:"external_version,omitempty"`
+	OccurredAt            *time.Time     `json:"occurred_at,omitempty"`
+	DetectedAt            time.Time      `json:"detected_at"`
+	ResolvedAt            *time.Time     `json:"resolved_at,omitempty"`
+	ResolutionSummary     string         `json:"resolution_summary,omitempty"`
+	TimeToCompleteSeconds *int64         `json:"time_to_complete_seconds,omitempty"`
 	CustomValues          map[string]any `json:"custom_values,omitempty"`
-	Version               int64      `json:"version"`
+	Version               int64          `json:"version"`
 }
 
 type CustomFieldRange struct {
