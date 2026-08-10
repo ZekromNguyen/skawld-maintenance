@@ -89,7 +89,7 @@ func main() {
 	}
 	run(
 		apiPool,
-		`SELECT count(*) FROM incidents WHERE state IN ('OPEN', 'IN_PROGRESS')`,
+		`SELECT count(*) FROM incidents WHERE status IN ('OPEN', 'IN_PROGRESS')`,
 		*apiConcurrency,
 	)
 	run(
