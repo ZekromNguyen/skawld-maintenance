@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -458,11 +459,28 @@ func (s Store) UpdateCustomValues(
 		if previous == nil {
 			previous = map[string]any{}
 		}
-		merged := make(map[string]any, len(previous)+len(command.CustomValues))
+		changed := make(map[string]any, len(command.CustomValues))
+		for defID, value := range command.CustomValues {
+			if !reflect.DeepEqual(previous[defID], value) {
+				changed[defID] = value
+			}
+		}
+		if len(changed) == 0 {
+			// No value actually changed: return the current incident without
+			// a version bump, history row, event, or audit entry.
+			body, _ := json.Marshal(before)
+			if err := s.Idempotency.Complete(
+				ctx, tx, principal.ID, scope, key, http.StatusOK, body, now,
+			); err != nil {
+				return outcome{}, err
+			}
+			return outcome{Value: before}, nil
+		}
+		merged := make(map[string]any, len(previous)+len(changed))
 		for defID, value := range previous {
 			merged[defID] = value
 		}
-		for defID, value := range command.CustomValues {
+		for defID, value := range changed {
 			merged[defID] = value
 		}
 		encoded, err := json.Marshal(merged)
@@ -481,7 +499,7 @@ func (s Store) UpdateCustomValues(
 		if tag.RowsAffected() != 1 {
 			return outcome{}, incidentapp.ErrVersionConflict
 		}
-		for defID, value := range command.CustomValues {
+		for defID, value := range changed {
 			encodedValue, err := json.Marshal(value)
 			if err != nil {
 				return outcome{}, err

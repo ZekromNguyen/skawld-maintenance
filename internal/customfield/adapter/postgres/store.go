@@ -9,6 +9,7 @@ import (
 	"github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/customfield/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -90,6 +91,12 @@ func (s Store) Create(ctx context.Context, organizationID string, d domain.Defin
 	`, organizationID, d.EntityType, d.Key, d.Label, d.Description,
 		string(d.FieldType), rawConfig, string(d.Status), d.SortOrder, d.Version, now)
 	if err := row.Scan(&d.ID, &d.CreatedAt, &d.UpdatedAt); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			// UNIQUE (organization_id, entity_type, key) violation: a tenant
+			// reused a field key.
+			return domain.Definition{}, application.ErrConflict
+		}
 		return domain.Definition{}, err
 	}
 	return d, nil
@@ -105,6 +112,13 @@ func (s Store) Update(ctx context.Context, organizationID, id string, d domain.D
 		SET label = $3, description = $4, field_type = $5, config = $6::jsonb,
 		    sort_order = $7, version = $8, updated_at = $9
 		WHERE id = $1::uuid AND organization_id = $2::uuid AND version = $10
+		  AND (
+		    ($5 = field_type AND $6::jsonb = config)
+		    OR NOT EXISTS (
+		      SELECT 1 FROM incidents i
+		      WHERE i.organization_id = $2::uuid AND i.custom_values ? $1::text
+		    )
+		  )
 	`, id, organizationID, d.Label, d.Description, string(d.FieldType),
 		rawConfig, d.SortOrder, d.Version, now, d.Version-1)
 	if err != nil {
@@ -161,6 +175,34 @@ func (s Store) History(ctx context.Context, organizationID, id string) ([]applic
 			return nil, err
 		}
 		out = append(out, entry)
+	}
+	return out, rows.Err()
+}
+
+// Usage reports which definitions already hold at least one incident value,
+// keyed by definition id, for the org and entity.
+func (s Store) Usage(ctx context.Context, organizationID, entityType string) (map[string]bool, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT f.id::text,
+		       EXISTS (
+		         SELECT 1 FROM incidents i
+		         WHERE i.organization_id = f.organization_id AND i.custom_values ? f.id::text
+		       )
+		FROM field_definitions f
+		WHERE f.organization_id = $1::uuid AND f.entity_type = $2
+	`, organizationID, entityType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		var used bool
+		if err := rows.Scan(&id, &used); err != nil {
+			return nil, err
+		}
+		out[id] = used
 	}
 	return out, rows.Err()
 }

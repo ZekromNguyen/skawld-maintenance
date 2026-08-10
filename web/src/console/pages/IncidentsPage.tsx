@@ -265,22 +265,32 @@ export function IncidentsPage() {
             <option value="HIGH">{t(priorityLabelKey("HIGH"))}</option>
             <option value="CRITICAL">{t(priorityLabelKey("CRITICAL"))}</option>
           </select>
-          {customFields.data?.filter((field) => field.status === "ACTIVE" && (field.field_type === "SELECT" || field.field_type === "TEXT")).map((field) => (
-            <select
-              key={field.id}
-              aria-label={field.label}
-              value={customFieldFilters[field.key] ?? ""}
-              onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
-              className="incident-severity-filter"
-            >
-              <option value="">{field.label}</option>
-              {field.field_type === "SELECT"
-                ? field.config.options?.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))
-                : null}
-            </select>
-          ))}
+          {customFields.data?.filter((field) => field.status === "ACTIVE" && (field.field_type === "SELECT" || field.field_type === "TEXT")).map((field) =>
+            field.field_type === "TEXT" ? (
+              <input
+                key={field.id}
+                type="text"
+                aria-label={field.label}
+                placeholder={field.label}
+                value={customFieldFilters[field.key] ?? ""}
+                onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
+                className="incident-search"
+              />
+            ) : (
+              <select
+                key={field.id}
+                aria-label={field.label}
+                value={customFieldFilters[field.key] ?? ""}
+                onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
+                className="incident-severity-filter"
+              >
+                <option value="">{field.label}</option>
+                {field.config.options?.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            ),
+          )}
           <div className="view-toggle" role="group" aria-label={t("incidents.view.label")}>
             <button
               type="button"

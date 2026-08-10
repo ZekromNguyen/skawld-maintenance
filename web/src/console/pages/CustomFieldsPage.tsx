@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../../api";
 import { useI18n } from "../../i18n/I18nProvider";
-import { useQuery } from "../useQuery";
+import { errorMessage, useQuery } from "../useQuery";
 import { useMutation } from "../useMutation";
 import { ErrorState } from "../ui/ErrorState";
 import { EmptyState } from "../ui/EmptyState";
@@ -29,18 +29,25 @@ export function CustomFieldsPage() {
   >(undefined);
   const [dialogError, setDialogError] = useState<string | undefined>(undefined);
 
+  const saveErrorRef = useRef<string | undefined>(undefined);
   const save = useMutation(async (value: Parameters<typeof api.createFieldDefinition>[0], id?: string) => {
-    if (id) {
-      return api.updateFieldDefinition(id, {
-        label: value.label,
-        description: value.description,
-        field_type: value.field_type,
-        config: value.config,
-        sort_order: value.sort_order,
-        expected_version: editing?.version ?? 1,
-      });
+    saveErrorRef.current = undefined;
+    try {
+      if (id) {
+        return await api.updateFieldDefinition(id, {
+          label: value.label,
+          description: value.description,
+          field_type: value.field_type,
+          config: value.config,
+          sort_order: value.sort_order,
+          expected_version: editing?.version ?? 1,
+        });
+      }
+      return await api.createFieldDefinition(value);
+    } catch (err) {
+      saveErrorRef.current = errorMessage(err);
+      return undefined;
     }
-    return api.createFieldDefinition(value);
   });
   const retire = useMutation((id: string) => api.retireFieldDefinition(id));
   const openHistory = useMutation((id: string) =>
@@ -51,7 +58,7 @@ export function CustomFieldsPage() {
     setDialogError(undefined);
     const result = await save.run(value, editing?.id);
     if (result === undefined) {
-      setDialogError(save.error ?? t("admin.customFields.saveFailed"));
+      setDialogError(saveErrorRef.current ?? t("admin.customFields.saveFailed"));
       return;
     }
     setCreating(false);

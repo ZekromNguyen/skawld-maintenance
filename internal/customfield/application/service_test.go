@@ -65,6 +65,14 @@ func (f *fakeStore) HasValues(_ context.Context, _, _ string) (bool, error) {
 	return f.hasValues, nil
 }
 
+func (f *fakeStore) Usage(_ context.Context, _, _ string) (map[string]bool, error) {
+	out := map[string]bool{}
+	for id, d := range f.definitions {
+		out[id] = d.Status == domain.StatusRetired
+	}
+	return out, nil
+}
+
 func admin() identitydomain.Principal {
 	return identitydomain.Principal{
 		ID: "p1", OrganizationID: "o1",

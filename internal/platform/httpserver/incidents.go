@@ -44,6 +44,14 @@ func listIncidents(service incidentapp.Service, customFields customfieldapp.Serv
 			PageSize: pageSize,
 			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
 		}
+		for key, values := range r.URL.Query() {
+			if strings.HasPrefix(key, "custom_field.") && len(values) > 0 {
+				if filter.CustomFields == nil {
+					filter.CustomFields = map[string]string{}
+				}
+				filter.CustomFields[strings.TrimPrefix(key, "custom_field.")] = values[0]
+			}
+		}
 		if filter.SiteID != "" && !validUUIDParam(w, filter.SiteID, "site ID") {
 			return
 		}

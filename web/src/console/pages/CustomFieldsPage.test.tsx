@@ -120,13 +120,13 @@ describe("CustomFieldsPage", () => {
   });
 });
 
-it("locks key and type when editing an existing field", async () => {
+it("locks the key but keeps the type editable for unused fields", async () => {
   renderPage();
   const row = (await screen.findByText("PO Number")).closest("tr") as HTMLTableRowElement;
   fireEvent.click(within(row).getByRole("button", { name: /edit/i }));
   const dialog = screen.getByRole("dialog");
   expect((within(dialog).getByLabelText(/key/i) as HTMLInputElement).disabled).toBe(true);
-  expect((within(dialog).getByLabelText(/field type/i) as HTMLSelectElement).disabled).toBe(true);
+  expect((within(dialog).getByLabelText(/field type/i) as HTMLSelectElement).disabled).toBe(false);
 });
 
 it("updates a field through the edit dialog", async () => {
@@ -153,5 +153,18 @@ it("shows the generic save error when the API rejects creation", async () => {
   fireEvent.change(within(dialog).getByLabelText(/label/i), { target: { value: "Zone" } });
   fireEvent.change(within(dialog).getByLabelText(/key/i), { target: { value: "zone" } });
   fireEvent.click(within(dialog).getByRole("button", { name: /create/i }));
-  expect(await screen.findByText(/Could not save the field/)).toBeTruthy();
+  expect(await screen.findByText("boom")).toBeTruthy();
+});
+
+it("locks config inputs when the field already holds values", async () => {
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [{ ...FIELD, has_values: true }]
+  });
+  renderPage();
+  const row = (await screen.findByText("PO Number")).closest("tr") as HTMLTableRowElement;
+  fireEvent.click(within(row).getByRole("button", { name: /edit/i }));
+  const dialog = screen.getByRole("dialog");
+  expect((within(dialog).getByLabelText(/field type/i) as HTMLSelectElement).disabled).toBe(true);
+  expect((within(dialog).getByLabelText(/required/i) as HTMLInputElement).disabled).toBe(true);
+  expect((within(dialog).getByLabelText(/key/i) as HTMLInputElement).disabled).toBe(true);
 });

@@ -36,6 +36,7 @@ export function CreateFieldDialog(props: {
 }) {
   const { t } = useI18n();
   const editing = props.field !== undefined;
+  const locked = editing && (props.field?.has_values ?? false);
   const [label, setLabel] = useState(props.field?.label ?? "");
   const [description, setDescription] = useState(props.field?.description ?? "");
   const [key, setKey] = useState(props.field?.key ?? "");
@@ -156,7 +157,7 @@ export function CreateFieldDialog(props: {
           <select
             id="field-type"
             value={fieldType}
-            disabled={editing}
+            disabled={locked}
             onChange={(event) => setFieldType(event.target.value as CustomFieldType)}
           >
             {FIELD_TYPES.map((type) => (
@@ -165,7 +166,7 @@ export function CreateFieldDialog(props: {
           </select>
         </FormField>
         <label className="option-row">
-          <input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />
+          <input type="checkbox" checked={required} disabled={locked} onChange={(event) => setRequired(event.target.checked)} />
           {t("admin.customFields.required")}
         </label>
         {fieldType === "TEXT" ? (
@@ -174,6 +175,7 @@ export function CreateFieldDialog(props: {
               id="field-maxlength"
               type="number"
               min={0}
+              disabled={locked}
               value={maxLength || ""}
               onChange={(event) => setMaxLength(Number(event.target.value) || 0)}
             />
@@ -183,6 +185,7 @@ export function CreateFieldDialog(props: {
           <FormField label={t("admin.customFields.regex")} htmlFor="field-regex">
             <input
               id="field-regex"
+              disabled={locked}
               value={regex}
               placeholder="^[A-Z]{2}-\d+$"
               onChange={(event) => setRegex(event.target.value)}
@@ -195,6 +198,7 @@ export function CreateFieldDialog(props: {
               <input
                 id="field-min"
                 type="number"
+                disabled={locked}
                 value={min ?? ""}
                 onChange={(event) => setMin(event.target.value === "" ? undefined : Number(event.target.value))}
               />
@@ -203,6 +207,7 @@ export function CreateFieldDialog(props: {
               <input
                 id="field-max"
                 type="number"
+                disabled={locked}
                 value={max ?? ""}
                 onChange={(event) => setMax(event.target.value === "" ? undefined : Number(event.target.value))}
               />
@@ -217,6 +222,7 @@ export function CreateFieldDialog(props: {
               <div key={index} className="field-row">
                 <input
                   aria-label={t("admin.customFields.optionLabel")}
+                  disabled={locked}
                   value={option.label}
                   placeholder={t("admin.customFields.optionLabel")}
                   onChange={(event) => {
@@ -227,6 +233,7 @@ export function CreateFieldDialog(props: {
                 />
                 <input
                   aria-label={t("admin.customFields.optionValue")}
+                  disabled={locked}
                   value={option.value}
                   placeholder={t("admin.customFields.optionValue")}
                   onChange={(event) => {
@@ -239,13 +246,14 @@ export function CreateFieldDialog(props: {
                   type="button"
                   className="icon-button"
                   aria-label={t("admin.customFields.removeOption")}
+                  disabled={locked}
                   onClick={() => setOptions(options.filter((_, i) => i !== index))}
                 >
                   ×
                 </button>
               </div>
             ))}
-            <button type="button" className="secondary-button" onClick={() => setOptions([...options, { label: "", value: "" }])}>
+            <button type="button" className="secondary-button" disabled={locked} onClick={() => setOptions([...options, { label: "", value: "" }])}>
               {t("admin.customFields.addOption")}
             </button>
           </fieldset>

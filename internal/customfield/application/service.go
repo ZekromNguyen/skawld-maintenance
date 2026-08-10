@@ -52,6 +52,7 @@ type Definition struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 	RetiredAt   *time.Time    `json:"retired_at,omitempty"`
+	HasValues   bool          `json:"has_values"`
 }
 
 type HistoryEntry struct {
@@ -70,6 +71,7 @@ type Store interface {
 	Retire(context.Context, string, string, time.Time) (domain.Definition, error)
 	History(context.Context, string, string) ([]HistoryEntry, error)
 	HasValues(context.Context, string, string) (bool, error)
+	Usage(context.Context, string, string) (map[string]bool, error)
 }
 
 type Service struct {
@@ -82,6 +84,26 @@ func (s Service) ListByEntity(ctx context.Context, principal identitydomain.Prin
 		return nil, ErrForbidden
 	}
 	return s.list(ctx, principal.OrganizationID, entityType)
+}
+
+// list returns the org's definitions for an entity sorted by sort_order.
+func (s Service) list(ctx context.Context, organizationID, entityType string) ([]Definition, error) {
+	items, err := s.Store.ListByEntity(ctx, organizationID, entityType)
+	if err != nil {
+		return nil, err
+	}
+	usage, err := s.Store.Usage(ctx, organizationID, entityType)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].SortOrder < items[j].SortOrder })
+	out := make([]Definition, 0, len(items))
+	for _, item := range items {
+		view := toView(item)
+		view.HasValues = usage[item.ID]
+		out = append(out, view)
+	}
+	return out, nil
 }
 
 func (s Service) Create(ctx context.Context, principal identitydomain.Principal, command CreateDefinition) (Definition, error) {
@@ -116,7 +138,13 @@ func (s Service) Get(ctx context.Context, principal identitydomain.Principal, id
 	if err != nil {
 		return Definition{}, err
 	}
-	return toView(value), nil
+	used, err := s.Store.HasValues(ctx, principal.OrganizationID, id)
+	if err != nil {
+		return Definition{}, err
+	}
+	view := toView(value)
+	view.HasValues = used
+	return view, nil
 }
 
 func (s Service) Update(ctx context.Context, principal identitydomain.Principal, id string, command UpdateDefinition) (Definition, error) {
@@ -197,19 +225,6 @@ func (s Service) History(ctx context.Context, principal identitydomain.Principal
 // responses with their custom_fields section.
 func (s Service) Definitions(ctx context.Context, organizationID, entityType string) ([]Definition, error) {
 	return s.list(ctx, organizationID, entityType)
-}
-
-func (s Service) list(ctx context.Context, organizationID, entityType string) ([]Definition, error) {
-	items, err := s.Store.ListByEntity(ctx, organizationID, entityType)
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].SortOrder < items[j].SortOrder })
-	out := make([]Definition, 0, len(items))
-	for _, item := range items {
-		out = append(out, toView(item))
-	}
-	return out, nil
 }
 
 // ResolveAndValidate maps values keyed by field key to values keyed by
