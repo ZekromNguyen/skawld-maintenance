@@ -33,7 +33,11 @@
 
 - [ ] **Step 1: Write the migration**
 
+Follow the repo's goose conventions (see `migrations/00013`/`00014`): `-- +goose Up` annotation, `skawld_app` GRANT block guarded on role existence, and a `-- +goose Down` that drops the new objects.
+
 ```sql
+-- +goose Up
+-- Custom fields core: per-tenant field definitions, incident JSONB values, history.
 CREATE TABLE field_definitions (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id uuid NOT NULL REFERENCES organizations(id),
@@ -73,6 +77,24 @@ CREATE INDEX incidents_custom_values_gin
     ON incidents USING gin (custom_values);
 CREATE INDEX custom_value_history_incident_idx
     ON custom_value_history (incident_id, changed_at DESC);
+
+-- Explicit grants to the API role, following the 00002 convention restored
+-- by 00014 for 00013's missing grants.
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'skawld_app') THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE ON field_definitions TO skawld_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON custom_value_history TO skawld_app;
+        GRANT USAGE, SELECT ON SEQUENCE custom_value_history_id_seq TO skawld_app;
+    END IF;
+END $$;
+-- +goose StatementEnd
+
+-- +goose Down
+DROP TABLE IF EXISTS custom_value_history;
+DROP TABLE IF EXISTS field_definitions;
+ALTER TABLE incidents DROP COLUMN IF EXISTS custom_values;
 ```
 
 - [ ] **Step 2: Verify migration applies**
@@ -2574,7 +2596,14 @@ git commit -m "feat: add web types and client for custom fields"
   - `CustomFieldControl(props: { field: CustomFieldDefinition; value: unknown; onChange: (value: unknown) => void })` — renders the right control per `field_type` and shows a required marker; value types: TEXT/DATE/SELECT → `string`, NUMBER → `number | ""`, MULTI_SELECT → `string[]`.
   - `CreateIncidentValue.custom_values?: Record<string, unknown>`.
 
-- [ ] **Step 1: Write failing tests**
+- [ ] **Step 1: Add the user-event test dependency**
+
+The repo does not ship `@testing-library/user-event`; this task introduces it as the interaction convention for custom-field tests:
+
+Run: `cd web && npm install -D @testing-library/user-event`
+Expected: `@testing-library/user-event` appears in `web/package.json` devDependencies.
+
+- [ ] **Step 2: Write failing tests**
 
 `web/src/console/components/CustomFieldControl.test.tsx`:
 
