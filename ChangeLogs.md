@@ -4,6 +4,18 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-10 — Custom fields spec gap closure
+
+- Incident list filters on NUMBER custom fields now accept `min:max` ranges
+  (open bounds supported) in addition to exact matches.
+- The retire dialog shows how many incidents currently hold values for the
+  field.
+- Retired fields no longer appear in the incident form and are hidden in the
+  admin list by default (with a "Show retired" toggle).
+- Custom field values moved from a queue column into an expandable per-row
+  "Fields" disclosure, and custom field filters are now persisted in saved
+  views.
+
 ### 2026-08-09 — Custom fields core (tenant-configurable incident fields)
 
 - Tenant administrators can now define custom fields on incidents
