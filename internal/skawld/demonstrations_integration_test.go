@@ -359,8 +359,8 @@ func seedDemonstrationFixture(
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO incidents (
-			id, organization_id, site_id, asset_id, number, summary, severity,
-			state, detected_at, source_of_truth, version, created_by,
+			id, organization_id, site_id, asset_id, number, summary, priority,
+			status, detected_at, source_of_truth, version, created_by,
 			created_at, updated_at
 		) VALUES (
 			$1::uuid, $2::uuid, $3::uuid, $4::uuid, 'INC-P3',

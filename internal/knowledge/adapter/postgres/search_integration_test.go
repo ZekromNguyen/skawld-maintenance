@@ -169,8 +169,8 @@ func TestHybridSearchFiltersScopeValidityAndApplicabilityBeforeRanking(t *testin
 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO incidents (
-			id, organization_id, site_id, asset_id, number, summary, severity,
-			state, source_of_truth, detected_at, resolved_at, resolution_summary,
+			id, organization_id, site_id, asset_id, number, summary, priority,
+			status, source_of_truth, detected_at, resolved_at, resolution_summary,
 			version, created_by, created_at, updated_at
 		) VALUES
 		  ($1::uuid, $3::uuid, $4::uuid, $5::uuid, 'INC-ELIGIBLE',
