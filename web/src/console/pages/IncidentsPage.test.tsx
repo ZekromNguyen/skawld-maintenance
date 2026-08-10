@@ -305,3 +305,21 @@ it("applies a custom field filter to the incident query", async () => {
     ),
   );
 });
+
+it("renders formatted custom values in the queue column", async () => {
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "Zone A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  (api.incidents as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { ...fixtures.OPEN_HIGH, custom_values: { "def-1": "a" } }
+    ],
+    next_cursor: null, has_more: false, custom_fields: [
+      { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "Zone A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderPage();
+  await screen.findByText("Zone: Zone A");
+});

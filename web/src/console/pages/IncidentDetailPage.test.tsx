@@ -173,3 +173,25 @@ describe("IncidentDetailPage resolved lifecycle", () => {
     expect(screen.getByText("Incident closed")).toBeTruthy();
   });
 });
+
+it("renders the custom fields card with formatted values", async () => {
+  (api.incident as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "inc1",
+    site_id: "s1",
+    asset_id: "a1",
+    asset_tag: "P-302",
+    number: "IN-1042",
+    summary: "High vibration on pump",
+    priority: "HIGH",
+    status: "OPEN",
+    detected_at: new Date().toISOString(),
+    version: 1,
+    custom_values: { "def-1": "a" },
+    custom_fields: [
+      { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "Zone A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderDetail();
+  expect(await screen.findByText("Zone")).toBeTruthy();
+  expect(screen.getByText("Zone A")).toBeTruthy();
+});
