@@ -2224,6 +2224,7 @@ components:
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         retired_at: {type: string, format: date-time, nullable: true}
+        has_values: {type: boolean}
     HistoryEntry:
       type: object
       properties:
