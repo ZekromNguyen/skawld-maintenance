@@ -11,6 +11,7 @@ import type {
   ListPage,
   MaintenanceReport,
   Incident,
+  IncidentDetail,
   ListResponse,
   Measurement,
   Person,
@@ -475,7 +476,7 @@ export const api = {
   asset: (id: string) => request<Asset>(`/assets/${id}`),
   approveAssetCriticality: (assetID: string) =>
     command<unknown>(`/assets/${assetID}/criticality-approvals`, {}),
-  incident: (id: string) => request<Incident>(`/incidents/${id}`),
+  incident: (id: string) => request<IncidentDetail>(`/incidents/${id}`),
   listExecutions: (options?: ListOptions) =>
     request<ListPage<Execution>>(`/executions${listQuery(options)}`),
   resolveIncident: (incidentID: string) =>

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Kanban, MagnifyingGlass, Rows } from "@phosphor-icons/react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePaginatedList } from "../usePaginatedList";
+import { formatCustomValue } from "../components/customFieldFormat";
 import { useCommand } from "../useCommand";
 import { useListKeyboard } from "../useListKeyboard";
 import { usePrincipal } from "../usePrincipal";
@@ -23,7 +24,7 @@ import {
   incidentStatusTone,
   incidentStatusLabelKey,
 } from "../labels";
-import type { Incident } from "../../types";
+import type { CustomFieldDefinition, Incident } from "../../types";
 
 type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "ALL";
 const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ALL"];
@@ -69,11 +70,24 @@ export function IncidentsPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incidents = usePaginatedList((params) => api.incidents(params), []);
+  const incidents = usePaginatedList(
+    (params) => api.incidents({ ...params, custom_fields: customFieldFiltersRef.current }),
+    [],
+  );
   const assets = useQuery(() => api.assets().then((list) => list.items));
   const teams = useQuery(() => api.teams().then((list) => list.items));
   const people = useQuery(() => api.people().then((list) => list.items));
   const customFields = useQuery(() => api.listFieldDefinitions("incident").then((list) => list.items));
+  const customFieldFiltersRef = useRef<Record<string, string>>({});
+  const [customFieldFilters, setCustomFieldFilters] = useState<Record<string, string>>({});
+  function setCustomFieldFilter(key: string, value: string) {
+    const next = { ...customFieldFiltersRef.current };
+    if (value === "") delete next[key];
+    else next[key] = value;
+    customFieldFiltersRef.current = next;
+    setCustomFieldFilters(next);
+    void incidents.refetch();
+  }
   const [tab, setTab] = useState<StateTab>("OPEN");
   const [priority, setPriority] = useState("ALL");
   const [query, setQuery] = useState("");
@@ -251,6 +265,22 @@ export function IncidentsPage() {
             <option value="HIGH">{t(priorityLabelKey("HIGH"))}</option>
             <option value="CRITICAL">{t(priorityLabelKey("CRITICAL"))}</option>
           </select>
+          {customFields.data?.filter((field) => field.status === "ACTIVE" && (field.field_type === "SELECT" || field.field_type === "TEXT")).map((field) => (
+            <select
+              key={field.id}
+              aria-label={field.label}
+              value={customFieldFilters[field.key] ?? ""}
+              onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
+              className="incident-severity-filter"
+            >
+              <option value="">{field.label}</option>
+              {field.field_type === "SELECT"
+                ? field.config.options?.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))
+                : null}
+            </select>
+          ))}
           <div className="view-toggle" role="group" aria-label={t("incidents.view.label")}>
             <button
               type="button"
@@ -358,6 +388,20 @@ export function IncidentsPage() {
               header: t("incident.team"),
               render: (incident) => incident.team_name ?? "—",
               sortValue: (i) => i.team_name ?? "",
+            },
+            {
+              key: "custom",
+              header: t("incident.customFields"),
+              render: (incident) => {
+                const entries = customFields.data
+                  ?.filter((field) => field.status === "ACTIVE")
+                  .map((field) => ({ field, value: incident.custom_values?.[field.id] }))
+                  .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
+                if (!entries || entries.length === 0) return "—";
+                const first = entries.slice(0, 2).map((entry) => `${entry.field.label}: ${formatCustomValue(entry.field, entry.value)}`).join(", ");
+                const extra = entries.length > 2 ? ` +${entries.length - 2}` : "";
+                return <span className="custom-fields-cell" title={entries.map((entry) => `${entry.field.label}: ${formatCustomValue(entry.field, entry.value)}`).join("\n")}>{first}{extra}</span>;
+              },
             },
             {
               key: "age",

@@ -289,3 +289,19 @@ it("forwards custom_values from the create form", async () => {
     ),
   );
 });
+
+it("applies a custom field filter to the incident query", async () => {
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderPage();
+  await waitFor(() => expect(screen.getByLabelText("Zone")).toBeTruthy());
+  fireEvent.change(screen.getByLabelText("Zone"), { target: { value: "a" } });
+  await waitFor(() =>
+    expect(api.incidents as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({ custom_fields: { zone: "a" } }),
+    ),
+  );
+});

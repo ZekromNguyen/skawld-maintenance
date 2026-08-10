@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
+import { formatCustomValue } from "../components/customFieldFormat";
+import type { CustomFieldDefinition } from "../../types";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -66,6 +68,13 @@ export function IncidentDetailPage() {
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
   const incident = useQuery(() => api.incident(incidentId ?? ""));
+
+  function customFieldEntries(value: { custom_values?: Record<string, unknown>; custom_fields?: CustomFieldDefinition[] }) {
+    return (value.custom_fields ?? [])
+      .filter((field) => field.status === "ACTIVE")
+      .map((field) => ({ field, value: value.custom_values?.[field.id] }))
+      .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
+  }
   const executions = useQuery(() => api.listExecutions().then((list) => list.items));
   const [confirmResolve, setConfirmResolve] = useState(false);
 
@@ -318,6 +327,21 @@ export function IncidentDetailPage() {
           </div>
           </div>
           <aside className="metadata-rail" aria-label={t("incident.facts")}>
+            {customFieldEntries(value).length > 0 ? (
+              <div className="panel">
+                <div className="panel-heading">
+                  <h2>{t("incident.customFields")}</h2>
+                </div>
+                <div className="incident-facts">
+                  {customFieldEntries(value).map(({ field, value: fieldValue }) => (
+                    <div key={field.id}>
+                      <span className="eyebrow">{field.label}</span>
+                      <span>{formatCustomValue(field, fieldValue)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="panel">
               <div className="panel-heading">
                 <h2>{t("incident.facts")}</h2>

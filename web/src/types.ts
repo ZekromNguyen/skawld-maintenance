@@ -452,6 +452,10 @@ export type IncidentListResponse = ListPage<Incident> & {
   custom_fields: CustomFieldDefinition[];
 };
 
+export type IncidentDetail = Incident & {
+  custom_fields: CustomFieldDefinition[];
+};
+
 export type ListPage<T> = ListResponse<T> & {
   next_cursor: string | null;
   has_more: boolean;
