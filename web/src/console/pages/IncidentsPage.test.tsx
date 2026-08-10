@@ -268,6 +268,27 @@ it("blocks submit when a required custom field is empty", async () => {
   await waitFor(() => expect(api.createIncident).not.toHaveBeenCalled());
 });
 
+it("does not let a retired required field block submit", async () => {
+  (api.createIncident as ReturnType<typeof vi.fn>).mockClear();
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "po_number", label: "PO Number", field_type: "TEXT", config: { required: true }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" },
+      { id: "def-2", entity_type: "incident", key: "retired_required", label: "Retired Required", field_type: "TEXT", config: { required: true }, status: "RETIRED", sort_order: 2, version: 1, created_at: "", updated_at: "" },
+    ],
+  });
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: /create incident/i }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText(/asset/i), { target: { value: "a1" } });
+  fireEvent.change(within(dialog).getByLabelText(/summary/i), { target: { value: "High vibration on bearing" } });
+  fireEvent.change(within(dialog).getByLabelText(/priority/i), { target: { value: "HIGH" } });
+  fireEvent.change(within(dialog).getByLabelText(/PO Number/), { target: { value: "PO-42" } });
+  fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+  await waitFor(() =>
+    expect(api.createIncident as ReturnType<typeof vi.fn>).toHaveBeenCalled(),
+  );
+});
+
 it("does not render retired custom fields in the create form", async () => {
   (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
     items: [

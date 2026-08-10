@@ -76,7 +76,7 @@ export function CreateIncidentForm(props: {
     summary: summary.trim().length < 3 ? t("form.required") : undefined,
     priority: !priority ? t("form.required") : undefined,
   };
-  const customFieldErrors = props.customFields.reduce<Record<string, string | undefined>>(
+  const customFieldErrors = activeCustomFields.reduce<Record<string, string | undefined>>(
     (acc, field) => {
       const value = customValues[field.key];
       const empty =
