@@ -268,6 +268,20 @@ it("blocks submit when a required custom field is empty", async () => {
   await waitFor(() => expect(api.createIncident).not.toHaveBeenCalled());
 });
 
+it("does not render retired custom fields in the create form", async () => {
+  (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    items: [
+      { id: "def-1", entity_type: "incident", key: "po_number", label: "PO Number", field_type: "TEXT", config: { required: false }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" },
+      { id: "def-2", entity_type: "incident", key: "retired_note", label: "Retired Note", field_type: "TEXT", config: { required: false }, status: "RETIRED", sort_order: 2, version: 1, created_at: "", updated_at: "" },
+    ],
+  });
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: /create incident/i }));
+  const dialog = screen.getByRole("dialog");
+  expect(await within(dialog).findByLabelText(/PO Number/)).toBeTruthy();
+  expect(within(dialog).queryByLabelText(/Retired Note/)).toBeNull();
+});
+
 it("forwards custom_values from the create form", async () => {
   (api.createIncident as ReturnType<typeof vi.fn>).mockClear();
   (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({

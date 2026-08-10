@@ -62,6 +62,7 @@ export function CreateIncidentForm(props: {
   const [teamID, setTeamID] = useState("");
   const [reporterID, setReporterID] = useState(props.principal?.id ?? "");
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({});
+  const activeCustomFields = props.customFields.filter((field) => field.status === "ACTIVE");
   const [touched, setTouched] = useState(false);
 
   const siteAssets = useMemo(
@@ -311,10 +312,10 @@ export function CreateIncidentForm(props: {
         </FormField>
       </div>
 
-      {props.customFields.length > 0 && (
+      {activeCustomFields.length > 0 && (
         <fieldset className="form-section">
           <legend>{t("incident.customFields")}</legend>
-          {props.customFields.map((field) => (
+          {activeCustomFields.map((field) => (
             <CustomFieldControl
               key={field.id}
               field={field}
