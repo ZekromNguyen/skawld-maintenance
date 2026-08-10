@@ -142,6 +142,17 @@ func TestCountsReportsIncidentsWithValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
+	// A second definition that never holds a value must report 0, which
+	// exercises the LEFT JOIN zero-count branch.
+	unused, err := store.Create(ctx, orgID, domain.Definition{
+		OrganizationID: orgID, EntityType: "incident", Key: "unused_field",
+		Label: "Unused Field", FieldType: domain.FieldTypeText,
+		Config: domain.Config{Required: false}, SortOrder: 2,
+		Status: domain.StatusActive, Version: 1,
+	}, now)
+	if err != nil {
+		t.Fatalf("create unused: %v", err)
+	}
 
 	var siteID, principalID string
 	if err := store.Pool.QueryRow(ctx, `
@@ -193,7 +204,7 @@ func TestCountsReportsIncidentsWithValues(t *testing.T) {
 	if counts[created.ID] != 1 {
 		t.Fatalf("Counts[%s] = %d, want 1", created.ID, counts[created.ID])
 	}
-	if counts["unused-def"] != 0 {
-		t.Fatalf("Counts[unused-def] = %d, want 0", counts["unused-def"])
+	if counts[unused.ID] != 0 {
+		t.Fatalf("Counts[%s] = %d, want 0", unused.ID, counts[unused.ID])
 	}
 }
