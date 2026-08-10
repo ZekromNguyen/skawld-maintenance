@@ -5,6 +5,7 @@ import { PromptDialog } from "../feedback/PromptDialog";
 import { Dialog } from "../feedback/Dialog";
 import { FormField } from "../ui/FormField";
 import { StatusBadge } from "../ui/StatusBadge";
+import { GatedButton } from "../ui/GatedButton";
 import type { Demonstration } from "../../types";
 
 type PromptState =
@@ -19,6 +20,8 @@ export function DemonstrationPanel(props: {
   values: Demonstration[];
   selected?: Demonstration;
   busy: boolean;
+  canReview: boolean;
+  canCapture: boolean;
   onSelect: (value: Demonstration) => void;
   onComplete: (value: Demonstration, outcome: string) => void;
   onRedact: (
@@ -38,8 +41,9 @@ export function DemonstrationPanel(props: {
   const [prompt, setPrompt] = useState<PromptState>(null);
 
   const localeTag = locale === "vi" ? "vi-VN" : "en-US";
-  const canReview =
+  const reviewable =
     selected?.status === "completed" && !REVIEWED.includes(selected.review_status ?? "");
+  const permissionReason = t("action.permissionRequired");
 
   return (
     <div className="demonstration-layout">
@@ -99,13 +103,15 @@ export function DemonstrationPanel(props: {
               <div className="heading-actions">
                 <StatusBadge tone={selected.review_status === "APPROVED" ? "success" : selected.review_status === "REJECTED" ? "critical" : "info"} label={selected.review_status ?? selected.status} />
                 {selected.status === "recording" && (
-                  <button
+                  <GatedButton
+                    allowed={props.canCapture}
+                    reason={permissionReason}
                     className="primary-button"
                     disabled={props.busy}
                     onClick={() => setPrompt({ kind: "complete" })}
                   >
                     {t("demo.completeCapture")}
-                  </button>
+                  </GatedButton>
                 )}
               </div>
             </div>
@@ -186,47 +192,55 @@ export function DemonstrationPanel(props: {
                           ? t("demo.domain", { id: event.domain_event_id })
                           : t("demo.manualCapture")}
                       </span>
-                      {canReview ? (
-                        <button
+                      {reviewable ? (
+                        <GatedButton
+                          allowed={props.canReview}
+                          reason={permissionReason}
                           className="secondary-button"
                           disabled={props.busy}
                           onClick={() => setPrompt({ kind: "redact", eventID: event.id })}
                         >
                           {t("demo.redactField")}
-                        </button>
+                        </GatedButton>
                       ) : null}
                     </div>
                   </div>
                 </article>
               ))}
             </div>
-            {canReview && (
+            {reviewable && (
               <div className="review-actions">
                 <span>
                   <strong>{t("demo.humanGovernance")}</strong>
                   <small>{t("demo.governanceNote")}</small>
                 </span>
-                <button
+                <GatedButton
+                  allowed={props.canReview}
+                  reason={permissionReason}
                   className="secondary-button"
                   disabled={props.busy}
                   onClick={() => setPrompt({ kind: "review", decision: "REDACTION_REQUIRED" })}
                 >
                   {t("demo.requestRedaction")}
-                </button>
-                <button
+                </GatedButton>
+                <GatedButton
+                  allowed={props.canReview}
+                  reason={permissionReason}
                   className="secondary-button"
                   disabled={props.busy}
                   onClick={() => setPrompt({ kind: "review", decision: "REJECTED" })}
                 >
                   {t("demo.reject")}
-                </button>
-                <button
+                </GatedButton>
+                <GatedButton
+                  allowed={props.canReview}
+                  reason={permissionReason}
                   className="primary-button"
                   disabled={props.busy}
                   onClick={() => setPrompt({ kind: "review", decision: "APPROVED" })}
                 >
                   {t("demo.approveTrace")}
-                </button>
+                </GatedButton>
               </div>
             )}
           </>

@@ -16,7 +16,7 @@ const fixtures = vi.hoisted(() => ({
     shift_end: "2026-08-06T18:00:00.000Z",
     state: "DRAFT" as const,
     version: 1,
-    structured_content: { summary: "Night shift summary", open_incidents: ["IN-1"], active_executions: [], safety_concerns: [], follow_up: [], evidence_ids: [], unknowns: ["torque spec unverified"], requires_human_review: true },
+    structured_content: { summary: "Night shift summary", open_incidents: [{ title: "IN-1" }], active_executions: [], safety_concerns: [], follow_up: [], evidence_ids: [], unknowns: [{ title: "torque spec unverified" }], requires_human_review: true },
     evidence: [],
     provider: "skawld-copilot",
     model: "copilot-v1",
@@ -104,5 +104,18 @@ describe("HandoverPage", () => {
       });
     });
     expect(await screen.findByText("Morning shift summary")).toBeTruthy();
+  });
+
+  it("disables accept with a reason without handover:accept", async () => {
+    (api.handovers as ReturnType<typeof vi.fn>).mockResolvedValue({
+      items: [{ ...fixtures.latest, state: "SUBMITTED" }, fixtures.older],
+      next_cursor: null,
+      has_more: false
+    });
+    renderPage();
+    await screen.findByText("Night shift summary");
+    const accept = screen.getByRole("button", { name: "Accept" }) as HTMLButtonElement;
+    expect(accept.disabled).toBe(true);
+    expect(accept.title).toBe("Required permission not granted");
   });
 });

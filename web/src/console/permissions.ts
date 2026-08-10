@@ -9,6 +9,7 @@ export type PermissionKey =
   | "execution:read:all"
   | "execution:write"
   | "execution:prerequisite:verify"
+  | "field:manage"
   | "handover:accept"
   | "handover:write"
   | "incident:create"
@@ -38,6 +39,13 @@ export function can(
   if (!required) return true;
   const list = Array.isArray(required) ? required : [required];
   return list.every((permission) => hasPermission(principal, permission));
+}
+
+export function canAny(
+  principal: Pick<Principal, "permissions"> | undefined,
+  candidates: PermissionKey[],
+): boolean {
+  return candidates.some((permission) => hasPermission(principal, permission));
 }
 
 export type RoleFocus =

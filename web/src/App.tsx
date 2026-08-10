@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { ToastProvider } from "./console/feedback/Toast";
 import { PrincipalProvider } from "./console/state/PrincipalProvider";
+import { PreviewProvider } from "./console/state/PreviewProvider";
 import { ConsoleLayout } from "./console/layout/ConsoleLayout";
 import { DashboardPage } from "./console/pages/DashboardPage";
 import { QualityPage } from "./console/pages/QualityPage";
@@ -18,35 +19,70 @@ import { ReportDetailPage } from "./console/pages/ReportDetailPage";
 import { DocumentDetailPage } from "./console/pages/DocumentDetailPage";
 import { SearchPage } from "./console/pages/SearchPage";
 import { ExecutionsPage } from "./console/pages/ExecutionsPage";
+import { AccountPage } from "./console/pages/AccountPage";
+import { CustomFieldsPage } from "./console/pages/CustomFieldsPage";
+import { AuthorizedRoute } from "./console/ui/AuthorizedRoute";
 
 export function App() {
   return (
-    <PrincipalProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<ConsoleLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/assets" element={<AssetsPage />} />
-              <Route path="/assets/:assetId" element={<AssetDetailPage />} />
-              <Route path="/incidents" element={<IncidentsPage />} />
-              <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
-              <Route path="/executions" element={<ExecutionsPage />} />
-              <Route path="/executions/:executionId" element={<ExecutionWorkbenchPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/reports/:reportId" element={<ReportDetailPage />} />
-              <Route path="/handovers" element={<HandoverPage />} />
-              <Route path="/knowledge" element={<KnowledgePage />} />
-              <Route path="/knowledge/:documentId" element={<DocumentDetailPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/quality" element={<QualityPage />} />
-              <Route path="/demonstrations" element={<DemonstrationsPage />} />
-              <Route path="/workflows" element={<WorkflowsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </ToastProvider>
-    </PrincipalProvider>
+    <PreviewProvider>
+      <PrincipalProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<ConsoleLayout />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/account" element={<AccountPage />} />
+                <Route
+                  path="/admin/custom-fields"
+                  element={
+                    <AuthorizedRoute anyOf={["field:manage"]}>
+                      <CustomFieldsPage />
+                    </AuthorizedRoute>
+                  }
+                />
+                <Route path="/assets" element={<AssetsPage />} />
+                <Route path="/assets/:assetId" element={<AssetDetailPage />} />
+                <Route path="/incidents" element={<IncidentsPage />} />
+                <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+                <Route path="/executions" element={<ExecutionsPage />} />
+                <Route path="/executions/:executionId" element={<ExecutionWorkbenchPage />} />
+                <Route
+                  path="/reports"
+                  element={
+                    <AuthorizedRoute anyOf={["report:write", "report:approve"]}>
+                      <ReportsPage />
+                    </AuthorizedRoute>
+                  }
+                />
+                <Route
+                  path="/reports/:reportId"
+                  element={
+                    <AuthorizedRoute anyOf={["report:write", "report:approve"]}>
+                      <ReportDetailPage />
+                    </AuthorizedRoute>
+                  }
+                />
+                <Route path="/handovers" element={<HandoverPage />} />
+                <Route path="/knowledge" element={<KnowledgePage />} />
+                <Route path="/knowledge/:documentId" element={<DocumentDetailPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route
+                  path="/quality"
+                  element={
+                    <AuthorizedRoute anyOf={["recommendation:review"]}>
+                      <QualityPage />
+                    </AuthorizedRoute>
+                  }
+                />
+                <Route path="/demonstrations" element={<DemonstrationsPage />} />
+                <Route path="/workflows" element={<WorkflowsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </PrincipalProvider>
+    </PreviewProvider>
   );
 }

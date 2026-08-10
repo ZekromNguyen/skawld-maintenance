@@ -1,5 +1,9 @@
 import type {
   Asset,
+  Attachment,
+  CustomFieldConfig,
+  CustomFieldDefinition,
+  CustomFieldType,
   Demonstration,
   EvaluationSummary,
   Execution,
@@ -7,15 +11,20 @@ import type {
   ListPage,
   MaintenanceReport,
   Incident,
+  IncidentDetail,
   ListResponse,
   Measurement,
+  Person,
   Principal,
   Problem,
   Recommendation,
   ShiftHandover,
   Step,
+  Team,
   WorkflowApplicability,
-  WorkflowVersion
+  WorkflowVersion,
+  IncidentListResponse,
+  HistoryEntry
 } from "./types";
 
 export class ApiError extends Error {
@@ -86,19 +95,31 @@ function command<T>(path: string, value: unknown): Promise<T> {
   });
 }
 
+function patch<T>(path: string, value: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(value)
+  });
+}
+
 export interface ListOptions {
   site_id?: string;
   state?: string[];
   cursor?: string;
   page_size?: number;
+  custom_fields?: Record<string, string>;
 }
 
-function listQuery(options: ListOptions): string {
+function listQuery(options?: ListOptions): string {
   const params = new URLSearchParams();
-  if (options.site_id) params.set("site_id", options.site_id);
-  for (const state of options.state ?? []) params.append("state", state);
-  if (options.cursor) params.set("cursor", options.cursor);
-  if (options.page_size) params.set("page_size", String(options.page_size));
+  if (options?.site_id) params.set("site_id", options.site_id);
+  for (const state of options?.state ?? []) params.append("state", state);
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.page_size) params.set("page_size", String(options.page_size));
+  for (const [key, value] of Object.entries(options?.custom_fields ?? {})) {
+    params.set(`custom_field.${key}`, value);
+  }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
@@ -119,7 +140,8 @@ export async function fetchAll<T>(
 
 export const api = {
   principal: () => request<Principal>("/me"),
-  assets: () => request<ListResponse<Asset>>("/assets"),
+  assets: (options?: ListOptions) =>
+    request<ListPage<Asset>>(`/assets${listQuery(options)}`),
   createAsset: (value: {
     site_id: string;
     tag: string;
@@ -131,18 +153,86 @@ export const api = {
       source_of_truth: "OWNED_BY_SKAWLD",
       components: []
     }),
-  incidents: () => request<ListResponse<Incident>>("/incidents"),
+  incidents: (options?: ListOptions) =>
+    request<IncidentListResponse>(`/incidents${listQuery(options)}`),
   createIncident: (value: {
     site_id: string;
     asset_id: string;
     summary: string;
-    severity: string;
+    details?: string;
+    priority: string;
+    status?: string;
+    assignee_id?: string;
+    reporter_id?: string;
+    team_id?: string;
+    occurred_at?: string;
+    custom_values?: Record<string, unknown>;
   }) =>
     command<Incident>("/incidents", {
       ...value,
       source_of_truth: "OWNED_BY_SKAWLD",
       detected_at: new Date().toISOString()
     }),
+  teams: () => request<{ items: Team[] }>("/teams"),
+  people: () => request<{ items: Person[] }>("/people"),
+  listFieldDefinitions: (entityType = "incident") =>
+    request<{ items: CustomFieldDefinition[] }>(
+      `/admin/field-definitions?entity_type=${encodeURIComponent(entityType)}`
+    ),
+  createFieldDefinition: (value: {
+    entity_type: string;
+    key: string;
+    label: string;
+    description?: string;
+    field_type: CustomFieldType;
+    config: CustomFieldConfig;
+    sort_order: number;
+  }) => command<CustomFieldDefinition>("/admin/field-definitions", value),
+  updateFieldDefinition: (id: string, value: {
+    label: string;
+    description?: string;
+    field_type: CustomFieldType;
+    config: CustomFieldConfig;
+    sort_order: number;
+    expected_version: number;
+  }) => patch<CustomFieldDefinition>(`/admin/field-definitions/${id}`, value),
+  retireFieldDefinition: (id: string) =>
+    command<CustomFieldDefinition>(`/admin/field-definitions/${id}/retire`, {}),
+  fieldDefinitionHistory: (id: string) =>
+    request<{ items: HistoryEntry[] }>(`/admin/field-definitions/${id}/history`),
+  listAttachments: (entityKind: string, entityId: string) =>
+    request<{ items: Attachment[] }>(
+      `/attachments?entity_kind=${encodeURIComponent(entityKind)}&entity_id=${encodeURIComponent(entityId)}`
+    ),
+  uploadIncidentAttachment: async (incidentId: string, siteId: string, file: File) => {
+    const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const checksum = Array.from(new Uint8Array(digest))
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    const manifest = await command<Attachment>("/attachments", {
+      site_id: siteId,
+      entity_kind: "INCIDENT",
+      entity_id: incidentId,
+      client_event_id: crypto.randomUUID(),
+      original_filename: file.name,
+      declared_mime: file.type || "video/mp4",
+      size_bytes: file.size,
+      checksum_sha256: checksum
+    });
+    const upload = await fetch(manifest.upload_url!, {
+      method: "PUT",
+      headers: manifest.upload_headers ?? {},
+      body: file
+    });
+    if (!upload.ok) {
+      throw new ApiError({ status: upload.status, title: "Upload failed", detail: `Upload failed with status ${upload.status}` });
+    }
+    return command<Attachment>(`/attachments/${manifest.id}/complete`, {});
+  },
+  closeIncident: (incidentID: string, expectedVersion: number) =>
+    command<Incident>(`/incidents/${incidentID}/close`, { expected_version: expectedVersion }),
+  reopenIncident: (incidentID: string, expectedVersion: number) =>
+    command<Incident>(`/incidents/${incidentID}/reopen`, { expected_version: expectedVersion }),
   execution: (id: string) => request<Execution>(`/executions/${id}`),
   createExecution: (incidentID: string) =>
     command<Execution>(`/incidents/${incidentID}/executions`, {
@@ -173,9 +263,9 @@ export const api = {
       verification_status: "UNVERIFIED",
       observed_at: new Date().toISOString()
     }),
-  documents: (siteID?: string) =>
-    request<ListResponse<KnowledgeDocument>>(
-      `/documents${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+  documents: (siteID?: string, options?: ListOptions) =>
+    request<ListPage<KnowledgeDocument>>(
+      `/documents${listQuery({ site_id: siteID, ...(options ?? {}) })}`
     ),
   createDocument: (siteID: string, title: string, documentType: string) =>
     command<KnowledgeDocument>("/documents", {
@@ -282,9 +372,9 @@ export const api = {
       shift_end: end.toISOString()
     });
   },
-  demonstrations: (siteID?: string) =>
-    request<ListResponse<Demonstration>>(
-      `/demonstrations${siteID ? `?site_id=${encodeURIComponent(siteID)}` : ""}`
+  demonstrations: (siteID?: string, options?: ListOptions) =>
+    request<ListPage<Demonstration>>(
+      `/demonstrations${listQuery({ site_id: siteID, ...(options ?? {}) })}`
     ),
   demonstration: (id: string) =>
     request<Demonstration>(`/demonstrations/${id}`),
@@ -320,7 +410,8 @@ export const api = {
       action: "MASK",
       reason
     }),
-  workflows: () => request<ListResponse<WorkflowVersion>>("/workflows"),
+  workflows: (options?: ListOptions) =>
+    request<ListPage<WorkflowVersion>>(`/workflows${listQuery(options)}`),
   workflow: (workflowID: string, version: number) =>
     request<WorkflowVersion>(
       `/workflows/${workflowID}/versions/${version}`
@@ -385,8 +476,9 @@ export const api = {
   asset: (id: string) => request<Asset>(`/assets/${id}`),
   approveAssetCriticality: (assetID: string) =>
     command<unknown>(`/assets/${assetID}/criticality-approvals`, {}),
-  incident: (id: string) => request<Incident>(`/incidents/${id}`),
-  listExecutions: () => request<ListResponse<Execution>>("/executions"),
+  incident: (id: string) => request<IncidentDetail>(`/incidents/${id}`),
+  listExecutions: (options?: ListOptions) =>
+    request<ListPage<Execution>>(`/executions${listQuery(options)}`),
   resolveIncident: (incidentID: string) =>
     command<Incident>(`/incidents/${incidentID}/resolution`, {}),
   generateRecommendation: (incidentID: string) =>

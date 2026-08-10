@@ -14,7 +14,7 @@ vi.mock("../../api", () => ({
       id: "p1",
       display_name: "Supervisor",
       site_ids: ["s1"],
-      permissions: ["execution:write", "incident:read", "incident:resolve"]
+      permissions: ["execution:write", "incident:read", "incident:resolve", "recommendation:run"]
     }),
     incident: vi.fn().mockResolvedValue({
       id: "inc1",
@@ -23,13 +23,16 @@ vi.mock("../../api", () => ({
       asset_tag: "P-302",
       number: "IN-1042",
       summary: "High vibration on pump",
-      severity: "HIGH",
-      state: "OPEN",
+      priority: "HIGH",
+      status: "OPEN",
       detected_at: new Date().toISOString(),
       version: 1
     }),
     listExecutions: vi.fn().mockResolvedValue({ items: [] }),
-    resolveIncident: vi.fn().mockResolvedValue({})
+    resolveIncident: vi.fn().mockResolvedValue({}),
+    generateRecommendation: vi.fn().mockResolvedValue({}),
+    closeIncident: vi.fn().mockResolvedValue({}),
+    reopenIncident: vi.fn().mockResolvedValue({})
   }
 }));
 
@@ -55,9 +58,16 @@ describe("IncidentDetailPage", () => {
   it("renders incident facts and actions", async () => {
     renderDetail();
     expect(await screen.findByText("High vibration on pump")).toBeTruthy();
-    expect(screen.getByText("High")).toBeTruthy();
+    expect(screen.getAllByText("High").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Create execution" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Resolve incident" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate evidence-backed recommendation" })).toBeTruthy();
+  });
+
+  it("renders the metadata rail", async () => {
+    renderDetail();
+    await screen.findByText("High vibration on pump");
+    expect(screen.getByRole("complementary")).toBeTruthy();
   });
 
   it("requires confirmation before resolving", async () => {
@@ -72,7 +82,7 @@ describe("IncidentDetailPage", () => {
     expect(screen.getByText("Incident resolved")).toBeTruthy();
   });
 
-  it("hides resolve for unauthorized principals", async () => {
+  it("disables resolve with a reason for unauthorized principals", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",
       display_name: "Tech",
@@ -81,6 +91,107 @@ describe("IncidentDetailPage", () => {
     });
     renderDetail();
     await screen.findByText("High vibration on pump");
-    expect(screen.queryByRole("button", { name: "Resolve incident" })).toBeNull();
+    const resolve = screen.getByRole("button", { name: "Resolve incident" }) as HTMLButtonElement;
+    expect(resolve.disabled).toBe(true);
+    expect(resolve.title).toBe("Required permission not granted");
   });
+
+  it("generates a recommendation when permitted", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "p1",
+      display_name: "Supervisor",
+      site_ids: ["s1"],
+      permissions: ["execution:write", "incident:read", "incident:resolve", "recommendation:run"]
+    });
+    renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Generate evidence-backed recommendation" }));
+    await waitFor(() =>
+      expect(api.generateRecommendation as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("inc1"),
+    );
+    expect(screen.getByText("Recommendation generated")).toBeTruthy();
+  });
+
+  it("disables recommendation generation without recommendation:run", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p3",
+      display_name: "Tech",
+      site_ids: ["s1"],
+      permissions: ["execution:write", "incident:resolve"]
+    });
+    renderDetail();
+    await screen.findByText("High vibration on pump");
+    const button = screen.getByRole("button", { name: "Generate evidence-backed recommendation" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe("Required permission not granted");
+  });
+});
+
+describe("IncidentDetailPage resolved lifecycle", () => {
+  it("renders media gallery, details, and close/reopen actions for a resolved incident", async () => {
+    (api.incident as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "inc1",
+      site_id: "s1",
+      asset_id: "a1",
+      asset_tag: "P-302",
+      number: "IN-1042",
+      summary: "High vibration on pump",
+      priority: "HIGH",
+      status: "RESOLVED",
+      details: "Bearing wear observed on the outboard end.",
+      occurred_at: new Date().toISOString(),
+      detected_at: new Date().toISOString(),
+      resolved_at: new Date().toISOString(),
+      time_to_complete_seconds: 3661,
+      version: 3,
+      attachments: [
+        {
+          id: "att1",
+          organization_id: "o1",
+          site_id: "s1",
+          entity_kind: "INCIDENT",
+          entity_id: "inc1",
+          original_filename: "clip.mp4",
+          declared_mime: "video/mp4",
+          verified_mime: "video/mp4",
+          size_bytes: 1024,
+          checksum_sha256: "a".repeat(64),
+          state: "AVAILABLE",
+          download_url: "https://example.test/clip.mp4"
+        }
+      ]
+    });
+    renderDetail();
+    expect(await screen.findByText("Bearing wear observed on the outboard end.")).toBeTruthy();
+    expect(screen.getByText("Video or images")).toBeTruthy();
+    expect(screen.getByText("1h 1m")).toBeTruthy();
+    const close = screen.getByRole("button", { name: "Close incident" });
+    expect(close).toBeTruthy();
+    fireEvent.click(close);
+    await waitFor(() =>
+      expect(api.closeIncident as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("inc1", 3),
+    );
+    expect(screen.getByText("Incident closed")).toBeTruthy();
+  });
+});
+
+it("renders the custom fields card with formatted values", async () => {
+  (api.incident as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "inc1",
+    site_id: "s1",
+    asset_id: "a1",
+    asset_tag: "P-302",
+    number: "IN-1042",
+    summary: "High vibration on pump",
+    priority: "HIGH",
+    status: "OPEN",
+    detected_at: new Date().toISOString(),
+    version: 1,
+    custom_values: { "def-1": "a" },
+    custom_fields: [
+      { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "Zone A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+    ]
+  });
+  renderDetail();
+  expect(await screen.findByText("Zone")).toBeTruthy();
+  expect(screen.getByText("Zone A")).toBeTruthy();
 });

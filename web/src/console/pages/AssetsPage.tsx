@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
-import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useCommand } from "../useCommand";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
@@ -19,8 +19,16 @@ export function AssetsPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const assets = useQuery(() => api.assets().then((list) => list.items));
+  const assets = usePaginatedList((params) => api.assets(params), []);
   const [showForm, setShowForm] = useState(false);
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get("create") === "1") {
+      setShowForm(true);
+      params.delete("create");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
   const canCreate = principal?.permissions.includes("asset:create") ?? false;
   const siteIDs = principal?.site_ids ?? [];
 
@@ -50,12 +58,23 @@ export function AssetsPage() {
           }
         />
         <AssetsTable
-          assets={assets.data ?? []}
+          assets={assets.items}
           loading={assets.loading}
           error={assets.error}
           onRetry={() => void assets.refetch()}
           onRowClick={(asset) => navigate(`/assets/${asset.id}`)}
         />
+        {assets.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void assets.loadMore()}
+            disabled={assets.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
         <Dialog
           open={showForm}
           onOpenChange={setShowForm}

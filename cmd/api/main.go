@@ -16,6 +16,8 @@ import (
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	copilotpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/adapter/postgres"
 	copilotapp "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/application"
+	customfieldpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/adapter/postgres"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	demonstrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/demonstration/application"
 	evaluationpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/adapter/postgres"
 	evaluationapp "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/application"
@@ -27,6 +29,7 @@ import (
 	identityapp "github.com/ZekromNguyen/skawld-maintenance/internal/identity/application"
 	incidentpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/incident/adapter/postgres"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
+	integrationpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/integration/adapter/postgres"
 	knowledgepostgres "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/adapter/postgres"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/audit"
@@ -42,6 +45,8 @@ import (
 	reportpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/report/adapter/postgres"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/skawld"
+	teampostgres "github.com/ZekromNguyen/skawld-maintenance/internal/team/adapter/postgres"
+	teamapp "github.com/ZekromNguyen/skawld-maintenance/internal/team/application"
 	transcriptionpostgres "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/adapter/postgres"
 	transcriptionapp "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/application"
 	workflowapp "github.com/ZekromNguyen/skawld-maintenance/internal/workflow/application"
@@ -93,6 +98,8 @@ func main() {
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
 		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
 	}
+	customFieldStore := customfieldpostgres.Store{Pool: pool}
+	customFieldService := customfieldapp.Service{Store: customFieldStore}
 	executionStore := executionpostgres.Store{
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
 		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
@@ -126,13 +133,28 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	embeddingProvider := skawld.DeterministicEmbeddingProvider{Dimensions: 64}
-	structuredProvider := skawld.DeterministicProvider{}
-	modelRouter := skawld.Router{Providers: map[skawld.Capability]skawld.StructuredProvider{
-		skawld.CapabilityRecommendation: structuredProvider,
-		skawld.CapabilityReportDraft:    structuredProvider,
-		skawld.CapabilityShiftHandover:  structuredProvider,
-	}}
+	structuredProviders, embeddingProvider, err := skawld.BuildProviders(
+		skawld.AIConfig{
+			StructuredProvider:     cfg.AI.StructuredProvider,
+			EmbeddingProvider:      cfg.AI.EmbeddingProvider,
+			StructuredEndpoint:     cfg.AI.Endpoint,
+			StructuredAPIKey:       cfg.AI.APIKey,
+			StructuredModel:        cfg.AI.Model,
+			StructuredModelVersion: cfg.AI.ModelVersion,
+			AnthropicAPIKey:        cfg.AI.AnthropicAPIKey,
+			AnthropicModel:         cfg.AI.AnthropicModel,
+			AnthropicModelVersion:  cfg.AI.AnthropicModelVersion,
+			EmbeddingEndpoint:      cfg.AI.EmbeddingEndpoint,
+			EmbeddingModel:         cfg.AI.EmbeddingModel,
+			EmbeddingModelVersion:  cfg.AI.EmbeddingModelVersion,
+		},
+		&http.Client{Timeout: 30 * time.Second},
+	)
+	if err != nil {
+		logger.Error("AI provider startup failed", "error", err)
+		os.Exit(1)
+	}
+	modelRouter := skawld.Router{Providers: structuredProviders}
 	authorityReader := identitypostgres.AuthorityReader{Pool: pool}
 	knowledgeStore := knowledgepostgres.Store{
 		Pool: pool, IDs: idGenerator, Clock: systemClock,
@@ -178,8 +200,12 @@ func main() {
 			Store:       assetStore,
 			Authorities: identitypostgres.AuthorityReader{Pool: pool},
 		},
-		Incidents:  incidentapp.Service{Store: incidentStore},
-		Executions: executionapp.Service{Store: executionStore},
+		Incidents: incidentapp.Service{
+			Store:  incidentStore,
+			Fields: customFieldService,
+		},
+		CustomFields: customFieldService,
+		Executions:   executionapp.Service{Store: executionStore},
 		Attachments: attachmentapp.Service{
 			Store: attachmentStore,
 		},
@@ -194,6 +220,9 @@ func main() {
 		Handovers: handoverapp.Service{
 			Store: handoverStore, Router: modelRouter,
 			Authorities: authorityReader, Now: systemClock.Now,
+		},
+		Teams: teamapp.Service{
+			Store: teampostgres.Store{Pool: pool},
 		},
 		Transcriptions: transcriptionapp.Service{
 			Store: transcriptionStore, Provider: transcriptionProvider,
@@ -214,6 +243,9 @@ func main() {
 		Evaluations: evaluationapp.Service{
 			Store: evaluationpostgres.Store{Pool: pool},
 			Now:   systemClock.Now,
+		},
+		IntegrationSink: integrationpostgres.Sink{
+			Pool: pool, IDs: idGenerator, Clock: systemClock, Audit: audit.Sink{},
 		},
 	})
 	server := &http.Server{

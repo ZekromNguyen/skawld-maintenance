@@ -103,8 +103,9 @@ func (f *fakeGateway) List(
 	context.Context,
 	identitydomain.Principal,
 	string,
-) ([]Demonstration, error) {
-	return []Demonstration{f.demo}, nil
+	ListFilter,
+) ([]Demonstration, bool, error) {
+	return []Demonstration{f.demo}, false, nil
 }
 func (f *fakeGateway) Complete(
 	context.Context,

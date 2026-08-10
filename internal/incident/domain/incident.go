@@ -8,18 +8,20 @@ import (
 	integrationdomain "github.com/ZekromNguyen/skawld-maintenance/internal/integration/domain"
 )
 
-type State string
-type Severity string
+type Status string
+type Priority string
 
 const (
-	StateOpen       State = "OPEN"
-	StateInProgress State = "IN_PROGRESS"
-	StateResolved   State = "RESOLVED"
+	StatusOpen       Status = "OPEN"
+	StatusInProgress Status = "IN_PROGRESS"
+	StatusResolved   Status = "RESOLVED"
+	StatusClosed     Status = "CLOSED"
+	StatusReopened   Status = "REOPENED"
 
-	SeverityLow      Severity = "LOW"
-	SeverityMedium   Severity = "MEDIUM"
-	SeverityHigh     Severity = "HIGH"
-	SeverityCritical Severity = "CRITICAL"
+	PriorityLow      Priority = "LOW"
+	PriorityMedium   Priority = "MEDIUM"
+	PriorityHigh     Priority = "HIGH"
+	PriorityCritical Priority = "CRITICAL"
 )
 
 type Incident struct {
@@ -29,8 +31,12 @@ type Incident struct {
 	AssetID           string
 	Number            string
 	Summary           string
-	Severity          Severity
-	State             State
+	Details           string
+	Priority          Priority
+	Status            Status
+	AssigneeID        string
+	ReporterID        string
+	TeamID            string
 	SourceOfTruth     integrationdomain.SourceOfTruth
 	ExternalSystem    string
 	ExternalID        string
@@ -39,6 +45,7 @@ type Incident struct {
 	DetectedAt        time.Time
 	ResolvedAt        *time.Time
 	ResolutionSummary string
+	CustomValues      map[string]any
 	Version           int64
 }
 
@@ -48,10 +55,10 @@ func New(value Incident) (Incident, error) {
 		value.AssetID == "" || value.Number == "" || value.Summary == "" {
 		return Incident{}, errors.New("incident identity, scope, asset, number, and summary are required")
 	}
-	switch value.Severity {
-	case SeverityLow, SeverityMedium, SeverityHigh, SeverityCritical:
+	switch value.Priority {
+	case PriorityLow, PriorityMedium, PriorityHigh, PriorityCritical:
 	default:
-		return Incident{}, errors.New("unsupported incident severity")
+		return Incident{}, errors.New("unsupported incident priority")
 	}
 	hasExternal := strings.TrimSpace(value.ExternalSystem) != "" &&
 		strings.TrimSpace(value.ExternalID) != ""
@@ -61,7 +68,14 @@ func New(value Incident) (Incident, error) {
 	if value.DetectedAt.IsZero() {
 		return Incident{}, errors.New("incident detection time is required")
 	}
-	value.State = StateOpen
+	if value.Status == "" {
+		value.Status = StatusOpen
+	}
+	switch value.Status {
+	case StatusOpen, StatusInProgress, StatusResolved, StatusClosed, StatusReopened:
+	default:
+		return Incident{}, errors.New("unsupported incident status")
+	}
 	value.Version = 1
 	value.DetectedAt = value.DetectedAt.UTC()
 	if value.OccurredAt != nil {
@@ -75,10 +89,10 @@ func (i *Incident) Start() error {
 	if err := i.requireNative(); err != nil {
 		return err
 	}
-	if i.State != StateOpen {
-		return errors.New("only an open incident can move to in progress")
+	if i.Status != StatusOpen && i.Status != StatusReopened {
+		return errors.New("only an open or reopened incident can move to in progress")
 	}
-	i.State = StateInProgress
+	i.Status = StatusInProgress
 	i.Version++
 	return nil
 }
@@ -87,7 +101,7 @@ func (i *Incident) Resolve(summary string, at time.Time) error {
 	if err := i.requireNative(); err != nil {
 		return err
 	}
-	if i.State == StateResolved {
+	if i.Status == StatusResolved {
 		return errors.New("incident is already resolved")
 	}
 	summary = strings.TrimSpace(summary)
@@ -95,9 +109,42 @@ func (i *Incident) Resolve(summary string, at time.Time) error {
 		return errors.New("resolution summary and time are required")
 	}
 	resolvedAt := at.UTC()
-	i.State = StateResolved
+	i.Status = StatusResolved
 	i.ResolutionSummary = summary
 	i.ResolvedAt = &resolvedAt
+	i.Version++
+	return nil
+}
+
+func (i *Incident) Close(at time.Time) error {
+	if err := i.requireNative(); err != nil {
+		return err
+	}
+	if i.Status != StatusResolved {
+		return errors.New("only a resolved incident can be closed")
+	}
+	if at.IsZero() {
+		return errors.New("resolution time is required")
+	}
+	closedAt := at.UTC()
+	if i.ResolvedAt == nil {
+		i.ResolvedAt = &closedAt
+	}
+	i.Status = StatusClosed
+	i.Version++
+	return nil
+}
+
+func (i *Incident) Reopen() error {
+	if err := i.requireNative(); err != nil {
+		return err
+	}
+	if i.Status != StatusResolved && i.Status != StatusClosed {
+		return errors.New("only a resolved or closed incident can be reopened")
+	}
+	i.Status = StatusReopened
+	i.ResolutionSummary = ""
+	i.ResolvedAt = nil
 	i.Version++
 	return nil
 }

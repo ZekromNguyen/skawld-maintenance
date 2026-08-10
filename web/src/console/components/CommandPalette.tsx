@@ -13,25 +13,53 @@ interface Command {
 
 /**
  * CommandPalette: Ctrl/Cmd+K quick navigation and actions. Filterable,
- * arrow-key navigable, Enter to run, Esc to close.
+ * arrow-key navigable, Enter to run, Esc to close. Accepts optional
+ * controlled open state (GlobalBar) while remaining usable standalone.
  */
-export function CommandPalette({ principal }: { principal?: Principal }) {
+export function CommandPalette({
+  principal,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  principal?: Principal;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean | ((current: boolean) => boolean)) => {
+    const resolved = typeof next === "function" ? next(open) : next;
+    setInternalOpen(resolved);
+    onOpenChange?.(resolved);
+  };
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setOpen((current) => !current);
+        return;
+      }
+      // "/" opens the palette when not already typing (Jira convention).
+      if (event.key === "/" && !typing && !open) {
+        event.preventDefault();
+        setOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [open]);
 
   const commands = useMemo<Command[]>(() => {
     const nav: Command[] = [

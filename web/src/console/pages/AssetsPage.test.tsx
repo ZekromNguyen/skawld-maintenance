@@ -17,6 +17,8 @@ vi.mock("../../api", () => ({
       permissions: ["asset:create"]
     }),
     assets: vi.fn().mockResolvedValue({
+      next_cursor: null,
+      has_more: false,
       items: [
         { id: "a1", site_id: "s1", tag: "P-302", name: "Process Pump", class: "CENTRIFUGAL_PUMP", status: "OPERATIONAL", source_of_truth: "OWNED_BY_SKAWLD" },
         { id: "a2", site_id: "s2", tag: "P-304", name: "Bearing Housing", class: "BEARING", status: "DECOMMISSIONED", source_of_truth: "EXTERNAL_REFERENCE" }
@@ -95,4 +97,25 @@ describe("AssetsPage", () => {
     );
     expect(screen.getByText("Asset created")).toBeTruthy();
   });
+});
+
+it("shows load more and appends the next page", async () => {
+  const list = vi.mocked(api.assets);
+  list
+    .mockResolvedValueOnce({
+      items: [{ id: "a9", site_id: "s1", tag: "P-999", name: "More Pump", class: "PUMP", status: "ACTIVE", source_of_truth: "OWNED_BY_SKAWLD" }],
+      next_cursor: "c1",
+      has_more: true,
+    })
+    .mockResolvedValueOnce({
+      items: [{ id: "a10", site_id: "s1", tag: "P-1000", name: "Even More", class: "PUMP", status: "ACTIVE", source_of_truth: "OWNED_BY_SKAWLD" }],
+      next_cursor: null,
+      has_more: false,
+    });
+  renderPage();
+  const button = await screen.findByRole("button", { name: "Load more" });
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
+  );
 });

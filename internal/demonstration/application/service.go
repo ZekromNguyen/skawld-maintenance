@@ -7,6 +7,7 @@ import (
 	"time"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
 
 var (
@@ -124,10 +125,15 @@ type Demonstration struct {
 	CreatedBy      string         `json:"created_by"`
 }
 
+type ListFilter struct {
+	PageSize int
+	Cursor   string
+}
+
 type Gateway interface {
 	Start(context.Context, identitydomain.Principal, Start) (Demonstration, error)
 	Get(context.Context, identitydomain.Principal, string) (Demonstration, error)
-	List(context.Context, identitydomain.Principal, string) ([]Demonstration, error)
+	List(context.Context, identitydomain.Principal, string, ListFilter) ([]Demonstration, bool, error)
 	Complete(context.Context, identitydomain.Principal, string, Complete) (Demonstration, error)
 	RecordEvidenceView(context.Context, identitydomain.Principal, string, RecordEvidenceView) (Event, error)
 	Review(context.Context, identitydomain.Principal, string, Review) (ReviewRecord, error)
@@ -174,14 +180,36 @@ func (s Service) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	siteID string,
-) ([]Demonstration, error) {
+	filter ListFilter,
+) ([]Demonstration, string, error) {
 	if !principal.Has(identitydomain.PermissionDemonstrationRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if siteID != "" && !principal.CanAccessSite(principal.OrganizationID, siteID) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
-	return s.Gateway.List(ctx, principal, siteID)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Gateway.List(ctx, principal, siteID, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, keyset.Encode(last.StartedAt, last.ID), nil
 }
 
 func (s Service) Complete(

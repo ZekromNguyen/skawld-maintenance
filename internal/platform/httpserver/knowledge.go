@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
@@ -27,14 +28,28 @@ func listDocuments(service knowledgeapp.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		items, err := service.ListDocuments(r.Context(), principal, knowledgeapp.Filter{
-			SiteID: r.URL.Query().Get("site_id"),
-		})
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := knowledgeapp.Filter{
+			SiteID:   r.URL.Query().Get("site_id"),
+			PageSize: pageSize,
+			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		if filter.SiteID != "" && !validUUIDParam(w, filter.SiteID, "site ID") {
+			return
+		}
+		items, next, err := service.ListDocuments(r.Context(), principal, filter)
 		if err != nil {
 			writeKnowledgeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"items": items})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

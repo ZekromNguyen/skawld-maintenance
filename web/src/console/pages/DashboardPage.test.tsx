@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { DashboardPage } from "./DashboardPage";
 import { I18nProvider } from "../../i18n/I18nProvider";
@@ -24,8 +24,8 @@ vi.mock("../../api", () => ({
           asset_tag: "P-302",
           number: "IN-1",
           summary: "Pump vibration",
-          severity: "HIGH",
-          state: "OPEN",
+          priority: "HIGH",
+          status: "OPEN",
           detected_at: new Date().toISOString(),
           version: 1
         },
@@ -36,12 +36,13 @@ vi.mock("../../api", () => ({
           asset_tag: "P-302",
           number: "IN-2",
           summary: "Resolved bearing noise",
-          severity: "LOW",
-          state: "RESOLVED",
+          priority: "LOW",
+          status: "RESOLVED",
           detected_at: new Date().toISOString(),
           version: 1
         }
-      ]
+      ],
+      custom_fields: []
     }),
     assets: vi.fn().mockResolvedValue({
       items: [
@@ -108,10 +109,13 @@ describe("DashboardPage", () => {
   it("renders real KPIs, my queue, and open incidents only", async () => {
     renderDashboard();
     expect(await screen.findByText("Operations overview")).toBeTruthy();
-    // Open incident row visible, resolved one excluded.
+    // Annunciator strip links to the incident queue.
+    expect(screen.getByRole("link", { name: /open incidents/i })).toBeTruthy();
+    // Recommended tab shows the open incident row, resolved one excluded.
     expect(screen.getByText("Pump vibration")).toBeTruthy();
     expect(screen.queryByText("Resolved bearing noise")).toBeNull();
-    // My queue shows the in-progress execution.
+    // Assigned tab shows the in-progress execution.
+    fireEvent.click(screen.getByRole("tab", { name: /assigned to me/i }));
     expect(screen.getByText("Shaft alignment check")).toBeTruthy();
   });
 

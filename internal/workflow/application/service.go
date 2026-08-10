@@ -2,11 +2,15 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
+	"github.com/google/uuid"
 )
 
 var (
@@ -133,10 +137,24 @@ type Version struct {
 	PublishedBy          string                 `json:"published_by,omitempty"`
 }
 
+type ListFilter struct {
+	PageSize int
+	Cursor   string
+}
+
+// cursorPayload is the three-part workflow version cursor: the sort key is
+// (created_at, workflow_id, version) because created_at alone is not unique
+// across versions of the same workflow.
+type cursorPayload struct {
+	T string `json:"t"`
+	W string `json:"w"`
+	V int    `json:"v"`
+}
+
 type Gateway interface {
 	Compile(context.Context, identitydomain.Principal, Compile) (Version, error)
 	Get(context.Context, identitydomain.Principal, string, int) (Version, error)
-	List(context.Context, identitydomain.Principal) ([]Version, error)
+	List(context.Context, identitydomain.Principal, ListFilter) ([]Version, bool, error)
 	Review(context.Context, identitydomain.Principal, string, int, Review) (Version, error)
 	Publish(context.Context, identitydomain.Principal, string, int, Publish) (Version, error)
 	ExpandApplicability(context.Context, identitydomain.Principal, string, int, ExpandApplicability) (Version, error)
@@ -191,11 +209,67 @@ func (s Service) Get(
 func (s Service) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
-) ([]Version, error) {
+	filter ListFilter,
+) ([]Version, string, error) {
 	if !principal.Has(identitydomain.PermissionWorkflowRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
-	return s.Gateway.List(ctx, principal)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		createdAt, workflowID, version, err := decodeWorkflowCursor(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = createdAt.UTC().Format(time.RFC3339Nano) + "|" + workflowID + "|" + strconv.Itoa(version)
+	}
+	items, hasMore, err := s.Gateway.List(ctx, principal, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, encodeWorkflowCursor(last.CreatedAt, last.WorkflowID, last.Version), nil
+}
+
+// encodeWorkflowCursor packs the version sort key (created_at, workflow_id,
+// version) into an opaque cursor. A two-part cursor would silently skip rows
+// when two versions share the same created_at and workflow_id.
+func encodeWorkflowCursor(createdAt time.Time, workflowID string, version int) string {
+	payload, _ := json.Marshal(cursorPayload{
+		T: createdAt.UTC().Format(time.RFC3339Nano),
+		W: workflowID,
+		V: version,
+	})
+	return base64.RawURLEncoding.EncodeToString(payload)
+}
+
+func decodeWorkflowCursor(raw string) (time.Time, string, int, error) {
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return time.Time{}, "", 0, err
+	}
+	var payload cursorPayload
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		return time.Time{}, "", 0, err
+	}
+	if payload.T == "" || payload.W == "" || payload.V < 1 {
+		return time.Time{}, "", 0, errors.New("workflow cursor is incomplete")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, payload.T)
+	if err != nil {
+		return time.Time{}, "", 0, err
+	}
+	if _, err := uuid.Parse(payload.W); err != nil {
+		return time.Time{}, "", 0, err
+	}
+	return createdAt, payload.W, payload.V, nil
 }
 
 func (s Service) Review(

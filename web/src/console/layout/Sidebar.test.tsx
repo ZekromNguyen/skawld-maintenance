@@ -4,27 +4,31 @@ import { MemoryRouter, Routes, Route } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { ThemeProvider } from "../../theme/ThemeProvider";
+import { SiteProvider } from "../state/SiteContext";
 
-function renderSidebar(entry: string) {
+function renderSidebar(entry: string, sites: string[] = ["s1"]) {
   return render(
     <ThemeProvider>
       <I18nProvider>
-      <MemoryRouter initialEntries={[entry]}>
-        <Routes>
-          <Route path="/incidents/:incidentId" element={<div>detail</div>} />
-          <Route path="*" element={<div>page</div>} />
-        </Routes>
-        <Sidebar principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }} />
-      </MemoryRouter>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, roles: [], permissions: [] }}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route path="/incidents/:incidentId" element={<div>detail</div>} />
+            <Route path="*" element={<div>page</div>} />
+          </Routes>
+          <Sidebar principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, roles: [], permissions: [] }} />
+        </MemoryRouter>
+        </SiteProvider>
       </I18nProvider>
     </ThemeProvider>,
   );
 }
 
-function renderSidebarWithPermissions(permissions: string[]) {
+function renderSidebarWithPermissions(permissions: string[], sites: string[] = ["s1"]) {
   return render(
     <ThemeProvider>
       <I18nProvider>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: sites, permissions }}>
         <MemoryRouter initialEntries={["/"]}>
           <Routes>
             <Route path="*" element={<div>page</div>} />
@@ -34,20 +38,24 @@ function renderSidebarWithPermissions(permissions: string[]) {
               id: "p1",
               display_name: "T",
               organization_id: "o1",
-              site_ids: ["s1"],
+              site_ids: sites,
+              roles: [],
               permissions,
             }}
           />
         </MemoryRouter>
+        </SiteProvider>
       </I18nProvider>
     </ThemeProvider>,
   );
 }
 
 describe("Sidebar", () => {
-  it("renders brand and grouped navigation", () => {
+  it("renders Jira-style grouped navigation", () => {
     renderSidebar("/");
-    expect(screen.getByText("Skawld")).toBeTruthy();
+    expect(screen.getByText("Primary")).toBeTruthy();
+    expect(screen.getByText("Recommended")).toBeTruthy();
+    expect(screen.getByText("Cross-links")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Incident execution" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Executions" })).toBeTruthy();
   });
@@ -72,5 +80,28 @@ describe("Sidebar", () => {
   it("hides Reports for a manager (no report:write)", () => {
     renderSidebarWithPermissions(["handover:accept", "recommendation:review"]);
     expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
+  });
+
+  it("shows Reports for an approver (report:approve only)", () => {
+    renderSidebarWithPermissions(["report:approve"]);
+    expect(screen.getByRole("link", { name: "Reports" })).toBeTruthy();
+  });
+
+  it("gates Quality on recommendation:review", () => {
+    renderSidebarWithPermissions(["execution:write"]);
+    expect(screen.queryByRole("link", { name: "AI quality & safety" })).toBeNull();
+    renderSidebarWithPermissions(["recommendation:review"]);
+    expect(screen.getByRole("link", { name: "AI quality & safety" })).toBeTruthy();
+  });
+
+  it("lists recent sites only when the principal has more than one", () => {
+    renderSidebar("/", ["s1", "s2"]);
+    expect(screen.getByText("Recents")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /s2/i })).toBeTruthy();
+  });
+
+  it("hides recent sites for a single-site principal", () => {
+    renderSidebar("/", ["s1"]);
+    expect(screen.queryByText("Recents")).toBeNull();
   });
 });

@@ -1,24 +1,24 @@
 import type { MessageKey } from "../i18n/messages";
 import type { Tone } from "./ui/StatusBadge";
 
-/** Single source of truth for incident severity labels and tones. */
-export function severityLabelKey(severity: string): MessageKey {
-  switch (severity) {
+/** Single source of truth for incident priority labels and tones. */
+export function priorityLabelKey(priority: string): MessageKey {
+  switch (priority) {
     case "CRITICAL":
-      return "incident.severity.critical";
+      return "incident.priority.critical";
     case "HIGH":
-      return "incident.severity.high";
+      return "incident.priority.high";
     case "MEDIUM":
-      return "incident.severity.medium";
+      return "incident.priority.medium";
     case "LOW":
-      return "incident.severity.low";
+      return "incident.priority.low";
     default:
-      return "incident.severity.unknown";
+      return "incident.priority.unknown";
   }
 }
 
-export function severityTone(severity: string): Tone {
-  switch (severity) {
+export function priorityTone(priority: string): Tone {
+  switch (priority) {
     case "CRITICAL":
       return "critical";
     case "HIGH":
@@ -32,28 +32,36 @@ export function severityTone(severity: string): Tone {
   }
 }
 
-/** Single source of truth for incident state labels and tones. */
-export function incidentStateLabelKey(state: string): MessageKey {
-  switch (state) {
+/** Single source of truth for incident status labels and tones. */
+export function incidentStatusLabelKey(status: string): MessageKey {
+  switch (status) {
     case "OPEN":
-      return "incident.state.open";
+      return "incident.status.open";
     case "IN_PROGRESS":
-      return "incident.state.inProgress";
+      return "incident.status.inProgress";
     case "RESOLVED":
-      return "incident.state.resolved";
+      return "incident.status.resolved";
+    case "CLOSED":
+      return "incident.status.closed";
+    case "REOPENED":
+      return "incident.status.reopened";
     default:
-      return "incident.state.unknown";
+      return "incident.status.unknown";
   }
 }
 
-export function incidentStateTone(state: string): Tone {
-  switch (state) {
+export function incidentStatusTone(status: string): Tone {
+  switch (status) {
     case "OPEN":
       return "high";
     case "IN_PROGRESS":
       return "medium";
     case "RESOLVED":
       return "success";
+    case "CLOSED":
+      return "low";
+    case "REOPENED":
+      return "medium";
     default:
       return "info";
   }

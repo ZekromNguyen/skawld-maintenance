@@ -100,7 +100,7 @@ func TestPumpExecutionPersistsEvidenceAndBlocksIntrusiveStep(t *testing.T) {
 	}
 	incident, _, err := incidentStore.Create(ctx, principal, uuid.NewString(), incidentapp.CreateIncident{
 		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
-		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +280,7 @@ func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
 	}
 	incident, _, err := incidentStore.Create(ctx, technician, uuid.NewString(), incidentapp.CreateIncident{
 		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
-		Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +291,7 @@ func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := executionStore.List(ctx, orgAdmin, executionapp.Filter{})
+	items, _, err := executionStore.List(ctx, orgAdmin, executionapp.Filter{PageSize: 25})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,5 +300,112 @@ func TestOrgScopedPrincipalWithNilSiteIDsSeesExecution(t *testing.T) {
 	}
 	if _, err := executionStore.Get(ctx, orgAdmin, items[0].ID); err != nil {
 		t.Fatalf("org-scoped Get failed: %v", err)
+	}
+}
+
+func TestExecutionListCursorPagination(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	generator := id.UUID{}
+	organizationID, siteID, technicianID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO organizations (
+			id, name, source_of_truth, version, created_at, updated_at
+		) VALUES ($1::uuid, 'Execution Pagination', 'OWNED_BY_SKAWLD', 1, $2, $2)
+	`, organizationID, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO sites (
+			id, organization_id, code, name, timezone, status, version, created_at, updated_at
+		) VALUES ($2::uuid, $1::uuid, 'EPG', 'Execution Pagination Site', 'UTC', 'ACTIVE', 1, $3, $3)
+	`, organizationID, siteID, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO principals (
+			id, external_subject, display_name, status, created_at, updated_at
+		) VALUES ($1::uuid, $1, 'Execution Pagination Technician', 'ACTIVE', $2, $2)
+	`, technicianID, now); err != nil {
+		t.Fatal(err)
+	}
+
+	technician := identitydomain.Principal{
+		ID: technicianID, OrganizationID: organizationID, SiteIDs: []string{siteID},
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionAssetCreate:    {},
+			identitydomain.PermissionIncidentCreate: {},
+			identitydomain.PermissionExecutionWrite: {},
+			identitydomain.PermissionExecutionRead:  {},
+		},
+	}
+	commonClock := clock.Fixed{Time: now}
+	assetStore := assetpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+	incidentStore := incidentpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+	executionStore := executionpostgres.Store{
+		Pool: pool, IDs: generator, Clock: commonClock,
+		Idempotency: idempotency.Store{}, Audit: audit.Sink{},
+	}
+	asset, _, err := assetStore.Create(ctx, technician, uuid.NewString(), assetapp.CreateAsset{
+		SiteID: siteID, Tag: "P-302", Name: "Process Pump P-302",
+		Class: "CENTRIFUGAL_PUMP", SourceOfTruth: "OWNED_BY_SKAWLD",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	incident, _, err := incidentStore.Create(ctx, technician, uuid.NewString(), incidentapp.CreateIncident{
+		SiteID: siteID, AssetID: asset.ID, Summary: "High vibration",
+		Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 3; index++ {
+		if _, _, err := executionStore.Create(ctx, technician, uuid.NewString(), executionapp.CreateExecution{
+			IncidentID: incident.ID, Purpose: "Inspect high vibration " + string(rune('0'+index)),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page1, hasMore, err := executionStore.List(ctx, technician, executionapp.Filter{PageSize: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1) != 2 || !hasMore {
+		t.Fatalf("page 1 = %d items, hasMore %v; want 2, true", len(page1), hasMore)
+	}
+	last := page1[len(page1)-1]
+	cursor := last.UpdatedAt.UTC().Format(time.RFC3339Nano) + "|" + last.ID
+	page2, hasMore2, err := executionStore.List(ctx, technician, executionapp.Filter{PageSize: 2, Cursor: cursor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2) != 1 || hasMore2 {
+		t.Fatalf("page 2 = %d items, hasMore %v; want 1, false", len(page2), hasMore2)
+	}
+	seen := map[string]bool{}
+	for _, item := range append(page1, page2...) {
+		seen[item.ID] = true
+	}
+	if len(seen) != 3 {
+		t.Fatalf("distinct executions across pages = %d, want 3", len(seen))
 	}
 }

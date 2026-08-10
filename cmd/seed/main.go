@@ -85,11 +85,17 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("job producer: %w", err)
 	}
+	structuredProviders, embeddingProvider, err := skawld.BuildProviders(
+		skawld.AIConfig{}, nil,
+	)
+	if err != nil {
+		return fmt.Errorf("AI provider: %w", err)
+	}
 	assetStore := assetpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
 	incidentStore := incidentpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
 	executionStore := executionpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
 	attachmentStore := attachmentpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}, Objects: objectStore}
-	knowledgeStore := knowledgepostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}, Enqueuer: jobClient, Embeddings: skawld.DeterministicEmbeddingProvider{Dimensions: 64}}
+	knowledgeStore := knowledgepostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}, Enqueuer: jobClient, Embeddings: embeddingProvider}
 	copilotStore := copilotpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
 	reportStore := reportpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
 	handoverStore := handoverpostgres.Store{Pool: pool, IDs: gen, Clock: c, Idempotency: idempotency.Store{}, Audit: audit.Sink{}}
@@ -133,7 +139,7 @@ func run(ctx context.Context) error {
 	if !ok {
 		incident, _, err = incidentStore.Create(ctx, principal, key("incident-1"), incidentapp.CreateIncident{
 			SiteID: siteID, AssetID: asset.ID, Summary: "High vibration on P-302 motor bearing",
-			Severity: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
+			Priority: "HIGH", SourceOfTruth: "OWNED_BY_SKAWLD", DetectedAt: now,
 		})
 		if err != nil {
 			return fmt.Errorf("create incident: %w", err)
@@ -324,11 +330,7 @@ Always verify energy isolation with a work permit before intrusive bearing inspe
 	}
 
 	// Step 5: copilot recommendation + correction feedback
-	router := skawld.Router{Providers: map[skawld.Capability]skawld.StructuredProvider{
-		skawld.CapabilityRecommendation: skawld.DeterministicProvider{},
-		skawld.CapabilityReportDraft:    skawld.DeterministicProvider{},
-		skawld.CapabilityShiftHandover:  skawld.DeterministicProvider{},
-	}}
+	router := skawld.Router{Providers: structuredProviders}
 	knowledgeService := knowledgeapp.Service{Store: knowledgeStore, Authorities: authorityReader, Now: clock.System{}.Now}
 	recommendation, _, err := copilotapp.Service{
 		Store: copilotStore, Search: knowledgeService, Router: router,
@@ -685,10 +687,14 @@ type documentIngestor struct {
 }
 
 func (d *documentIngestor) ProcessDocument(ctx context.Context, revisionID string) error {
+	_, embeddingProvider, err := skawld.BuildProviders(skawld.AIConfig{}, nil)
+	if err != nil {
+		return fmt.Errorf("AI provider: %w", err)
+	}
 	processor := ingest.Processor{
 		Pool: d.pool, Objects: d.objects,
 		Extractor:  ingest.BoundedExtractor{PDFToTextBinary: d.cfgDocuments.PDFToTextBinary},
-		Embeddings: skawld.DeterministicEmbeddingProvider{Dimensions: 64},
+		Embeddings: embeddingProvider,
 		IDs:        id.UUID{}, Clock: clock.System{}, Audit: audit.Sink{},
 	}
 	return processor.ProcessDocument(ctx, revisionID)

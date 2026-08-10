@@ -7,6 +7,7 @@ import (
 	"time"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
 
 var (
@@ -108,6 +109,8 @@ type Filter struct {
 	SiteID     string
 	State      string
 	AssignedTo string
+	PageSize   int
+	Cursor     string
 }
 
 type Step struct {
@@ -199,6 +202,7 @@ type Execution struct {
 	StartedAt      *time.Time     `json:"started_at,omitempty"`
 	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
 	OutcomeSummary string         `json:"outcome_summary,omitempty"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 	Steps          []Step         `json:"steps"`
 	Prerequisites  []Prerequisite `json:"prerequisites"`
 	Measurements   []Measurement  `json:"measurements"`
@@ -210,7 +214,7 @@ type Execution struct {
 type Store interface {
 	Create(context.Context, identitydomain.Principal, string, CreateExecution) (Execution, bool, error)
 	Get(context.Context, identitydomain.Principal, string) (Execution, error)
-	List(context.Context, identitydomain.Principal, Filter) ([]Execution, error)
+	List(context.Context, identitydomain.Principal, Filter) ([]Execution, bool, error)
 	Start(context.Context, identitydomain.Principal, string, string, StartExecution) (Execution, bool, error)
 	VerifyPrerequisite(context.Context, identitydomain.Principal, string, string, VerifyPrerequisite) (Prerequisite, bool, error)
 	CompleteStep(context.Context, identitydomain.Principal, string, string, string, CompleteStep) (Step, bool, error)
@@ -246,17 +250,38 @@ func (s Service) List(
 	ctx context.Context,
 	p identitydomain.Principal,
 	filter Filter,
-) ([]Execution, error) {
+) ([]Execution, string, error) {
 	if !p.Has(identitydomain.PermissionExecutionRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if filter.SiteID != "" && !p.CanAccessSite(p.OrganizationID, filter.SiteID) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if !p.Has(identitydomain.PermissionExecutionReadAll) || filter.AssignedTo == "me" {
 		filter.AssignedTo = p.ID
 	}
-	return s.Store.List(ctx, p, filter)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.List(ctx, p, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, keyset.Encode(last.UpdatedAt, last.ID), nil
 }
 
 func (s Service) Start(ctx context.Context, p identitydomain.Principal, key, id string, c StartExecution) (Execution, bool, error) {

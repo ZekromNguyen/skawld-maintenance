@@ -3,6 +3,7 @@ export type Principal = {
   display_name: string;
   organization_id: string;
   site_ids: string[];
+  roles?: string[];
   permissions: string[];
 };
 
@@ -27,6 +28,9 @@ export type Asset = {
   criticality?: Criticality;
 };
 
+export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "REOPENED";
+export type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
 export type Incident = {
   id: string;
   site_id: string;
@@ -34,10 +38,82 @@ export type Incident = {
   asset_tag?: string;
   number: string;
   summary: string;
-  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  state: "OPEN" | "IN_PROGRESS" | "RESOLVED";
+  details?: string;
+  priority: Priority;
+  status: IncidentStatus;
+  assignee_id?: string;
+  assignee_name?: string;
+  reporter_id?: string;
+  reporter_name?: string;
+  team_id?: string;
+  team_name?: string;
+  occurred_at?: string;
   detected_at: string;
+  resolved_at?: string;
+  time_to_complete_seconds?: number;
   version: number;
+  custom_values?: Record<string, unknown>;
+  attachments?: Attachment[];
+};
+
+export type Team = { id: string; name: string };
+export type Person = { id: string; display_name: string };
+
+export type CustomFieldType = "TEXT" | "NUMBER" | "DATE" | "SELECT" | "MULTI_SELECT";
+export type CustomFieldStatus = "ACTIVE" | "RETIRED";
+
+export type CustomFieldOption = { label: string; value: string };
+
+export type CustomFieldConfig = {
+  required?: boolean;
+  max_length?: number;
+  regex?: string;
+  min?: number;
+  max?: number;
+  options?: CustomFieldOption[];
+};
+
+export type CustomFieldDefinition = {
+  id: string;
+  entity_type: string;
+  key: string;
+  label: string;
+  description?: string;
+  field_type: CustomFieldType;
+  config: CustomFieldConfig;
+  status: CustomFieldStatus;
+  sort_order: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  retired_at?: string;
+  has_values?: boolean;
+  incident_count?: number;
+};
+
+export type HistoryEntry = {
+  incident_id: string;
+  principal_id: string;
+  value_before?: unknown;
+  value_after: unknown;
+  changed_at: string;
+};
+
+export type Attachment = {
+  id: string;
+  organization_id: string;
+  site_id: string;
+  entity_kind: "EXECUTION" | "OBSERVATION" | "INCIDENT" | "DOCUMENT_REVISION";
+  entity_id: string;
+  original_filename: string;
+  declared_mime: string;
+  verified_mime?: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  state: string;
+  upload_url?: string;
+  upload_headers?: Record<string, string>;
+  download_url?: string;
 };
 
 export type Step = {
@@ -160,6 +236,19 @@ export type EvaluationSummary = {
   generated_at: string;
 };
 
+export type DashboardSummary = {
+  open_incidents: number;
+  in_progress_incidents: number;
+  resolved_incidents: number;
+  total_incidents: number;
+  by_severity: { LOW: number; MEDIUM: number; HIGH: number; CRITICAL: number };
+  active_executions: number;
+  critical_assets: number;
+  pending_handovers: number;
+};
+
+export type ReportContentItem = string | Record<string, unknown>;
+
 export type MaintenanceReport = {
   id: string;
   execution_id: string;
@@ -168,18 +257,24 @@ export type MaintenanceReport = {
   state: "DRAFT" | "SUBMITTED" | "APPROVED";
   structured_content: {
     summary: string;
-    measurements: string[];
-    observations: string[];
-    actions: string[];
+    measurements: ReportContentItem[];
+    observations: ReportContentItem[];
+    actions: ReportContentItem[];
     outcome: string;
     evidence_ids: string[];
-    unknowns: string[];
+    unknowns: ReportContentItem[];
     requires_human_review: boolean;
   };
   evidence: Evidence[];
   provider?: string;
   model?: string;
   prompt_version?: string;
+};
+
+export type HandoverListItem = {
+  title: string;
+  detail?: string;
+  severity?: string;
 };
 
 export type ShiftHandover = {
@@ -191,12 +286,12 @@ export type ShiftHandover = {
   version: number;
   structured_content: {
     summary: string;
-    open_incidents: string[];
-    active_executions: string[];
-    safety_concerns: string[];
-    follow_up: string[];
+    open_incidents: HandoverListItem[];
+    active_executions: HandoverListItem[];
+    safety_concerns: HandoverListItem[];
+    follow_up: HandoverListItem[];
     evidence_ids: string[];
-    unknowns: string[];
+    unknowns: HandoverListItem[];
     requires_human_review: boolean;
   };
   evidence: Evidence[];
@@ -354,6 +449,14 @@ export type WorkflowVersion = {
 };
 
 export type ListResponse<T> = { items: T[] };
+
+export type IncidentListResponse = ListPage<Incident> & {
+  custom_fields: CustomFieldDefinition[];
+};
+
+export type IncidentDetail = Incident & {
+  custom_fields: CustomFieldDefinition[];
+};
 
 export type ListPage<T> = ListResponse<T> & {
   next_cursor: string | null;

@@ -144,6 +144,22 @@ func containsPermission(permissions []Permission, expected Permission) bool {
 	return false
 }
 
+func TestFieldManageIsAdministratorOnly(t *testing.T) {
+	t.Parallel()
+	for _, role := range []Role{RoleAdministrator} {
+		if !containsPermission(PermissionsForRole(role), PermissionFieldManage) {
+			t.Fatalf("%s should have field:manage permission", role)
+		}
+	}
+	for _, role := range []Role{
+		RoleMaintenanceSupervisor, RoleSeniorTechnician, RoleTechnician, RoleManager,
+	} {
+		if containsPermission(PermissionsForRole(role), PermissionFieldManage) {
+			t.Fatalf("%s must not have field:manage permission", role)
+		}
+	}
+}
+
 func TestPermissionsForRoleMatrix(t *testing.T) {
 	t.Parallel()
 	read := []string{
@@ -160,6 +176,7 @@ func TestPermissionsForRoleMatrix(t *testing.T) {
 			"execution:prerequisite:verify",
 			"recommendation:review", "recommendation:run", "report:approve",
 			"report:write", "workflow:publish", "workflow:review",
+			"field:manage",
 		),
 		RoleMaintenanceSupervisor: matrixSet(read,
 			"asset:create", "asset:criticality:approve", "attachment:write",

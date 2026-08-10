@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../../api";
-import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
 import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
 import { PageTrailProvider } from "../layout/PageTrail";
@@ -20,13 +20,13 @@ const STATE_FILTERS: StateFilter[] = ["ALL", "ASSIGNED", "IN_PROGRESS", "COMPLET
 
 export function ExecutionsPage() {
   const { t } = useI18n();
-  const executions = useQuery(() => api.listExecutions().then((list) => list.items));
+  const executions = usePaginatedList((params) => api.listExecutions(params), []);
   const [filter, setFilter] = useState<StateFilter>("ALL");
 
   const rows = useMemo(() => {
-    const items = executions.data ?? [];
+    const items = executions.items;
     return filter === "ALL" ? items : items.filter((execution) => execution.state === filter);
-  }, [executions.data, filter]);
+  }, [executions.items, filter]);
 
   return (
     <PageTrailProvider trail={[]}>
@@ -105,6 +105,17 @@ export function ExecutionsPage() {
           error={executions.error}
           onRetry={() => void executions.refetch()}
         />
+        {executions.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void executions.loadMore()}
+            disabled={executions.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
       </section>
     </PageTrailProvider>
   );

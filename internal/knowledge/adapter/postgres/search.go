@@ -99,7 +99,7 @@ func (s Store) Search(
 			 AND e.provider = $6 AND e.model = $7 AND e.model_version = $8
 			LEFT JOIN asset_context ac ON true
 			WHERE i.organization_id = $1::uuid AND i.site_id = $2::uuid
-			  AND i.state = 'RESOLVED'
+			  AND i.status = 'RESOLVED'
 			  AND (
 			    nullif($3, '') IS NULL OR
 			    lower(a.asset_class) = lower(coalesce(ac.asset_class, ''))

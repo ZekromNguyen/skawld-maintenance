@@ -11,11 +11,12 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorState } from "../ui/ErrorState";
 import { Skeleton } from "../ui/Skeleton";
+import { GatedButton } from "../ui/GatedButton";
 import {
-  severityTone,
-  severityLabelKey,
-  incidentStateTone,
-  incidentStateLabelKey,
+  priorityTone,
+  priorityLabelKey,
+  incidentStatusTone,
+  incidentStatusLabelKey,
   assetStatusTone,
   assetStatusLabelKey,
 } from "../labels";
@@ -78,14 +79,16 @@ export function AssetDetailPage() {
           title={value.tag}
           principal={principal}
           actions={
-            canApprove && value.criticality ? (
-              <button
+            value.criticality ? (
+              <GatedButton
+                allowed={canApprove}
+                reason={t("action.permissionRequired")}
                 className="primary-button"
                 disabled={approve.pending}
                 onClick={() => void approve.run(value.id)}
               >
                 {t("asset.approveCriticality")}
-              </button>
+              </GatedButton>
             ) : undefined
           }
         />
@@ -174,12 +177,12 @@ export function AssetDetailPage() {
                       {
                         key: "severity",
                         header: t("dashboard.table.severity"),
-                        render: (incident) => <StatusBadge tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />,
+                        render: (incident) => <StatusBadge tone={priorityTone(incident.priority)} label={t(priorityLabelKey(incident.priority))} />,
                       },
                       {
                         key: "state",
                         header: t("dashboard.table.state"),
-                        render: (incident) => <StatusBadge tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />,
+                        render: (incident) => <StatusBadge tone={incidentStatusTone(incident.status)} label={t(incidentStatusLabelKey(incident.status))} />,
                       },
                     ]}
                     rows={linkedIncidents}

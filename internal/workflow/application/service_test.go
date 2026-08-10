@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -145,8 +146,9 @@ func (s workflowGatewayStub) Get(
 func (s workflowGatewayStub) List(
 	context.Context,
 	identitydomain.Principal,
-) ([]Version, error) {
-	return []Version{s.current}, nil
+	ListFilter,
+) ([]Version, bool, error) {
+	return []Version{s.current}, false, nil
 }
 
 func (s workflowGatewayStub) Review(
@@ -210,4 +212,56 @@ func (s workflowAuthorityStub) ForSubject(
 	string,
 ) ([]identitydomain.ApprovalAuthority, error) {
 	return s.values, nil
+}
+
+func TestWorkflowCursorRoundTrip(t *testing.T) {
+	t.Parallel()
+	createdAt := time.Date(2026, 8, 6, 12, 0, 0, 123456789, time.UTC)
+	const workflowID = "00000000-0000-0000-0000-000000000010"
+	cursor := encodeWorkflowCursor(createdAt, workflowID, 3)
+	gotTime, gotID, gotVersion, err := decodeWorkflowCursor(cursor)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !gotTime.Equal(createdAt) || gotID != workflowID || gotVersion != 3 {
+		t.Fatalf("round trip = %v %q %d, want %v %q 3",
+			gotTime, gotID, gotVersion, createdAt, workflowID)
+	}
+}
+
+func TestWorkflowCursorRejectsMalformed(t *testing.T) {
+	t.Parallel()
+	workflowID := "00000000-0000-0000-0000-000000000010"
+	cases := []string{
+		"%%%",
+		base64.RawURLEncoding.EncodeToString([]byte(`{"t":"","w":"` + workflowID + `","v":1}`)),
+		base64.RawURLEncoding.EncodeToString([]byte(`{"t":"not-a-time","w":"` + workflowID + `","v":1}`)),
+		base64.RawURLEncoding.EncodeToString([]byte(`{"t":"2026-08-06T12:00:00Z","w":"not-a-uuid","v":1}`)),
+		base64.RawURLEncoding.EncodeToString([]byte(`{"t":"2026-08-06T12:00:00Z","w":"` + workflowID + `","v":0}`)),
+	}
+	for _, raw := range cases {
+		if _, _, _, err := decodeWorkflowCursor(raw); err == nil {
+			t.Fatalf("expected error for cursor %q", raw)
+		}
+	}
+}
+
+func TestServiceListRejectsMalformedCursor(t *testing.T) {
+	t.Parallel()
+	principal := identitydomain.Principal{
+		ID: "principal-1", OrganizationID: "organization-1",
+		Permissions: map[identitydomain.Permission]struct{}{
+			identitydomain.PermissionWorkflowRead: {},
+		},
+	}
+	service := Service{
+		Gateway: workflowGatewayStub{current: Version{
+			WorkflowID: "00000000-0000-0000-0000-000000000010", Version: 1,
+		}},
+	}
+	if _, _, err := service.List(
+		context.Background(), principal, ListFilter{Cursor: "%%%"},
+	); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("malformed cursor error = %v, want ErrInvalid", err)
+	}
 }

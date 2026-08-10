@@ -8,6 +8,7 @@ import (
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	knowledgedomain "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/domain"
+	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/keyset"
 )
 
 var (
@@ -48,14 +49,16 @@ type RequestIngestion struct {
 }
 
 type Filter struct {
-	SiteID string
+	SiteID   string
+	PageSize int
+	Cursor   string
 }
 
 type Store interface {
 	CreateDocument(context.Context, identitydomain.Principal, string, CreateDocument) (knowledgedomain.Document, bool, error)
 	CreateRevision(context.Context, identitydomain.Principal, string, string, CreateRevision) (knowledgedomain.Revision, bool, error)
 	GetDocument(context.Context, identitydomain.Principal, string) (knowledgedomain.Document, error)
-	ListDocuments(context.Context, identitydomain.Principal, Filter) ([]knowledgedomain.Document, error)
+	ListDocuments(context.Context, identitydomain.Principal, Filter) ([]knowledgedomain.Document, bool, error)
 	ApproveRevision(context.Context, identitydomain.Principal, string, string, ApproveRevision) (knowledgedomain.Revision, bool, error)
 	RetireRevision(context.Context, identitydomain.Principal, string, string, RetireRevision) (knowledgedomain.Revision, bool, error)
 	RequestIngestion(context.Context, identitydomain.Principal, string, string, RequestIngestion) (knowledgedomain.Revision, bool, error)
@@ -226,15 +229,36 @@ func (s Service) ListDocuments(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter Filter,
-) ([]knowledgedomain.Document, error) {
+) ([]knowledgedomain.Document, string, error) {
 	if !principal.Has(identitydomain.PermissionKnowledgeRead) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
 	if filter.SiteID != "" &&
 		!principal.CanAccessSite(principal.OrganizationID, filter.SiteID) {
-		return nil, ErrForbidden
+		return nil, "", ErrForbidden
 	}
-	return s.Store.ListDocuments(ctx, principal, filter)
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	if filter.Cursor != "" {
+		key, err := keyset.Decode(filter.Cursor)
+		if err != nil {
+			return nil, "", ErrInvalid
+		}
+		filter.Cursor = key.Timestamp.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+	}
+	items, hasMore, err := s.Store.ListDocuments(ctx, principal, filter)
+	if err != nil {
+		return nil, "", err
+	}
+	if !hasMore || len(items) == 0 {
+		return items, "", nil
+	}
+	last := items[len(items)-1]
+	return items, keyset.Encode(last.UpdatedAt, last.ID), nil
 }
 
 func (s Service) Search(

@@ -205,3 +205,39 @@ manifest, uploads the object at the generated key, and completes the upload so
 size/checksum/MIME verification runs. `verified_mime` is persisted normalized
 (`text/plain`), which document ingestion requires. See the MIME regression
 test in `internal/attachment/adapter/postgres/mime_test.go`.
+
+## Importing external asset data (cmd/import)
+
+`go run ./cmd/import -snapshot <file.ndjson> -site-id <uuid> -database-url "$DATABASE_URL"`
+projects external asset records from an EAM/CMMS snapshot into the site as
+`EXTERNAL_REFERENCE` assets. Use `-external-subject` to pick the administrator
+principal (default `import-admin`; `seed-admin` also works), `-limit` to bound
+page size (1-500, default 100), and `-cursor` to resume an interrupted import.
+The snapshot may use the `REPLACED_BY_PRINCIPAL` / `REPLACED_BY_SITE`
+placeholders shown in `test/fixtures/import-p302.ndjson`; the CLI rewrites
+them to the running principal's organization and site. Re-running the same
+snapshot is safe: matching external versions are skipped.
+
+## Demo corpus verification
+
+After `make seed`, confirm each artifact landed end-to-end. Sign in as one of
+the per-role demo accounts (`dev.supervisor` / `dev.senior` / `dev.manager`)
+and check the supervisor console, or query the API directly with a session
+cookie. The seed is idempotent, so re-running it and re-verifying is safe.
+
+| Seed artifact | How to verify |
+|---|---|
+| Organization + site | `GET /api/v1/me` shows the demo `organization_id` and `site_ids` (incl. `PLANT-A`); the console header shows "Demo Maintenance Co. / Plant A" |
+| Asset P-302 | `GET /api/v1/assets?site_id=<site>` lists `P-302` with approved criticality A; Asset detail shows components `MTR-BRG` / `PUMP-BRG` |
+| Incident | `GET /api/v1/incidents?site_id=<site>` lists "High vibration on P-302 motor bearing" (severity HIGH, OPEN; the seed does not resolve it) |
+| Execution | `GET /api/v1/executions?site_id=<site>` lists the P-302 execution COMPLETED with the `8.1 mm/s` vibration and `94 °C` temperature measurements |
+| SOP document | `GET /api/v1/documents?site_id=<site>` shows "P-302 Bearing Lubrication SOP" with an APPROVED revision in `READY` ingestion state; Search returns it as evidence |
+| Recommendation + correction | `GET /api/v1/recommendations/{recommendationID}` (the seed prints the id) shows the correlated recommendation and its `CORRECTED` feedback; alternatively the incident timeline in the console |
+| Report | `GET /api/v1/reports?site_id=<site>` shows the drafted/submitted/approved maintenance report |
+| Handover | `GET /api/v1/handovers?site_id=<site>` shows the prepared/submitted/accepted shift handover |
+| Demonstrations | `GET /api/v1/demonstrations?site_id=<site>` shows 2 completed demonstrations with `review_status` APPROVED and a non-empty event timeline |
+| Workflow | `GET /api/v1/workflows` shows "High vibration centrifugal pump inspection" PUBLISHED; `GET /api/v1/workflows/applicable?asset_id=<P-302>` returns it |
+
+If any row cannot be confirmed, fix the seed (or the UI) rather than
+inventing coverage: the demo must be reproducible from an empty database by
+`make seed` alone (see `Makefile` and the cleanup section below).

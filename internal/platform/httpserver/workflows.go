@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	workflowapp "github.com/ZekromNguyen/skawld-maintenance/internal/workflow/application"
@@ -66,12 +67,24 @@ func listWorkflows(service workflowapp.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		values, err := service.List(r.Context(), principal)
+		pageSize, ok := parsePageSize(w, r)
+		if !ok {
+			return
+		}
+		filter := workflowapp.ListFilter{
+			PageSize: pageSize,
+			Cursor:   strings.TrimSpace(r.URL.Query().Get("cursor")),
+		}
+		items, next, err := service.List(r.Context(), principal, filter)
 		if err != nil {
 			writeWorkflowError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{"items": values})
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"items":       items,
+			"next_cursor": nullableString(next),
+			"has_more":    next != "",
+		})
 	}
 }
 

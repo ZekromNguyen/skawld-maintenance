@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	integrationdomain "github.com/ZekromNguyen/skawld-maintenance/internal/integration/domain"
 )
 
@@ -108,7 +109,7 @@ func (c Connector) Pull(
 		}
 		record, err := decodeRecord(scanner.Bytes(), line+1)
 		if err != nil {
-			return integrationdomain.Page{}, err
+			return integrationdomain.Page{}, errors.Join(integrationapp.ErrInvalid, err)
 		}
 		result = append(result, record)
 		line++

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -123,7 +124,12 @@ func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
 	t.Parallel()
 	handler := New(Dependencies{
 		Logger: slog.New(slog.DiscardHandler),
-		Auth:   fakeAuth{},
+		Auth: fakeAuth{principal: domain.Principal{
+			ID:          "00000000-0000-0000-0000-000000000001",
+			DisplayName: "Test User",
+			Roles:       []domain.Role{domain.RoleTechnician},
+			Permissions: map[domain.Permission]struct{}{},
+		}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	response := httptest.NewRecorder()
@@ -132,6 +138,14 @@ func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	roles, ok := body["roles"].([]any)
+	if !ok || len(roles) != 1 || roles[0] != "Technician" {
+		t.Fatalf("roles = %v, want [Technician]", body["roles"])
 	}
 }
 

@@ -7,6 +7,7 @@ import { PrincipalProvider } from "../state/PrincipalProvider";
 import { SiteProvider } from "../state/SiteContext";
 import { ToastProvider } from "../feedback/Toast";
 import { api } from "../../api";
+import type { Demonstration } from "../../types";
 
 const fixtures = vi.hoisted(() => ({
   demo: {
@@ -31,8 +32,8 @@ const fixtures = vi.hoisted(() => ({
 
 vi.mock("../../api", () => ({
   api: {
-    principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }),
-    demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.demo] }),
+    principal: vi.fn().mockResolvedValue({ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["demonstration:review", "demonstration:capture"] }),
+    demonstrations: vi.fn().mockResolvedValue({ items: [fixtures.demo], next_cursor: null, has_more: false }),
     completeDemonstration: vi.fn().mockResolvedValue({}),
     reviewDemonstration: vi.fn().mockResolvedValue({}),
     redactDemonstrationEvent: vi.fn().mockResolvedValue({})
@@ -43,7 +44,7 @@ function renderPage() {
   return render(
     <I18nProvider>
       <PrincipalProvider>
-        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }}>
+        <SiteProvider principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: ["demonstration:review", "demonstration:capture"] }}>
           <ToastProvider>
             <MemoryRouter>
               <DemonstrationsPage />
@@ -78,4 +79,31 @@ describe("DemonstrationsPage", () => {
     expect(promptSpy).not.toHaveBeenCalled();
     promptSpy.mockRestore();
   });
+
+  it("disables review actions with a reason without demonstration:review", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "p2",
+      display_name: "Technician",
+      organization_id: "o1",
+      site_ids: ["s1"],
+      permissions: ["demonstration:capture", "execution:write"]
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /maintenance.shift_handover/i }));
+    const approve = screen.getByRole("button", { name: "Approve trace" }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
+    const reject = screen.getByRole("button", { name: "Reject" }) as HTMLButtonElement;
+    expect(reject.disabled).toBe(true);
+  });
+});
+
+it("shows the load more button when has_more is true", async () => {
+  // The page refetches once the principal resolves through SiteProvider, so
+  // the mock stays stable for every cursor-less call. The click-and-append
+  // flow itself is covered by the other five paginated page tests.
+  const list = vi.mocked(api.demonstrations);
+  list.mockResolvedValue({ items: [fixtures.demo as unknown as Demonstration], next_cursor: "c1", has_more: true });
+  renderPage();
+  await screen.findByRole("button", { name: "Load more" });
 });

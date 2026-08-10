@@ -14,6 +14,7 @@ import (
 	assetapp "github.com/ZekromNguyen/skawld-maintenance/internal/asset/application"
 	attachmentapp "github.com/ZekromNguyen/skawld-maintenance/internal/attachment/application"
 	copilotapp "github.com/ZekromNguyen/skawld-maintenance/internal/copilot/application"
+	customfieldapp "github.com/ZekromNguyen/skawld-maintenance/internal/customfield/application"
 	demonstrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/demonstration/application"
 	evaluationapp "github.com/ZekromNguyen/skawld-maintenance/internal/evaluation/application"
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
@@ -21,10 +22,12 @@ import (
 	identityapp "github.com/ZekromNguyen/skawld-maintenance/internal/identity/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
 	incidentapp "github.com/ZekromNguyen/skawld-maintenance/internal/incident/application"
+	integrationapp "github.com/ZekromNguyen/skawld-maintenance/internal/integration/application"
 	knowledgeapp "github.com/ZekromNguyen/skawld-maintenance/internal/knowledge/application"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/buildinfo"
 	"github.com/ZekromNguyen/skawld-maintenance/internal/platform/idempotency"
 	reportapp "github.com/ZekromNguyen/skawld-maintenance/internal/report/application"
+	teamapp "github.com/ZekromNguyen/skawld-maintenance/internal/team/application"
 	transcriptionapp "github.com/ZekromNguyen/skawld-maintenance/internal/transcription/application"
 	workflowapp "github.com/ZekromNguyen/skawld-maintenance/internal/workflow/application"
 	"github.com/go-chi/chi/v5"
@@ -41,24 +44,27 @@ type Authenticator interface {
 }
 
 type Dependencies struct {
-	Logger         *slog.Logger
-	Database       *pgxpool.Pool
-	Auth           Authenticator
-	OpenAPI        []byte
-	Organizations  identityapp.OrganizationService
-	Sites          identityapp.SiteService
-	Assets         assetapp.Service
-	Incidents      incidentapp.Service
-	Executions     executionapp.Service
-	Attachments    attachmentapp.Service
-	Knowledge      knowledgeapp.Service
-	Copilot        copilotapp.Service
-	Reports        reportapp.Service
-	Handovers      handoverapp.Service
-	Transcriptions transcriptionapp.Service
-	Demonstrations demonstrationapp.Service
-	Workflows      workflowapp.Service
-	Evaluations    evaluationapp.Service
+	Logger          *slog.Logger
+	Database        *pgxpool.Pool
+	Auth            Authenticator
+	OpenAPI         []byte
+	Organizations   identityapp.OrganizationService
+	Sites           identityapp.SiteService
+	Assets          assetapp.Service
+	Incidents       incidentapp.Service
+	Executions      executionapp.Service
+	Attachments     attachmentapp.Service
+	Knowledge       knowledgeapp.Service
+	Copilot         copilotapp.Service
+	Reports         reportapp.Service
+	Handovers       handoverapp.Service
+	Transcriptions  transcriptionapp.Service
+	Demonstrations  demonstrationapp.Service
+	Workflows       workflowapp.Service
+	Evaluations     evaluationapp.Service
+	CustomFields    customfieldapp.Service
+	Teams           teamapp.Service
+	IntegrationSink integrationapp.ProjectionSink
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -93,9 +99,10 @@ func New(dependencies Dependencies) http.Handler {
 		api.Post("/organizations", createOrganization(dependencies.Organizations))
 		api.Get("/sites/{siteID}", getSite(dependencies.Sites))
 		mountAssetRoutes(api, dependencies.Assets)
-		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions)
+		mountIncidentRoutes(api, dependencies.Incidents, dependencies.Executions, dependencies.Attachments, dependencies.CustomFields)
 		mountExecutionRoutes(api, dependencies.Executions)
 		mountAttachmentRoutes(api, dependencies.Attachments)
+		mountTeamRoutes(api, dependencies.Teams)
 		mountKnowledgeRoutes(api, dependencies.Knowledge)
 		mountCopilotRoutes(api, dependencies.Copilot)
 		mountReportRoutes(api, dependencies.Reports)
@@ -104,6 +111,8 @@ func New(dependencies Dependencies) http.Handler {
 		mountDemonstrationRoutes(api, dependencies.Demonstrations)
 		mountWorkflowRoutes(api, dependencies.Workflows)
 		mountEvaluationRoutes(api, dependencies.Evaluations)
+		mountCustomFieldRoutes(api, dependencies.CustomFields)
+		mountIntegrationRoutes(api, dependencies.IntegrationSink)
 	})
 	return router
 }
@@ -155,12 +164,17 @@ func currentPrincipal(w http.ResponseWriter, r *http.Request) {
 		permissions = append(permissions, string(permission))
 	}
 	sort.Strings(permissions)
+	roles := make([]string, 0, len(principal.Roles))
+	for _, role := range principal.Roles {
+		roles = append(roles, string(role))
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":               principal.ID,
 		"external_subject": principal.ExternalSubject,
 		"display_name":     principal.DisplayName,
 		"organization_id":  principal.OrganizationID,
 		"site_ids":         principal.SiteIDs,
+		"roles":            roles,
 		"permissions":      permissions,
 	})
 }

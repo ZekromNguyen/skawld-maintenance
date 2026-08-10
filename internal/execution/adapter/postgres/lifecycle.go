@@ -26,7 +26,7 @@ func (s Store) Create(
 			var organizationID, siteID, assetID, assetTag, assetClass, incidentState string
 			err := tx.QueryRow(ctx, `
 				SELECT i.organization_id::text, i.site_id::text, i.asset_id::text,
-				       a.tag, a.asset_class, i.state
+				       a.tag, a.asset_class, i.status
 				FROM incidents i
 				JOIN assets a ON a.id = i.asset_id
 				WHERE i.id = $1::uuid
@@ -93,7 +93,7 @@ func (s Store) Create(
 			if incidentState == "OPEN" {
 				if _, err := tx.Exec(ctx, `
 					UPDATE incidents
-					SET state = 'IN_PROGRESS', version = version + 1, updated_at = $2
+					SET status = 'IN_PROGRESS', version = version + 1, updated_at = $2
 					WHERE id = $1::uuid
 				`, command.IncidentID, now); err != nil {
 					return executionapp.Execution{}, err

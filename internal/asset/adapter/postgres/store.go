@@ -223,7 +223,8 @@ func (s Store) Get(
 			coalesce(r.parent_asset_id::text, ''), a.tag, a.name, a.asset_class,
 			coalesce(a.manufacturer, ''), coalesce(a.model, ''), a.status,
 			a.source_of_truth, coalesce(a.external_system, ''),
-			coalesce(a.external_id, ''), coalesce(a.external_version, ''), a.version
+			coalesce(a.external_id, ''), coalesce(a.external_version, ''), a.version,
+			a.created_at
 		FROM assets a
 		LEFT JOIN asset_relationships r
 		  ON r.child_asset_id = a.id AND r.relationship_type = 'CONTAINS'
@@ -247,14 +248,15 @@ func (s Store) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter application.Filter,
-) ([]application.Asset, error) {
-	rows, err := s.Pool.Query(ctx, `
+) ([]application.Asset, bool, error) {
+	query := `
 		SELECT
 			a.id::text, a.organization_id::text, a.site_id::text,
 			coalesce(r.parent_asset_id::text, ''), a.tag, a.name, a.asset_class,
 			coalesce(a.manufacturer, ''), coalesce(a.model, ''), a.status,
 			a.source_of_truth, coalesce(a.external_system, ''),
-			coalesce(a.external_id, ''), coalesce(a.external_version, ''), a.version
+			coalesce(a.external_id, ''), coalesce(a.external_version, ''), a.version,
+			a.created_at
 		FROM assets a
 		LEFT JOIN asset_relationships r
 		  ON r.child_asset_id = a.id AND r.relationship_type = 'CONTAINS'
@@ -266,26 +268,43 @@ func (s Store) List(
 		      OR a.tag ILIKE '%' || $4 || '%'
 		      OR a.name ILIKE '%' || $4 || '%'
 		      OR a.asset_class ILIKE '%' || $4 || '%'
-		  )
-		ORDER BY a.tag
-		LIMIT 200
-	`, principal.OrganizationID, principal.SiteIDs, filter.SiteID, strings.TrimSpace(filter.Query))
+		  )`
+	args := []any{
+		principal.OrganizationID, principal.SiteIDs,
+		filter.SiteID, strings.TrimSpace(filter.Query),
+	}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, application.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (a.created_at, a.id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY a.created_at DESC, a.id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list assets: %w", err)
+		return nil, false, fmt.Errorf("list assets: %w", err)
 	}
 	defer rows.Close()
-	var result []application.Asset
+	result := make([]application.Asset, 0, filter.PageSize+1)
 	for rows.Next() {
 		asset, err := scanAsset(rows)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, asset)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate assets: %w", err)
+		return nil, false, fmt.Errorf("iterate assets: %w", err)
 	}
-	return result, nil
+	hasMore := len(result) > filter.PageSize
+	if hasMore {
+		result = result[:filter.PageSize]
+	}
+	return result, hasMore, nil
 }
 
 func (s Store) ApproveCriticality(
@@ -409,7 +428,7 @@ func scanAsset(row scanner) (application.Asset, error) {
 		&asset.ID, &asset.OrganizationID, &asset.SiteID, &asset.ParentAssetID,
 		&asset.Tag, &asset.Name, &asset.Class, &asset.Manufacturer, &asset.Model,
 		&asset.Status, &asset.SourceOfTruth, &externalSystem, &externalID,
-		&externalVersion, &asset.Version,
+		&externalVersion, &asset.Version, &asset.CreatedAt,
 	)
 	if err != nil {
 		return application.Asset{}, err

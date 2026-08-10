@@ -20,6 +20,34 @@ describe("CommandPalette", () => {
     expect(screen.getAllByRole("option").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("opens with / when not typing in an input", async () => {
+    render(
+      <I18nProvider>
+        <MemoryRouter>
+          <CommandPalette principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }} />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    fireEvent.keyDown(window, { key: "/" });
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  it("does not open with / while typing in an input", async () => {
+    render(
+      <I18nProvider>
+        <MemoryRouter>
+          <CommandPalette principal={{ id: "p1", display_name: "T", organization_id: "o1", site_ids: ["s1"], permissions: [] }} />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: "/" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    document.body.removeChild(input);
+  });
+
   it("runs the highlighted command on Enter", async () => {
     render(
       <I18nProvider>

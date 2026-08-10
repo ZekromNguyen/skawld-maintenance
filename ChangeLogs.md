@@ -4,6 +4,50 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-10 — Custom fields spec gap closure
+
+- Incident list filters on NUMBER custom fields now accept `min:max` ranges
+  (open bounds supported) in addition to exact matches.
+- The retire dialog shows how many incidents currently hold values for the
+  field.
+- Retired fields no longer appear in the incident form and are hidden in the
+  admin list by default (with a "Show retired" toggle).
+- Custom field values moved from a queue column into an expandable per-row
+  "Fields" disclosure, and custom field filters are now persisted in saved
+  views.
+
+### 2026-08-09 — Custom fields core (tenant-configurable incident fields)
+
+- Tenant administrators can now define custom fields on incidents
+  (TEXT/NUMBER/DATE/SELECT/MULTI_SELECT) through a new `/admin/custom-fields`
+  page, gated by a new Administrator-only `field:manage` permission.
+- Field definitions are org-scoped; keys are immutable; once an incident holds
+  a value the field type and config lock and the field can only be retired,
+  keeping all values and history.
+- Incident create form renders the tenant's active fields dynamically; values
+  are validated server-side (type, required, length, regex, range, options),
+  stored in a JSONB `custom_values` column with a full audit history, and
+  surfaced on the detail page and queue rows.
+- Incident list supports `custom_field.<key>` filter parameters, joined with
+  existing saved-view filters.
+
+### 2026-08-08 — Jira-style console chrome and per-role authorization screens
+
+- Restyled the console top bar into a Jira-like app frame: the brand moved
+  from the sidebar into the header, the command-palette trigger is a centered
+  search field, and a permission-gated "Create" menu (New incident / New
+  asset) deep-links to the existing create dialogs via `?create=1`.
+- Added an avatar account menu (initials, roles, Profile, Theme, Sign out)
+  and a new `/account` page showing identity, role badges, and the
+  principal's real permissions grouped by area, plus a demo role preview
+  switcher for the five pilot roles. Preview overlays the role's permission
+  mirror for navigation only; the API still enforces real permissions.
+- Added explicit authorization screens: `/me` now returns `roles`, and
+  `AuthorizedRoute` renders a Jira-style lock screen (roles + missing
+  permission) instead of a failing fetch when a route is out of scope.
+  Sidebar nav gating now mirrors backend enforcement: Reports requires
+  `report:write` OR `report:approve`, Quality requires `recommendation:review`.
+
 ### 2026-08-05 — RP-initiated logout, id_token-bound web sessions, console sign-out, login-loop fix
 
 - Web sessions now persist the OIDC `id_token` (migration `00011` adds a

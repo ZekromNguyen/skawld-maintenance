@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
@@ -20,6 +20,11 @@ export function DataTable<T>({
   error,
   onRetry,
   onRowClick,
+  rowClassName,
+  selectedKey,
+  expandedKey,
+  expandedRow,
+  onTableKeyDown,
 }: {
   columns: Array<Column<T>>;
   rows: T[];
@@ -30,6 +35,11 @@ export function DataTable<T>({
   error?: string;
   onRetry?: () => void;
   onRowClick?: (row: T) => void;
+  rowClassName?: (row: T) => string;
+  selectedKey?: string | null;
+  expandedKey?: string | null;
+  expandedRow?: (row: T) => ReactNode;
+  onTableKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
 
@@ -55,8 +65,9 @@ export function DataTable<T>({
   if (sorted.length === 0) {
     return <EmptyState title={emptyTitle} body={emptyBody} />;
   }
+  const clickableRows = onRowClick != null;
   return (
-    <div className="table-wrap">
+    <div className="table-wrap" onKeyDown={onTableKeyDown} tabIndex={clickableRows ? 0 : undefined}>
       <table>
         <thead>
           <tr>
@@ -93,16 +104,34 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row) => (
-            <tr
-              key={rowKey(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-            >
-              {columns.map((column) => (
-                <td key={column.key}>{column.render(row)}</td>
-              ))}
-            </tr>
-          ))}
+          {sorted.map((row) => {
+            const key = rowKey(row);
+            const selected = selectedKey != null && selectedKey === key;
+            const clickable = onRowClick != null;
+            return (
+              <Fragment key={key}>
+                <tr
+                  className={[
+                    rowClassName?.(row),
+                    selected ? "data-row selected" : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  aria-selected={selected || undefined}
+                >
+                  {columns.map((column) => (
+                    <td key={column.key}>{column.render(row)}</td>
+                  ))}
+                </tr>
+                {expandedKey === key && expandedRow ? (
+                  <tr className="data-row-detail">
+                    <td colSpan={columns.length}>{expandedRow(row)}</td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

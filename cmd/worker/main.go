@@ -43,12 +43,26 @@ func main() {
 		logger.Error("worker object storage startup failed", "error", err)
 		os.Exit(1)
 	}
+	_, embeddingProvider, err := skawld.BuildProviders(
+		skawld.AIConfig{
+			EmbeddingProvider:     cfg.AI.EmbeddingProvider,
+			StructuredAPIKey:      cfg.AI.APIKey,
+			EmbeddingEndpoint:     cfg.AI.EmbeddingEndpoint,
+			EmbeddingModel:        cfg.AI.EmbeddingModel,
+			EmbeddingModelVersion: cfg.AI.EmbeddingModelVersion,
+		},
+		&http.Client{Timeout: 30 * time.Second},
+	)
+	if err != nil {
+		logger.Error("AI provider startup failed", "error", err)
+		os.Exit(1)
+	}
 	processor := ingest.Processor{
 		Pool: pool, Objects: objectStore,
 		Extractor: ingest.BoundedExtractor{
 			PDFToTextBinary: cfg.Documents.PDFToTextBinary,
 		},
-		Embeddings: skawld.DeterministicEmbeddingProvider{Dimensions: 64},
+		Embeddings: embeddingProvider,
 		IDs:        id.UUID{}, Clock: clock.System{}, Audit: audit.Sink{},
 	}
 	var transcriptionProvider skawld.TranscriptionProvider = skawld.UnavailableTranscriptionProvider{}

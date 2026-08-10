@@ -17,9 +17,33 @@ const fixtures = vi.hoisted(() => ({
     state: "DRAFT" as const,
     structured_content: {
       summary: "Pump inspection R1",
-      measurements: ["8.1 mm/s"],
-      observations: [],
-      actions: [],
+      measurements: [
+        {
+          id: "m1",
+          type: "VIBRATION_VELOCITY",
+          value: "8.1",
+          unit: "MM_PER_S",
+          quality: "GOOD",
+          observed_at: "2026-08-04T09:40:09+00:00"
+        }
+      ],
+      observations: [
+        {
+          id: "o1",
+          narrative: "Bearing housing shows slight grease staining",
+          verification: "UNVERIFIED",
+          observed_at: "2026-08-04T09:40:09+00:00"
+        }
+      ],
+      actions: [
+        {
+          id: "a1",
+          type: "LUBRICATED",
+          narrative: "Re-greased motor-side bearing",
+          outcome: "COMPLETED",
+          performed_at: "2026-08-04T09:40:09+00:00"
+        }
+      ],
       outcome: "",
       evidence_ids: [],
       unknowns: ["root cause unconfirmed"],
@@ -69,6 +93,21 @@ describe("ReportDetailPage", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeTruthy();
   });
 
+  it("renders structured entries as readable information instead of raw JSON", async () => {
+    renderDetail();
+    await screen.findByText("Pump inspection R1");
+    expect(screen.getByText("8.1 mm/s")).toBeTruthy();
+    expect(screen.getByText("Vibration velocity")).toBeTruthy();
+    expect(screen.getByText("Good data")).toBeTruthy();
+    expect(screen.getByText("Bearing housing shows slight grease staining")).toBeTruthy();
+    expect(screen.getByText("Unverified")).toBeTruthy();
+    expect(screen.getByText("Re-greased motor-side bearing")).toBeTruthy();
+    expect(screen.getByText("Completed")).toBeTruthy();
+    expect(screen.getByText("Lubricated")).toBeTruthy();
+    expect(screen.queryByText(/observed_at/)).toBeNull();
+    expect(screen.queryByText(/VIBRATION_VELOCITY/)).toBeNull();
+  });
+
   it("submits with a success toast", async () => {
     renderDetail();
     fireEvent.click(await screen.findByRole("button", { name: "Submit" }));
@@ -93,5 +132,35 @@ describe("ReportDetailPage", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
     await waitFor(() => expect(api.approveReport as ReturnType<typeof vi.fn>).toHaveBeenCalledWith("r1"));
     expect(screen.getByText("Report approved")).toBeTruthy();
+  });
+
+  it("disables submit with a reason without report:write", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Manager",
+      site_ids: ["s1"],
+      permissions: ["report:approve", "handover:accept"]
+    });
+    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue(fixtures.report);
+    renderDetail();
+    await screen.findByText("Pump inspection R1");
+    const submit = screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    expect(submit.title).toBe("Required permission not granted");
+  });
+
+  it("disables approve with a reason without report:approve", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: "p3",
+      display_name: "Technician",
+      site_ids: ["s1"],
+      permissions: ["report:write", "execution:write"]
+    });
+    (api.report as ReturnType<typeof vi.fn>).mockResolvedValue({ ...fixtures.report, state: "SUBMITTED" });
+    renderDetail();
+    await screen.findByText("Pump inspection R1");
+    const approve = screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
   });
 });

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	executionapp "github.com/ZekromNguyen/skawld-maintenance/internal/execution/application"
 	identitydomain "github.com/ZekromNguyen/skawld-maintenance/internal/identity/domain"
@@ -28,45 +29,65 @@ func (s Store) List(
 	ctx context.Context,
 	principal identitydomain.Principal,
 	filter executionapp.Filter,
-) ([]executionapp.Execution, error) {
-	rows, err := s.Pool.Query(ctx, `
+) ([]executionapp.Execution, bool, error) {
+	if filter.PageSize <= 0 {
+		filter.PageSize = 25
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	query := `
 		SELECT e.id::text
 		FROM maintenance_executions e
 		WHERE e.organization_id = $1::uuid
 		  AND (COALESCE(cardinality($2::uuid[]), 0) = 0 OR e.site_id = ANY($2::uuid[]))
 		  AND (nullif($3, '') IS NULL OR e.site_id = $3::uuid)
 		  AND (nullif($4, '') IS NULL OR e.state = $4)
-		  AND (nullif($5, '') IS NULL OR e.assigned_to = $5::uuid)
-		ORDER BY e.updated_at DESC
-		LIMIT 100
-	`, principal.OrganizationID, principal.SiteIDs, filter.SiteID,
-		filter.State, filter.AssignedTo)
+		  AND (nullif($5, '') IS NULL OR e.assigned_to = $5::uuid)`
+	args := []any{principal.OrganizationID, principal.SiteIDs,
+		filter.SiteID, filter.State, filter.AssignedTo}
+	if filter.Cursor != "" {
+		cut := strings.LastIndex(filter.Cursor, "|")
+		if cut < 0 {
+			return nil, false, executionapp.ErrInvalid
+		}
+		args = append(args, filter.Cursor[:cut], filter.Cursor[cut+1:])
+		query += fmt.Sprintf(" AND (e.updated_at, e.id) < ($%d, $%d::uuid)", len(args)-1, len(args))
+	}
+	args = append(args, filter.PageSize+1)
+	query += fmt.Sprintf(" ORDER BY e.updated_at DESC, e.id DESC LIMIT $%d", len(args))
+
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var ids []string
 	for rows.Next() {
 		var executionID string
 		if err := rows.Scan(&executionID); err != nil {
 			rows.Close()
-			return nil, err
+			return nil, false, err
 		}
 		ids = append(ids, executionID)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return nil, err
+		return nil, false, err
 	}
 	rows.Close()
+	hasMore := len(ids) > filter.PageSize
+	if hasMore {
+		ids = ids[:filter.PageSize]
+	}
 	result := make([]executionapp.Execution, 0, len(ids))
 	for _, executionID := range ids {
 		value, err := loadExecution(ctx, s.Pool, principal, executionID, false)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, value)
 	}
-	return result, nil
+	return result, hasMore, nil
 }
 
 func loadExecution(
@@ -85,7 +106,8 @@ func loadExecution(
 		SELECT e.id::text, e.organization_id::text, e.site_id::text,
 		       coalesce(e.incident_id::text, ''), e.asset_id::text, a.tag,
 		       e.purpose, e.state, coalesce(e.assigned_to::text, ''), e.version,
-		       e.started_at, e.completed_at, coalesce(e.outcome_summary, '')
+		       e.started_at, e.completed_at, coalesce(e.outcome_summary, ''),
+		       e.updated_at
 		FROM maintenance_executions e
 		JOIN assets a ON a.id = e.asset_id
 		WHERE e.id = $1::uuid
@@ -95,7 +117,7 @@ func loadExecution(
 		&value.ID, &value.OrganizationID, &value.SiteID, &value.IncidentID,
 		&value.AssetID, &value.AssetTag, &value.Purpose, &value.State,
 		&value.AssignedTo, &value.Version, &value.StartedAt, &value.CompletedAt,
-		&value.OutcomeSummary,
+		&value.OutcomeSummary, &value.UpdatedAt,
 	)
 	if err != nil {
 		return executionapp.Execution{}, err

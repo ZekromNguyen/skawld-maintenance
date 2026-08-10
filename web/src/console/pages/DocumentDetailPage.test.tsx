@@ -75,4 +75,21 @@ describe("DocumentDetailPage", () => {
     await screen.findByRole("heading", { level: 2, name: "LOTO Procedure" });
     expect(screen.getAllByRole("button", { name: "Retire" }).length).toBe(1);
   });
+
+  it("disables approve and retire with a reason without knowledge permissions", async () => {
+    (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p2",
+      display_name: "Senior Tech",
+      site_ids: ["s1"],
+      permissions: ["knowledge:read", "execution:write"]
+    });
+    renderDetail();
+    await screen.findByRole("heading", { level: 2, name: "LOTO Procedure" });
+    const approve = screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(approve.title).toBe("Required permission not granted");
+    const retire = screen.getByRole("button", { name: "Retire" }) as HTMLButtonElement;
+    expect(retire.disabled).toBe(true);
+    expect(retire.title).toBe("Required permission not granted");
+  });
 });

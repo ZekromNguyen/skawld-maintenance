@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { Kanban, CaretDown, MagnifyingGlass, Rows } from "@phosphor-icons/react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
+import { usePaginatedList } from "../usePaginatedList";
+import { formatCustomValue } from "../components/customFieldFormat";
 import { useCommand } from "../useCommand";
+import { useListKeyboard } from "../useListKeyboard";
 import { usePrincipal } from "../usePrincipal";
 import { useI18n } from "../../i18n/I18nProvider";
 import { PageHeader } from "../layout/PageHeader";
@@ -11,17 +15,52 @@ import { Dialog } from "../feedback/Dialog";
 import { DataTable } from "../ui/DataTable";
 import { StatusBadge } from "../ui/StatusBadge";
 import { RelativeTime } from "../ui/RelativeTime";
-import { CreateIncidentForm } from "../components/CreateIncidentForm";
+import { initials, avatarColor } from "../ui/avatar";
+import { CreateIncidentForm, type CreateIncidentValue } from "../components/CreateIncidentForm";
+import { IncidentBoard } from "../components/IncidentBoard";
+import { SavedViews, type SavedView } from "../components/SavedViews";
 import {
-  severityTone,
-  severityLabelKey,
-  incidentStateTone,
-  incidentStateLabelKey,
+  priorityLabelKey,
+  incidentStatusTone,
+  incidentStatusLabelKey,
 } from "../labels";
-import type { Incident } from "../../types";
+import type { CustomFieldDefinition, Incident } from "../../types";
 
-type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "ALL";
-const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "ALL"];
+type StateTab = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "ALL";
+const STATE_TABS: StateTab[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ALL"];
+
+type ViewMode = "list" | "board";
+const VIEW_STORAGE_KEY = "skawld.incidents.view";
+const SAVED_VIEWS_KEY = "skawld.incidents.savedViews";
+
+function initialView(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_STORAGE_KEY) === "board" ? "board" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function readSavedViews(seed: SavedView[]): SavedView[] {
+  try {
+    const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as SavedView[];
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // storage unavailable or corrupt; fall through to the seed
+  }
+  return seed;
+}
+
+function writeSavedViews(views: SavedView[]) {
+  try {
+    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
+  } catch {
+    // storage unavailable — session-only views
+  }
+}
 
 /**
  * IncidentsPage: filterable incident queue with native creation inside a
@@ -31,32 +70,113 @@ export function IncidentsPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { data: principal } = usePrincipal();
-  const incidents = useQuery(() => api.incidents().then((list) => list.items));
+  const incidents = usePaginatedList(
+    (params) => api.incidents({ ...params, custom_fields: customFieldFiltersRef.current }),
+    [],
+  );
   const assets = useQuery(() => api.assets().then((list) => list.items));
+  const teams = useQuery(() => api.teams().then((list) => list.items));
+  const people = useQuery(() => api.people().then((list) => list.items));
+  const customFields = useQuery(() => api.listFieldDefinitions("incident").then((list) => list.items));
+  const customFieldFiltersRef = useRef<Record<string, string>>({});
+  const [customFieldFilters, setCustomFieldFilters] = useState<Record<string, string>>({});
+  function setCustomFieldFilter(key: string, value: string) {
+    const next = { ...customFieldFiltersRef.current };
+    if (value === "") delete next[key];
+    else next[key] = value;
+    customFieldFiltersRef.current = next;
+    setCustomFieldFilters(next);
+    void incidents.refetch();
+  }
   const [tab, setTab] = useState<StateTab>("OPEN");
-  const [severity, setSeverity] = useState("ALL");
+  const [priority, setPriority] = useState("ALL");
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<ViewMode>(initialView);
   const [showForm, setShowForm] = useState(false);
-  const [params] = useSearchParams();
+  const [expandedIncident, setExpandedIncident] = useState<string | null>(null);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() =>
+    readSavedViews([
+      {
+        id: "my-critical",
+        name: t("incidents.views.myCritical"),
+        priority: "CRITICAL",
+        query: "",
+      },
+    ]),
+  );
+  const [params, setParams] = useSearchParams();
   useEffect(() => {
-    if (params.get("create") === "1") setShowForm(true);
-  }, [params]);
+    if (params.get("create") === "1") {
+      setShowForm(true);
+      params.delete("create");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
   const canCreate = principal?.permissions.includes("incident:create") ?? false;
 
+  function switchView(next: ViewMode) {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // storage unavailable — session-only preference
+    }
+  }
+
+  function saveCurrentView() {
+    const next: SavedView = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : String(Date.now()),
+      name: t("incidents.views.defaultName"),
+      priority,
+      query,
+      custom_fields: { ...customFieldFiltersRef.current },
+    };
+    const updated = [...savedViews, next];
+    setSavedViews(updated);
+    writeSavedViews(updated);
+    setActiveViewId(next.id);
+  }
+
+  function applyView(id: string) {
+    const view = savedViews.find((item) => item.id === id);
+    if (!view) return;
+    setPriority(view.priority);
+    setQuery(view.query);
+    const filters = view.custom_fields ?? {};
+    customFieldFiltersRef.current = { ...filters };
+    setCustomFieldFilters({ ...filters });
+    setActiveViewId(id);
+    void incidents.refetch();
+  }
+
+  function deleteView(id: string) {
+    const updated = savedViews.filter((item) => item.id !== id);
+    setSavedViews(updated);
+    writeSavedViews(updated);
+    if (activeViewId === id) setActiveViewId(null);
+  }
+
   const create = useCommand(
-    (value: { site_id: string; asset_id: string; summary: string; severity: string }) =>
-      api.createIncident(value),
+    async (value: CreateIncidentValue) => {
+      const incident = await api.createIncident(value);
+      for (const file of value.files) {
+        await api.uploadIncidentAttachment(incident.id, value.site_id, file);
+      }
+      return incident;
+    },
     {
       successMessage: t("incidents.create.success"),
       onSuccess: (incident) => navigate(`/incidents/${incident.id}`),
     },
   );
 
-  const rows = useMemo(() => {
-    const items = incidents.data ?? [];
+  const filtered = useMemo(() => {
+    const items = incidents.items;
     return items
-      .filter((incident) => tab === "ALL" || incident.state === tab)
-      .filter((incident) => severity === "ALL" || incident.severity === severity)
+      .filter((incident) => priority === "ALL" || incident.priority === priority)
       .filter((incident) => {
         if (!query.trim()) return true;
         const q = query.trim().toLowerCase();
@@ -66,17 +186,29 @@ export function IncidentsPage() {
           (incident.asset_tag ?? "").toLowerCase().includes(q)
         );
       });
-  }, [incidents.data, tab, severity, query]);
+  }, [incidents.items, priority, query]);
+
+  const rows = useMemo(
+    () => filtered.filter((incident) => tab === "ALL" || incident.status === tab),
+    [filtered, tab],
+  );
+
+  const { selectedIndex, setSelectedIndex, onKeyDown } = useListKeyboard<Incident>({
+    rows,
+    onOpen: (incident) => navigate(`/incidents/${incident.id}`),
+  });
+  const selectedIncident = selectedIndex >= 0 ? rows[selectedIndex] : undefined;
 
   const counts = useMemo(() => {
-    const items = incidents.data ?? [];
+    const items = filtered;
     return {
-      OPEN: items.filter((i) => i.state === "OPEN").length,
-      IN_PROGRESS: items.filter((i) => i.state === "IN_PROGRESS").length,
-      RESOLVED: items.filter((i) => i.state === "RESOLVED").length,
+      OPEN: items.filter((i) => i.status === "OPEN").length,
+      IN_PROGRESS: items.filter((i) => i.status === "IN_PROGRESS").length,
+      RESOLVED: items.filter((i) => i.status === "RESOLVED").length,
+      CLOSED: items.filter((i) => i.status === "CLOSED").length,
       ALL: items.length,
     } as Record<StateTab, number>;
-  }, [incidents.data]);
+  }, [filtered]);
 
   return (
     <PageTrailProvider trail={[]}>
@@ -93,42 +225,118 @@ export function IncidentsPage() {
           }
         />
         <div className="incident-toolbar">
-          <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
-            {STATE_TABS.map((state) => (
-              <button
-                key={state}
-                role="tab"
-                aria-selected={tab === state}
-                className={`tab${tab === state ? " active" : ""}`}
-                onClick={() => setTab(state)}
-              >
-                {state === "ALL" ? t("incidents.tabs.all") : t(incidentStateLabelKey(state))}
-                <span className="count">{counts[state]}</span>
-              </button>
-            ))}
-          </div>
-          <input
-            aria-label={t("incidents.filter.search")}
-            placeholder={t("incidents.filter.search")}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="incident-search"
+          <SavedViews
+            views={savedViews}
+            activeId={activeViewId}
+            onSave={saveCurrentView}
+            onApply={applyView}
+            onDelete={deleteView}
           />
+          <div className="incident-filter-row">
+          {view === "list" && (
+            <div className="incident-tabs" role="tablist" aria-label={t("nav.incidents")}>
+              {STATE_TABS.map((state) => (
+                <button
+                  key={state}
+                  role="tab"
+                  aria-selected={tab === state}
+                  className={`tab${tab === state ? " active" : ""}`}
+                  onClick={() => setTab(state)}
+                >
+                  {state === "ALL" ? t("incidents.tabs.all") : t(incidentStatusLabelKey(state))}
+                  <span className="count">{counts[state]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="search-field">
+            <MagnifyingGlass size={13} className="search-icon" aria-hidden="true" />
+            <input
+              aria-label={t("incidents.filter.search")}
+              placeholder={t("incidents.filter.search")}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="incident-search"
+            />
+          </div>
           <select
             aria-label={t("incidents.filter.severity")}
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value)}
+            value={priority}
+            onChange={(event) => setPriority(event.target.value)}
             className="incident-severity-filter"
           >
             <option value="ALL">{t("incidents.tabs.all")}</option>
-            <option value="LOW">{t(severityLabelKey("LOW"))}</option>
-            <option value="MEDIUM">{t(severityLabelKey("MEDIUM"))}</option>
-            <option value="HIGH">{t(severityLabelKey("HIGH"))}</option>
-            <option value="CRITICAL">{t(severityLabelKey("CRITICAL"))}</option>
+            <option value="LOW">{t(priorityLabelKey("LOW"))}</option>
+            <option value="MEDIUM">{t(priorityLabelKey("MEDIUM"))}</option>
+            <option value="HIGH">{t(priorityLabelKey("HIGH"))}</option>
+            <option value="CRITICAL">{t(priorityLabelKey("CRITICAL"))}</option>
           </select>
+          {customFields.data?.filter((field) => field.status === "ACTIVE" && (field.field_type === "SELECT" || field.field_type === "TEXT")).map((field) =>
+            field.field_type === "TEXT" ? (
+              <input
+                key={field.id}
+                type="text"
+                aria-label={field.label}
+                placeholder={field.label}
+                value={customFieldFilters[field.key] ?? ""}
+                onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
+                className="incident-search"
+              />
+            ) : (
+              <select
+                key={field.id}
+                aria-label={field.label}
+                value={customFieldFilters[field.key] ?? ""}
+                onChange={(event) => setCustomFieldFilter(field.key, event.target.value)}
+                className="incident-severity-filter"
+              >
+                <option value="">{field.label}</option>
+                {field.config.options?.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            ),
+          )}
+          <div className="view-toggle" role="group" aria-label={t("incidents.view.label")}>
+            <button
+              type="button"
+              className={view === "list" ? "view-toggle-button active" : "view-toggle-button"}
+              aria-pressed={view === "list"}
+              title={t("incidents.view.list")}
+              onClick={() => switchView("list")}
+            >
+              <Rows size={14} weight="bold" />
+              {t("incidents.view.list")}
+            </button>
+            <button
+              type="button"
+              className={view === "board" ? "view-toggle-button active" : "view-toggle-button"}
+              aria-pressed={view === "board"}
+              title={t("incidents.view.board")}
+              onClick={() => switchView("board")}
+            >
+              <Kanban size={14} weight="bold" />
+              {t("incidents.view.board")}
+            </button>
+          </div>
+          </div>
         </div>
+        {view === "board" ? (
+          <IncidentBoard
+            incidents={filtered}
+            loading={incidents.loading}
+            hasMore={incidents.hasMore}
+            onLoadMore={() => void incidents.loadMore()}
+            emptyTitle={t("incidents.noResults")}
+          />
+        ) : (
         <DataTable<Incident>
           columns={[
+            {
+              key: "edge",
+              header: "",
+              render: () => <span className="alarm-edge" aria-hidden="true" />,
+            },
             {
               key: "number",
               header: t("dashboard.table.incident"),
@@ -153,40 +361,141 @@ export function IncidentsPage() {
               key: "severity",
               header: t("dashboard.table.severity"),
               render: (incident) => (
-                <StatusBadge tone={severityTone(incident.severity)} label={t(severityLabelKey(incident.severity))} />
+                <span className="priority-cell">
+                  <span
+                    className={`priority-dot priority-dot--${incident.priority.toLowerCase()}`}
+                    aria-hidden="true"
+                  />
+                  {t(priorityLabelKey(incident.priority))}
+                </span>
               ),
-              sortValue: (i) => i.severity,
+              sortValue: (i) => i.priority,
             },
             {
               key: "state",
               header: t("dashboard.table.state"),
               render: (incident) => (
-                <StatusBadge tone={incidentStateTone(incident.state)} label={t(incidentStateLabelKey(incident.state))} />
+                <StatusBadge tone={incidentStatusTone(incident.status)} label={t(incidentStatusLabelKey(incident.status))} />
               ),
-              sortValue: (i) => i.state,
+              sortValue: (i) => i.status,
+            },
+            {
+              key: "assignee",
+              header: t("incident.assignee"),
+              render: (incident) =>
+                incident.assignee_name ? (
+                  <span className="assignee-cell">
+                    <span
+                      className="assignee-avatar"
+                      style={{ backgroundColor: avatarColor(incident.assignee_name) }}
+                      aria-hidden="true"
+                    >
+                      {initials(incident.assignee_name)}
+                    </span>
+                    {incident.assignee_name}
+                  </span>
+                ) : (
+                  "—"
+                ),
+              sortValue: (i) => i.assignee_name ?? "",
+            },
+            {
+              key: "team",
+              header: t("incident.team"),
+              render: (incident) => incident.team_name ?? "—",
+              sortValue: (i) => i.team_name ?? "",
             },
             {
               key: "age",
-              header: t("dashboard.table.age"),
-              render: (incident) => <RelativeTime time={incident.detected_at} locale={locale} />,
+              header: t("incident.date"),
+              render: (incident) => (
+                <RelativeTime time={incident.occurred_at ?? incident.detected_at} locale={locale} />
+              ),
+            },
+            {
+              key: "fields",
+              header: "",
+              render: (incident) => {
+                const expanded = expandedIncident === incident.id;
+                return (
+                  <button
+                    type="button"
+                    className="row-expander"
+                    aria-expanded={expanded}
+                    aria-label={`${t("incidents.expandFields")}: ${incident.number}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setExpandedIncident(expanded ? null : incident.id);
+                    }}
+                  >
+                    <CaretDown
+                      size={14}
+                      aria-hidden="true"
+                      className={expanded ? "row-expander-icon expanded" : "row-expander-icon"}
+                    />
+                  </button>
+                );
+              },
             },
           ]}
           rows={rows}
           rowKey={(incident) => incident.id}
+          expandedKey={expandedIncident}
+          expandedRow={(incident) => {
+            const entries = customFields.data
+              ?.filter((field) => field.status === "ACTIVE")
+              .map((field) => ({ field, value: incident.custom_values?.[field.id] }))
+              .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
+            if (!entries || entries.length === 0) {
+              return <p className="muted">{t("incidents.noCustomValues")}</p>;
+            }
+            return (
+              <dl className="custom-fields-inline">
+                {entries.map(({ field, value }) => (
+                  <div key={field.id} className="inline-value">
+                    <dt>{field.label}</dt>
+                    <dd>{formatCustomValue(field, value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            );
+          }}
+          rowClassName={(incident) => `alarm-row alarm-row--${incident.priority.toLowerCase()}`}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
+          onTableKeyDown={(event) => {
+            if (view === "list") onKeyDown(event);
+          }}
+          selectedKey={selectedIncident?.id}
           emptyTitle={t("incidents.noResults")}
           loading={incidents.loading}
           error={incidents.error}
           onRetry={() => void incidents.refetch()}
         />
+        )}
+        {view === "list" && incidents.hasMore ? (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void incidents.loadMore()}
+            disabled={incidents.loading}
+            style={{ marginTop: 12 }}
+          >
+            {t("common.loadMore")}
+          </button>
+        ) : null}
         <Dialog
           open={showForm}
           onOpenChange={setShowForm}
           title={t("form.createIncident")}
           footer={null}
+          wide
         >
           <CreateIncidentForm
             assets={assets.data ?? []}
+            people={people.data ?? []}
+            teams={teams.data ?? []}
+            principal={principal}
+            customFields={customFields.data ?? []}
             pending={create.pending}
             onCancel={() => setShowForm(false)}
             onCreate={(value) => void create.run(value)}
