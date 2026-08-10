@@ -4,6 +4,21 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-09 — Custom fields core (tenant-configurable incident fields)
+
+- Tenant administrators can now define custom fields on incidents
+  (TEXT/NUMBER/DATE/SELECT/MULTI_SELECT) through a new `/admin/custom-fields`
+  page, gated by a new Administrator-only `field:manage` permission.
+- Field definitions are org-scoped; keys are immutable; once an incident holds
+  a value the field type and config lock and the field can only be retired,
+  keeping all values and history.
+- Incident create form renders the tenant's active fields dynamically; values
+  are validated server-side (type, required, length, regex, range, options),
+  stored in a JSONB `custom_values` column with a full audit history, and
+  surfaced on the detail page and queue rows.
+- Incident list supports `custom_field.<key>` filter parameters, joined with
+  existing saved-view filters.
+
 ### 2026-08-08 — Jira-style console chrome and per-role authorization screens
 
 - Restyled the console top bar into a Jira-like app frame: the brand moved
