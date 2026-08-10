@@ -127,3 +127,73 @@ func TestStoreCRUDAndImmutability(t *testing.T) {
 		t.Fatal("update after retire must preserve retired_at")
 	}
 }
+
+func TestCountsReportsIncidentsWithValues(t *testing.T) {
+	store, orgID := newTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	created, err := store.Create(ctx, orgID, domain.Definition{
+		OrganizationID: orgID, EntityType: "incident", Key: "po_number",
+		Label: "PO Number", FieldType: domain.FieldTypeText,
+		Config: domain.Config{Required: true}, SortOrder: 1,
+		Status: domain.StatusActive, Version: 1,
+	}, now)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	var siteID, principalID string
+	if err := store.Pool.QueryRow(ctx, `
+		INSERT INTO sites (id, organization_id, code, name, timezone, status, version, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1::uuid, 'CF', 'CF Site', 'UTC', 'ACTIVE', 1, $2, $2)
+		RETURNING id::text
+	`, orgID, now).Scan(&siteID); err != nil {
+		t.Fatal(err)
+	}
+	subject := "cf-tester-" + now.Format("150405.000000")
+	if err := store.Pool.QueryRow(ctx, `
+		INSERT INTO principals (id, external_subject, display_name, status, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, 'CF Tester', 'ACTIVE', $2, $2)
+		RETURNING id::text
+	`, subject, now).Scan(&principalID); err != nil {
+		t.Fatal(err)
+	}
+	var assetID string
+	if err := store.Pool.QueryRow(ctx, `
+		INSERT INTO assets (
+			id, organization_id, site_id, tag, name, asset_class,
+			status, source_of_truth, attributes, version, created_at, updated_at
+		) VALUES (
+			gen_random_uuid(), $1::uuid, $2::uuid, 'CF-ASSET', 'CF Asset', 'PUMP',
+			'ACTIVE', 'OWNED_BY_SKAWLD', '{}'::jsonb, 1, $3, $3
+		)
+		RETURNING id::text
+	`, orgID, siteID, now).Scan(&assetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Pool.Exec(ctx, `
+		INSERT INTO incidents (
+			id, organization_id, site_id, asset_id, number, summary, priority,
+			status, source_of_truth, detected_at, version, created_by, created_at, updated_at,
+			custom_values
+		) VALUES (
+			gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid, 'INC-CF-1', 'CF', 'MEDIUM',
+			'OPEN', 'OWNED_BY_SKAWLD', $4, 1, $5::uuid, $4, $4,
+			jsonb_build_object($6::text, 1)
+		)
+	`, orgID, siteID, assetID, now, principalID, created.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := store.Counts(ctx, orgID, "incident")
+	if err != nil {
+		t.Fatalf("Counts: %v", err)
+	}
+	if counts[created.ID] != 1 {
+		t.Fatalf("Counts[%s] = %d, want 1", created.ID, counts[created.ID])
+	}
+	if counts["unused-def"] != 0 {
+		t.Fatalf("Counts[unused-def] = %d, want 0", counts["unused-def"])
+	}
+}

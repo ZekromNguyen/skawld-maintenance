@@ -14,6 +14,7 @@ type fakeStore struct {
 	definitions map[string]domain.Definition
 	byKey       map[string]domain.Definition
 	hasValues   bool
+	counts      map[string]int
 	history     []HistoryEntry
 }
 
@@ -63,6 +64,10 @@ func (f *fakeStore) History(_ context.Context, _, _ string) ([]HistoryEntry, err
 
 func (f *fakeStore) HasValues(_ context.Context, _, _ string) (bool, error) {
 	return f.hasValues, nil
+}
+
+func (f *fakeStore) Counts(_ context.Context, _, _ string) (map[string]int, error) {
+	return f.counts, nil
 }
 
 func (f *fakeStore) Usage(_ context.Context, _, _ string) (map[string]bool, error) {
@@ -229,5 +234,35 @@ func TestResolveAndValidateRejectsRetiredField(t *testing.T) {
 	s := newService(store)
 	if _, err := s.ResolveAndValidate(context.Background(), "o1", "incident", map[string]any{"po_number": "x"}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("value for retired field must be ErrValidation, got %v", err)
+	}
+}
+
+func TestListAndGetPopulateIncidentCount(t *testing.T) {
+	definition := domain.Definition{
+		ID: "def-1", OrganizationID: "o1", EntityType: "incident",
+		Key: "po_number", Label: "PO Number", FieldType: domain.FieldTypeText,
+		Status: domain.StatusActive,
+	}
+	store := &fakeStore{
+		definitions: map[string]domain.Definition{"def-1": definition},
+		byKey:       map[string]domain.Definition{"po_number": definition},
+		counts:      map[string]int{"def-1": 3},
+	}
+	s := newService(store)
+
+	list, err := s.ListByEntity(context.Background(), reader(), "incident")
+	if err != nil {
+		t.Fatalf("ListByEntity: %v", err)
+	}
+	if len(list) != 1 || list[0].IncidentCount != 3 {
+		t.Fatalf("list incident_count = %#v, want 3", list)
+	}
+
+	got, err := s.Get(context.Background(), reader(), "def-1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.IncidentCount != 3 {
+		t.Fatalf("Get incident_count = %d, want 3", got.IncidentCount)
 	}
 }

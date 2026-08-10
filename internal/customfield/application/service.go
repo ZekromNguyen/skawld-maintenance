@@ -39,20 +39,21 @@ type UpdateDefinition struct {
 }
 
 type Definition struct {
-	ID          string        `json:"id"`
-	EntityType  string        `json:"entity_type"`
-	Key         string        `json:"key"`
-	Label       string        `json:"label"`
-	Description string        `json:"description,omitempty"`
-	FieldType   string        `json:"field_type"`
-	Config      domain.Config `json:"config"`
-	Status      string        `json:"status"`
-	SortOrder   int           `json:"sort_order"`
-	Version     int64         `json:"version"`
-	CreatedAt   time.Time     `json:"created_at"`
-	UpdatedAt   time.Time     `json:"updated_at"`
-	RetiredAt   *time.Time    `json:"retired_at,omitempty"`
-	HasValues   bool          `json:"has_values"`
+	ID            string        `json:"id"`
+	EntityType    string        `json:"entity_type"`
+	Key           string        `json:"key"`
+	Label         string        `json:"label"`
+	Description   string        `json:"description,omitempty"`
+	FieldType     string        `json:"field_type"`
+	Config        domain.Config `json:"config"`
+	Status        string        `json:"status"`
+	SortOrder     int           `json:"sort_order"`
+	Version       int64         `json:"version"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	RetiredAt     *time.Time    `json:"retired_at,omitempty"`
+	HasValues     bool          `json:"has_values"`
+	IncidentCount int           `json:"incident_count"`
 }
 
 type HistoryEntry struct {
@@ -72,6 +73,7 @@ type Store interface {
 	History(context.Context, string, string) ([]HistoryEntry, error)
 	HasValues(context.Context, string, string) (bool, error)
 	Usage(context.Context, string, string) (map[string]bool, error)
+	Counts(context.Context, string, string) (map[string]int, error)
 }
 
 type Service struct {
@@ -96,11 +98,16 @@ func (s Service) list(ctx context.Context, organizationID, entityType string) ([
 	if err != nil {
 		return nil, err
 	}
+	counts, err := s.Store.Counts(ctx, organizationID, entityType)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].SortOrder < items[j].SortOrder })
 	out := make([]Definition, 0, len(items))
 	for _, item := range items {
 		view := toView(item)
 		view.HasValues = usage[item.ID]
+		view.IncidentCount = counts[item.ID]
 		out = append(out, view)
 	}
 	return out, nil
@@ -142,8 +149,13 @@ func (s Service) Get(ctx context.Context, principal identitydomain.Principal, id
 	if err != nil {
 		return Definition{}, err
 	}
+	counts, err := s.Store.Counts(ctx, principal.OrganizationID, value.EntityType)
+	if err != nil {
+		return Definition{}, err
+	}
 	view := toView(value)
 	view.HasValues = used
+	view.IncidentCount = counts[id]
 	return view, nil
 }
 

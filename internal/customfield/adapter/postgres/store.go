@@ -207,6 +207,33 @@ func (s Store) Usage(ctx context.Context, organizationID, entityType string) (ma
 	return out, rows.Err()
 }
 
+// Counts reports how many incidents hold a value per definition, keyed by
+// definition id, for the org and entity.
+func (s Store) Counts(ctx context.Context, organizationID, entityType string) (map[string]int, error) {
+	rows, err := s.Pool.Query(ctx, `
+		SELECT f.id::text, count(i.id)::int
+		FROM field_definitions f
+		LEFT JOIN incidents i
+		  ON i.organization_id = f.organization_id AND i.custom_values ? f.id::text
+		WHERE f.organization_id = $1::uuid AND f.entity_type = $2
+		GROUP BY f.id
+	`, organizationID, entityType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]int)
+	for rows.Next() {
+		var id string
+		var count int
+		if err := rows.Scan(&id, &count); err != nil {
+			return nil, err
+		}
+		out[id] = count
+	}
+	return out, rows.Err()
+}
+
 func (s Store) HasValues(ctx context.Context, organizationID, id string) (bool, error) {
 	var exists bool
 	err := s.Pool.QueryRow(ctx, `

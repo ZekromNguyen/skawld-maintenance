@@ -107,6 +107,10 @@ func (s *stubFieldStore) Usage(_ context.Context, _, _ string) (map[string]bool,
 	return out, nil
 }
 
+func (s *stubFieldStore) Counts(_ context.Context, _, _ string) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+
 func withFieldPrincipal(r *http.Request, principal identitydomain.Principal) *http.Request {
 	return r.WithContext(identitydomain.WithPrincipal(r.Context(), principal))
 }

@@ -2233,6 +2233,7 @@ components:
         updated_at: {type: string, format: date-time}
         retired_at: {type: string, format: date-time, nullable: true}
         has_values: {type: boolean}
+        incident_count: {type: integer}
     HistoryEntry:
       type: object
       properties:
