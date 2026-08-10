@@ -19,7 +19,11 @@ import type { CustomFieldDefinition } from "../../types";
  */
 export function CustomFieldsPage() {
   const { t } = useI18n();
+  const [showRetired, setShowRetired] = useState(false);
   const fields = useQuery(() => api.listFieldDefinitions("incident").then((list) => list.items), []);
+  const visibleFields = (fields.data ?? []).filter(
+    (field) => showRetired || field.status === "ACTIVE",
+  );
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | undefined>(undefined);
   const [retiring, setRetiring] = useState<CustomFieldDefinition | undefined>(undefined);
@@ -98,13 +102,23 @@ export function CustomFieldsPage() {
       <PageHeader
         title={t("admin.customFields.title")}
         actions={
-          <button className="primary-button" onClick={() => { setDialogError(undefined); setCreating(true); }}>
-            {t("admin.customFields.newField")}
-          </button>
+          <>
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={showRetired}
+                onChange={(event) => setShowRetired(event.target.checked)}
+              />
+              {t("admin.customFields.showRetired")}
+            </label>
+            <button className="primary-button" onClick={() => { setDialogError(undefined); setCreating(true); }}>
+              {t("admin.customFields.newField")}
+            </button>
+          </>
         }
       />
       <section className="data-card">
-        {fields.data && fields.data.length === 0 ? (
+        {visibleFields.length === 0 ? (
           <EmptyState title={t("admin.customFields.empty")} />
         ) : (
           <table className="data-table">
@@ -120,7 +134,7 @@ export function CustomFieldsPage() {
               </tr>
             </thead>
             <tbody>
-              {fields.data?.map((field) => (
+              {visibleFields.map((field) => (
                 <tr key={field.id}>
                   <td>{field.label}</td>
                   <td className="mono">{field.key}</td>

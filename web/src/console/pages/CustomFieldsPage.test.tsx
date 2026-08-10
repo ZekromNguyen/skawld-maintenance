@@ -68,7 +68,11 @@ describe("CustomFieldsPage", () => {
   it("renders definitions in a table", async () => {
     renderPage();
     expect(await screen.findByText("PO Number")).toBeTruthy();
-    expect(screen.getByText("zone")).toBeTruthy();
+    // Retired fields are hidden by default.
+    expect(screen.queryByText("zone")).toBeNull();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: /show retired/i }));
+    expect(await screen.findByText("zone")).toBeTruthy();
     expect(screen.getAllByText("TEXT").length).toBeGreaterThan(0);
   });
 
@@ -107,6 +111,7 @@ describe("CustomFieldsPage", () => {
 
   it("disables retire for already-retired fields", async () => {
     renderPage();
+    fireEvent.click(await screen.findByRole("checkbox", { name: /show retired/i }));
     const row = (await screen.findByText("Zone")).closest("tr") as HTMLTableRowElement;
     expect((within(row).getByRole("button", { name: /retire/i }) as HTMLButtonElement).disabled).toBe(true);
   });
