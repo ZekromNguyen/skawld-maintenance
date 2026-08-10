@@ -176,6 +176,27 @@ describe("IncidentsPage", () => {
     expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("bearing");
   });
 
+  it("persists custom field filters in saved views", async () => {
+    localStorage.setItem(
+      "skawld.incidents.savedViews",
+      JSON.stringify([
+        { id: "zone-view", name: "Zone A", priority: "ALL", query: "", custom_fields: { zone: "a" } },
+      ]),
+    );
+    (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [
+        { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
+      ]
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Zone A" }));
+    await waitFor(() =>
+      expect(api.incidents as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+        expect.objectContaining({ custom_fields: { zone: "a" } }),
+      ),
+    );
+  });
+
   it("hides create for unauthorized principals", async () => {
     (api.principal as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "p2",

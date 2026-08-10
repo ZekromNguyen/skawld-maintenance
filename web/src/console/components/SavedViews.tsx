@@ -6,6 +6,7 @@ export interface SavedView {
   name: string;
   priority: string;
   query: string;
+  custom_fields?: Record<string, string>;
 }
 
 /**

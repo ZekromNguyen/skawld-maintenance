@@ -132,6 +132,7 @@ export function IncidentsPage() {
       name: t("incidents.views.defaultName"),
       priority,
       query,
+      custom_fields: { ...customFieldFiltersRef.current },
     };
     const updated = [...savedViews, next];
     setSavedViews(updated);
@@ -144,7 +145,11 @@ export function IncidentsPage() {
     if (!view) return;
     setPriority(view.priority);
     setQuery(view.query);
+    const filters = view.custom_fields ?? {};
+    customFieldFiltersRef.current = { ...filters };
+    setCustomFieldFilters({ ...filters });
     setActiveViewId(id);
+    void incidents.refetch();
   }
 
   function deleteView(id: string) {
