@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { Skeleton } from "./Skeleton";
@@ -22,6 +22,8 @@ export function DataTable<T>({
   onRowClick,
   rowClassName,
   selectedKey,
+  expandedKey,
+  expandedRow,
   onTableKeyDown,
 }: {
   columns: Array<Column<T>>;
@@ -35,6 +37,8 @@ export function DataTable<T>({
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T) => string;
   selectedKey?: string | null;
+  expandedKey?: string | null;
+  expandedRow?: (row: T) => ReactNode;
   onTableKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
@@ -105,21 +109,27 @@ export function DataTable<T>({
             const selected = selectedKey != null && selectedKey === key;
             const clickable = onRowClick != null;
             return (
-              <tr
-                key={key}
-                className={[
-                  rowClassName?.(row),
-                  selected ? "data-row selected" : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                aria-selected={selected || undefined}
-              >
-                {columns.map((column) => (
-                  <td key={column.key}>{column.render(row)}</td>
-                ))}
-              </tr>
+              <Fragment key={key}>
+                <tr
+                  className={[
+                    rowClassName?.(row),
+                    selected ? "data-row selected" : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  aria-selected={selected || undefined}
+                >
+                  {columns.map((column) => (
+                    <td key={column.key}>{column.render(row)}</td>
+                  ))}
+                </tr>
+                {expandedKey === key && expandedRow ? (
+                  <tr className="data-row-detail">
+                    <td colSpan={columns.length}>{expandedRow(row)}</td>
+                  </tr>
+                ) : null}
+              </Fragment>
             );
           })}
         </tbody>

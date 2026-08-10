@@ -565,6 +565,15 @@ tr[onclick]:hover td { background: var(--raised); }
 tr.data-row.selected td { background: var(--brand-dim); }
 tr.data-row.selected { box-shadow: inset 3px 0 var(--brand); }
 tr.data-row.selected td:first-child { box-shadow: none; }
+tr.data-row-detail td { background: var(--raised); padding: 10px 18px; }
+.row-expander { border: 0; background: transparent; color: var(--ink-muted); cursor: pointer; padding: 6px; display: inline-flex; align-items: center; }
+.row-expander:hover { color: var(--brand); }
+.row-expander-icon { transition: transform 140ms ease; }
+.row-expander-icon.expanded { transform: rotate(180deg); }
+.custom-fields-inline { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+.inline-value { display: flex; gap: 8px; align-items: baseline; }
+.inline-value dt { color: var(--ink-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.inline-value dd { margin: 0; color: var(--ink); }
 .table-wrap:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .muted { color: var(--ink-muted); }
 

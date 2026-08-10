@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { Kanban, MagnifyingGlass, Rows } from "@phosphor-icons/react";
+import { Kanban, CaretDown, MagnifyingGlass, Rows } from "@phosphor-icons/react";
 import { api } from "../../api";
 import { useQuery } from "../useQuery";
 import { usePaginatedList } from "../usePaginatedList";
@@ -93,6 +93,7 @@ export function IncidentsPage() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>(initialView);
   const [showForm, setShowForm] = useState(false);
+  const [expandedIncident, setExpandedIncident] = useState<string | null>(null);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [savedViews, setSavedViews] = useState<SavedView[]>(() =>
     readSavedViews([
@@ -400,29 +401,60 @@ export function IncidentsPage() {
               sortValue: (i) => i.team_name ?? "",
             },
             {
-              key: "custom",
-              header: t("incident.customFields"),
-              render: (incident) => {
-                const entries = customFields.data
-                  ?.filter((field) => field.status === "ACTIVE")
-                  .map((field) => ({ field, value: incident.custom_values?.[field.id] }))
-                  .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
-                if (!entries || entries.length === 0) return "—";
-                const first = entries.slice(0, 2).map((entry) => `${entry.field.label}: ${formatCustomValue(entry.field, entry.value)}`).join(", ");
-                const extra = entries.length > 2 ? ` +${entries.length - 2}` : "";
-                return <span className="custom-fields-cell" title={entries.map((entry) => `${entry.field.label}: ${formatCustomValue(entry.field, entry.value)}`).join("\n")}>{first}{extra}</span>;
-              },
-            },
-            {
               key: "age",
               header: t("incident.date"),
               render: (incident) => (
                 <RelativeTime time={incident.occurred_at ?? incident.detected_at} locale={locale} />
               ),
             },
+            {
+              key: "fields",
+              header: "",
+              render: (incident) => {
+                const expanded = expandedIncident === incident.id;
+                return (
+                  <button
+                    type="button"
+                    className="row-expander"
+                    aria-expanded={expanded}
+                    aria-label={`${t("incidents.expandFields")}: ${incident.number}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setExpandedIncident(expanded ? null : incident.id);
+                    }}
+                  >
+                    <CaretDown
+                      size={14}
+                      aria-hidden="true"
+                      className={expanded ? "row-expander-icon expanded" : "row-expander-icon"}
+                    />
+                  </button>
+                );
+              },
+            },
           ]}
           rows={rows}
           rowKey={(incident) => incident.id}
+          expandedKey={expandedIncident}
+          expandedRow={(incident) => {
+            const entries = customFields.data
+              ?.filter((field) => field.status === "ACTIVE")
+              .map((field) => ({ field, value: incident.custom_values?.[field.id] }))
+              .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
+            if (!entries || entries.length === 0) {
+              return <p className="muted">{t("incidents.noCustomValues")}</p>;
+            }
+            return (
+              <dl className="custom-fields-inline">
+                {entries.map(({ field, value }) => (
+                  <div key={field.id} className="inline-value">
+                    <dt>{field.label}</dt>
+                    <dd>{formatCustomValue(field, value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            );
+          }}
           rowClassName={(incident) => `alarm-row alarm-row--${incident.priority.toLowerCase()}`}
           onRowClick={(incident) => navigate(`/incidents/${incident.id}`)}
           onTableKeyDown={(event) => {

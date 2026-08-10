@@ -341,7 +341,7 @@ it("applies a custom field filter to the incident query", async () => {
   );
 });
 
-it("renders formatted custom values in the queue column", async () => {
+it("shows custom field values in an expandable queue row", async () => {
   (api.listFieldDefinitions as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
     items: [
       { id: "def-1", entity_type: "incident", key: "zone", label: "Zone", field_type: "SELECT", config: { options: [{ label: "Zone A", value: "a" }] }, status: "ACTIVE", sort_order: 1, version: 1, created_at: "", updated_at: "" }
@@ -356,5 +356,10 @@ it("renders formatted custom values in the queue column", async () => {
     ]
   });
   renderPage();
-  await screen.findByText("Zone: Zone A");
+  // Custom fields are not new columns (spec): no dedicated column header.
+  expect(screen.queryByRole("columnheader", { name: "Custom fields" })).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: /show custom fields/i }));
+  const detailRow = document.querySelector("tr.data-row-detail");
+  expect(detailRow).toBeTruthy();
+  expect(within(detailRow as HTMLElement).getByText("Zone A")).toBeTruthy();
 });
