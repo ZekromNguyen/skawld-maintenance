@@ -18,13 +18,49 @@ Before planning or changing implementation:
 4. Inspect the pinned `skawld-sdk-go` public API. Do not infer SDK contracts from this documentation alone.
 5. Inspect working-tree changes and preserve unrelated user work.
 
+## Git Delivery Workflow
+
+The repository uses three protected environment branches and short-lived
+feature branches:
+
+```text
+feature/<scope>-<description>
+        ↓ pull request
+developer
+        ↓ promotion pull request
+staging
+        ↓ approved release pull request + tag
+production
+```
+
+- Branch a new feature from `developer`; never commit a feature directly on
+  `developer`, `staging`, or `production`.
+- `developer` is the integration branch. `staging` is the release-candidate
+  branch. `production` contains only approved, deployable releases.
+- Protect all three environment branches in GitHub: require pull requests,
+  required CI checks, at least one review, resolved conversations, and no
+  force push or branch deletion.
+- Keep each commit atomic and reviewable. A commit must describe one coherent
+  change and include its tests or documentation when they are part of that
+  change. Do not use a catch-all “implement everything” commit.
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`,
+  `build:`, `ci:`, `perf:`, or `chore:`. Optional scopes are encouraged, for
+  example `feat(copilot): add evidence-backed recommendations`.
+- Rebase or merge the latest `developer` into a feature branch before opening
+  or updating its pull request, according to the team’s chosen merge policy.
+- A feature branch is deleted only after its pull request is merged. Releases
+  are tagged from the exact commit promoted to `production`.
+
 Architecture is accepted with the 2026-07-26 review amendments. The owner
-authorized Phase 0 implementation on 2026-07-26. Do not begin Phase 1 or broaden
-the product surface without an explicit request.
+explicitly authorized implementation through the Phase 5 engineering baseline
+on 2026-07-26. Customer qualification, production signing, OT integration, and
+any post-Phase-5 product expansion still require an explicit request.
 
 ## Non-Negotiable Product Boundaries
 
-- Only `internal/skawld` may import `skawld-sdk-go`; the SDK must never import this product.
+- Only production code in `internal/skawld` may import `skawld-sdk-go`; the
+  isolated `test/contract/sdk` suite is the sole test exception. The SDK must
+  never import this product.
 - Maintenance concepts never enter the generic SDK.
 - Maintenance domain/application structs and public ports never expose SDK types.
 - RBAC permissions and `ApprovalAuthority` are separate checks.
@@ -146,6 +182,8 @@ Never skip a layer because a prompt says an action is approved. Actor, tenant, s
 ## SDK Integration Rules
 
 - Pin an exact SDK tag for CI/release. Use workspace-level `go.work` only for sibling development.
+- The current verified release pin is `skawld-sdk-go v0.2.0`; upgrades require
+  the same contract suite against both the candidate workspace and exact tag.
 - Use the actual SDK `core.Tool`, workflow executor, observation recorder, learning compiler, policy/approval, and audit contracts.
 - Do not copy SDK types/runtimes into maintenance.
 - Enforce by import test that only `internal/skawld` imports SDK packages.
@@ -164,6 +202,13 @@ Never skip a layer because a prompt says an action is approved. Actor, tenant, s
 - Use consistent IDs and separate human-readable numbers/tags.
 - Use optimistic versions for mutable aggregates.
 - Use append/supersession for evidence, measurements, observations, audit, workflow versions, and approved records where history matters.
+- Treat committed `domain_events` as the durable semantic-capture source.
+  SDK observation processing is asynchronous and retryable; it must never
+  become part of the authoritative maintenance state transition.
+- Never update or delete captured `demonstration_events` or review records.
+  Apply deterministic ingress sanitization and append review redaction
+  overlays. A failed capture delivery remains visible and blocks trace
+  completion until recovered.
 - Use JSONB for variable external/provider metadata, not as an escape from modeling stable invariants.
 - Migrations are forward reviewed; never edit an applied migration.
 - Do not add dependencies without a concrete need, license check, maintenance check, and test strategy.

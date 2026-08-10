@@ -7,12 +7,46 @@ import (
 )
 
 type Permission string
+type Role string
 
 const (
-	PermissionOrganizationCreate Permission = "organization:create"
-	PermissionWorkflowReview     Permission = "workflow:review"
-	PermissionWorkflowPublish    Permission = "workflow:publish"
-	PermissionReportApprove      Permission = "report:approve"
+	RoleAdministrator         Role = "Administrator"
+	RoleMaintenanceSupervisor Role = "Maintenance Supervisor"
+	RoleSeniorTechnician      Role = "Senior Technician"
+	RoleTechnician            Role = "Technician"
+	RoleManager               Role = "Manager"
+)
+
+const (
+	PermissionOrganizationCreate   Permission = "organization:create"
+	PermissionAssetRead            Permission = "asset:read"
+	PermissionAssetCreate          Permission = "asset:create"
+	PermissionCriticalityApprove   Permission = "asset:criticality:approve"
+	PermissionIncidentRead         Permission = "incident:read"
+	PermissionIncidentCreate       Permission = "incident:create"
+	PermissionIncidentResolve      Permission = "incident:resolve"
+	PermissionExecutionRead        Permission = "execution:read"
+	PermissionExecutionReadAll     Permission = "execution:read:all"
+	PermissionExecutionWrite       Permission = "execution:write"
+	PermissionPrerequisiteVerify   Permission = "execution:prerequisite:verify"
+	PermissionAttachmentWrite      Permission = "attachment:write"
+	PermissionKnowledgeRead        Permission = "knowledge:read"
+	PermissionKnowledgeWrite       Permission = "knowledge:write"
+	PermissionKnowledgeApprove     Permission = "knowledge:approve"
+	PermissionRecommendationRun    Permission = "recommendation:run"
+	PermissionRecommendationReview Permission = "recommendation:review"
+	PermissionReportWrite          Permission = "report:write"
+	PermissionHandoverWrite        Permission = "handover:write"
+	PermissionHandoverAccept       Permission = "handover:accept"
+	PermissionDemonstrationRead    Permission = "demonstration:read"
+	PermissionDemonstrationCapture Permission = "demonstration:capture"
+	PermissionDemonstrationReview  Permission = "demonstration:review"
+	PermissionWorkflowRead         Permission = "workflow:read"
+	PermissionWorkflowReview       Permission = "workflow:review"
+	PermissionWorkflowPublish      Permission = "workflow:publish"
+	PermissionReportApprove        Permission = "report:approve"
+	PermissionExternalImport       Permission = "integration:external:import"
+	PermissionFieldManage          Permission = "field:manage"
 )
 
 type RiskLevel int
@@ -31,6 +65,7 @@ type Principal struct {
 	DisplayName     string
 	OrganizationID  string
 	SiteIDs         []string
+	Roles           []Role
 	Permissions     map[Permission]struct{}
 }
 
@@ -52,6 +87,102 @@ func (p Principal) CanAccessSite(organizationID, siteID string) bool {
 		}
 	}
 	return false
+}
+
+// PermissionsForRole is the single trusted role-to-capability mapping used by
+// HTTP authorization and the SDK policy adapter. Unknown roles fail closed.
+func PermissionsForRole(role Role) []Permission {
+	read := []Permission{
+		PermissionAssetRead,
+		PermissionIncidentRead,
+		PermissionExecutionRead,
+		PermissionKnowledgeRead,
+		PermissionDemonstrationRead,
+		PermissionWorkflowRead,
+	}
+	switch role {
+	case RoleAdministrator:
+		return append(read,
+			PermissionOrganizationCreate,
+			PermissionAssetCreate,
+			PermissionCriticalityApprove,
+			PermissionIncidentCreate,
+			PermissionIncidentResolve,
+			PermissionExecutionWrite,
+			PermissionExecutionReadAll,
+			PermissionPrerequisiteVerify,
+			PermissionAttachmentWrite,
+			PermissionKnowledgeWrite,
+			PermissionKnowledgeApprove,
+			PermissionRecommendationRun,
+			PermissionRecommendationReview,
+			PermissionReportWrite,
+			PermissionHandoverWrite,
+			PermissionHandoverAccept,
+			PermissionDemonstrationCapture,
+			PermissionDemonstrationReview,
+			PermissionWorkflowReview,
+			PermissionWorkflowPublish,
+			PermissionReportApprove,
+			PermissionExternalImport,
+			PermissionFieldManage,
+		)
+	case RoleMaintenanceSupervisor:
+		return append(read,
+			PermissionAssetCreate,
+			PermissionCriticalityApprove,
+			PermissionIncidentCreate,
+			PermissionIncidentResolve,
+			PermissionExecutionWrite,
+			PermissionExecutionReadAll,
+			PermissionPrerequisiteVerify,
+			PermissionAttachmentWrite,
+			PermissionKnowledgeWrite,
+			PermissionKnowledgeApprove,
+			PermissionRecommendationRun,
+			PermissionRecommendationReview,
+			PermissionReportWrite,
+			PermissionHandoverWrite,
+			PermissionHandoverAccept,
+			PermissionDemonstrationCapture,
+			PermissionDemonstrationReview,
+			PermissionWorkflowReview,
+			PermissionReportApprove,
+			PermissionExternalImport,
+		)
+	case RoleSeniorTechnician:
+		return append(read,
+			PermissionIncidentCreate,
+			PermissionExecutionWrite,
+			PermissionPrerequisiteVerify,
+			PermissionAttachmentWrite,
+			PermissionRecommendationRun,
+			PermissionReportWrite,
+			PermissionHandoverWrite,
+			PermissionDemonstrationCapture,
+			PermissionDemonstrationReview,
+			PermissionWorkflowReview,
+		)
+	case RoleTechnician:
+		return append(read,
+			PermissionExecutionWrite,
+			PermissionAttachmentWrite,
+			PermissionRecommendationRun,
+			PermissionReportWrite,
+			PermissionHandoverWrite,
+			PermissionDemonstrationCapture,
+		)
+	case RoleManager:
+		return append(read,
+			PermissionRecommendationRun,
+			PermissionRecommendationReview,
+			PermissionHandoverWrite,
+			PermissionHandoverAccept,
+			PermissionDemonstrationReview,
+		)
+	default:
+		return nil
+	}
 }
 
 type ApprovalRequest struct {

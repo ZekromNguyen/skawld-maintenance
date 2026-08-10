@@ -4,6 +4,404 @@ All notable product architecture and implementation changes are recorded here. T
 
 ## [Unreleased]
 
+### 2026-08-10 — Custom fields spec gap closure
+
+- Incident list filters on NUMBER custom fields now accept `min:max` ranges
+  (open bounds supported) in addition to exact matches.
+- The retire dialog shows how many incidents currently hold values for the
+  field.
+- Retired fields no longer appear in the incident form and are hidden in the
+  admin list by default (with a "Show retired" toggle).
+- Custom field values moved from a queue column into an expandable per-row
+  "Fields" disclosure, and custom field filters are now persisted in saved
+  views.
+
+### 2026-08-09 — Custom fields core (tenant-configurable incident fields)
+
+- Tenant administrators can now define custom fields on incidents
+  (TEXT/NUMBER/DATE/SELECT/MULTI_SELECT) through a new `/admin/custom-fields`
+  page, gated by a new Administrator-only `field:manage` permission.
+- Field definitions are org-scoped; keys are immutable; once an incident holds
+  a value the field type and config lock and the field can only be retired,
+  keeping all values and history.
+- Incident create form renders the tenant's active fields dynamically; values
+  are validated server-side (type, required, length, regex, range, options),
+  stored in a JSONB `custom_values` column with a full audit history, and
+  surfaced on the detail page and queue rows.
+- Incident list supports `custom_field.<key>` filter parameters, joined with
+  existing saved-view filters.
+
+### 2026-08-08 — Jira-style console chrome and per-role authorization screens
+
+- Restyled the console top bar into a Jira-like app frame: the brand moved
+  from the sidebar into the header, the command-palette trigger is a centered
+  search field, and a permission-gated "Create" menu (New incident / New
+  asset) deep-links to the existing create dialogs via `?create=1`.
+- Added an avatar account menu (initials, roles, Profile, Theme, Sign out)
+  and a new `/account` page showing identity, role badges, and the
+  principal's real permissions grouped by area, plus a demo role preview
+  switcher for the five pilot roles. Preview overlays the role's permission
+  mirror for navigation only; the API still enforces real permissions.
+- Added explicit authorization screens: `/me` now returns `roles`, and
+  `AuthorizedRoute` renders a Jira-style lock screen (roles + missing
+  permission) instead of a failing fetch when a route is out of scope.
+  Sidebar nav gating now mirrors backend enforcement: Reports requires
+  `report:write` OR `report:approve`, Quality requires `recommendation:review`.
+
+### 2026-08-05 — RP-initiated logout, id_token-bound web sessions, console sign-out, login-loop fix
+
+- Web sessions now persist the OIDC `id_token` (migration `00011` adds a
+  nullable `web_sessions.id_token` column), so `/auth/logout` can forward
+  it to the provider's `end_session_endpoint` as `id_token_hint`. Sign-out
+  therefore tears down the Keycloak SSO session in addition to the local
+  cookie, preventing the browser from silently re-authenticating back into
+  the SPA after the user pressed "Sign out".
+- Fixed the SPA login-loop: the OIDC callback redirect now targets the SPA
+  origin (`http://localhost:5173`) via the Vite dev proxy so the session
+  cookie is host-scoped to where the SPA actually runs, instead of being
+  set on `:8080` and dropped on the cross-origin hop back to `:5173`.
+- Added a per-role demo account set to the dev Keycloak realm
+  (`dev.supervisor`, `dev.senior`, `dev.technician`, `dev.manager`) plus a
+  `phase0.admin` bootstrap superuser. Product RBAC for the demo accounts is
+  provisioned by `make seed` (see `cmd/seed`), not by Keycloak realm roles;
+  `phase0.admin` is intentionally bootstrap-only (it can create the first
+  organization but has no demo memberships).
+- Added a "Sign out" action to the supervisor web console that posts a
+  hidden form so the browser follows the full `303 → Keycloak → SPA`
+  redirect chain natively (a `fetch`-based logout cannot, because Keycloak
+  does not CORS-allow the cross-origin RP-logout hop).
+- Hardened the OIDC layer: `RevokeSession` failures are now logged (no
+  longer silently discarded), and the end-session-endpoint discovery fetch
+  uses a dedicated 10 s-bounded HTTP client instead of `http.DefaultClient`
+  so a slow identity provider cannot wedge API startup indefinitely.
+
+### 2026-08-04 — Demo data seed, text/plain attachment MIME fix, runbook
+
+- Added `cmd/seed` (invoked with `make seed`) that loads a complete, coherent
+  P-302 pump demo through the same application services the API uses: identity
+  foundation, asset + approved criticality, incident, LOTO-gated execution
+  with exact `8.1 mm/s` / `94 °C` measurements, an ingested + approved SOP,
+  hybrid search, recommendation + correction feedback, approved report and
+  handover, two reviewed semantic demonstrations, and a compiled/reviewed/
+  published workflow. The command is idempotent and re-runnable.
+- Fixed a latent text/plain attachment bug: `http.DetectContentType` returns
+  `text/plain; charset=utf-8`, and the verified MIME was stored verbatim, so
+  document ingestion could never accept a text/plain document. Verified MIME
+  is now normalized to the stable media type before storage, with regression
+  tests in `internal/attachment/adapter/postgres/mime_test.go`.
+- Added `docs/runbooks/demo-data.md` covering usage, the Phase 0–5 data
+  workflow, UI login, verification, and demo cleanup SQL; linked it from the
+  ReadMe quick start.
+
+### 2026-08-01 — Web image vulnerability-gate remediation
+
+- Upgraded the web runtime from `nginx-unprivileged:1.29-alpine` (stale
+  Alpine `3.23.4` base, last rebuilt 2026-05-11) to
+  `nginx-unprivileged:1.31-alpine` (Alpine `3.24.1`).
+- Cleared the remediable High/Critical container findings that failed the CI
+  web image gate: stale `openssl` (`libcrypto3`/`libssl3` `3.5.6-r0`, including
+  CVEs-2026-9076/34181/34182), `libexpat` `2.7.5-r0`
+  (CVEs-2026-45186/41080), and `curl`/`libcurl` `8.17.0-r1`
+  (CVE-2026-6276).
+- Reproduced the scan with Grype `v0.116.1`; the new base image's remediable
+  High/Critical finding set is empty.
+
+### 2026-07-27 — Worker image vulnerability-gate remediation
+
+- Replaced the worker's Debian runtime with minimal Alpine `3.23`; the static
+  Go worker retains only CA certificates and `poppler-utils` for PDF text
+  extraction.
+- Kept the non-root runtime and verified `pdftotext 25.12.0` inside the image.
+- Made image gates fail on High/Critical vulnerabilities with a vendor-provided
+  remediation (`only-fixed: true`). Current upstream-unfixed findings remain a
+  security-review input instead of creating an unremediable release deadlock.
+- Reproduced the worker scan with Grype `v0.110.0`; its remediable
+  High/Critical finding set is empty.
+
+### 2026-07-26 — Go standard-library security update
+
+- Upgraded the minimum, CI, and container build toolchain from Go `1.25.7` to
+  Go `1.25.12`.
+- Cleared reachable standard-library findings reported by `govulncheck`,
+  including `crypto/tls`, `crypto/x509`, `net/http`, `net/textproto`,
+  `net/url`, `net`, and `os`.
+- Verified the full race-enabled PostgreSQL/S3 suite and `govulncheck` with the
+  exact `go1.25.12` toolchain.
+
+### 2026-07-26 — Phase 5 pilot engineering baseline implemented
+
+#### Added
+
+- Tenant/site-scoped AI quality summaries, append-only reviewer labels,
+  evidence coverage/retrieval precision counters, supervisor quality dashboard,
+  and a frozen deterministic pilot evaluation CLI/dataset with fail-closed
+  unsafe recommendation gates.
+- Separate API/worker PostgreSQL connection budgets, per-job River concurrency,
+  deadlines, bounded retry schedules, permanent/transient classification, and
+  an OLTP contention load-check tool.
+- Offline sync policy tests for duplicate, reordered, interrupted, retryable,
+  stale-version, and independent attachment transfer behavior.
+- Read-only EAM/CMMS connector/import boundary plus a path-confined,
+  digest-cursored NDJSON snapshot adapter; no external write-back.
+- PostgreSQL backup, checksum, empty-target restore, count/schema verification,
+  tenant audit export, data retention, incident response, threat model, release,
+  identity/object-store support, and single-server pilot runbooks.
+- Pilot Compose profile, migrator and static web images, dependency SBOM tool,
+  pinned GitHub Actions, dependency/image scan gates, tagged artifact
+  provenance, and Windows/macOS backend evaluation packages.
+
+#### Verified
+
+- Migration upgrade to version 10 and append-only feedback privileges.
+- Backup/restore rehearsal with schema and key-table count parity; the temporary
+  restore database was removed after verification.
+- Frozen safety evaluation passed with zero escaped unsafe candidates.
+- Local API/worker contention test completed 1,600 operations with zero errors.
+- Full race-enabled Go/PostgreSQL/S3 suite, vet/build, React lint/Vitest/Vite,
+  OpenAPI validation, npm high-severity audit, and all four OCI builds passed.
+
+#### Open qualification gates
+
+- A named customer must still approve topology, data class, OIDC/S3, support,
+  RPO/RTO, retention, and safety acceptance. Object-store recovery must be
+  rehearsed against the selected product.
+- Windows/macOS Flutter CI execution, code signing/notarization, protected
+  signing identities, and clean-machine installation remain release gates.
+- The result is a pilot engineering baseline, not an industrial standards,
+  compliance, safety-authority, or autonomous-control claim.
+
+### 2026-07-26 — Phase 4 governed workflow learning implemented
+
+#### Added
+
+- PostgreSQL workflow identities, immutable versions, applicability,
+  append-oriented reviews/evaluations, and correction-derived improvement
+  candidates in migration `00009`.
+- A maintenance learning gateway contained in `internal/skawld`: approved
+  demonstration loader with redaction overlays, deterministic extractor,
+  read-only guidance tool catalog, SDK v0.2.0 stores/compiler/evaluation/
+  publication adapters, and product-owned query DTOs.
+- Multi-demonstration compilation with exact event evidence, source digest,
+  sequence consistency, visible conflicts, behavioral diff, prerequisites,
+  competencies, effective/review dates, and reproducible SDK payload.
+- REST/OpenAPI and supervisor UI for candidate compilation, evidence review,
+  approval/rejection, evaluation/publication, applicability expansion,
+  applicable-workflow lookup, and retirement.
+
+#### Safety and boundaries
+
+- Only completed, approved, gap-free demonstrations from the same workflow,
+  site, and asset class can compile; at least two distinct demonstrations are
+  required.
+- Unsupported or unclassified semantic actions are rejected. The tool catalog
+  contains read-only maintenance guidance tools and no industrial-control
+  capability.
+- RBAC and `ApprovalAuthority` remain separate. Initial approval cannot expand
+  applicability outside the learned site/asset class; expansion is a distinct
+  authorized operation.
+- Corrections create improvement candidates only. Published/retired executable
+  payloads are database-immutable and production workflows never self-modify.
+- Compilation remains synchronous and bounded for MVP volume; no new queue or
+  service was introduced without measured need.
+
+#### Verified
+
+- PostgreSQL migration upgrade through version 9 and database immutability
+  enforcement for published workflow payloads.
+- Full Go vet and race-enabled PostgreSQL/S3 suite, including compile-review-
+  evaluate-publish-expand-retire integration behavior.
+- React TypeScript check, Vitest, Vite production build, and valid OpenAPI
+  Phase 4 contract.
+- Windows and macOS backend archives for amd64/arm64 with SHA-256 manifests.
+
+### 2026-07-26 — Phase 3 semantic demonstration capture implemented
+
+#### Added
+
+- PostgreSQL implementation of SDK Observation v1 contained inside
+  `internal/skawld`, with product-owned demonstration DTOs and services.
+- Subject-aware domain-event outbox and durable capture deliveries. River
+  processes them on a dedicated single-concurrency queue with bounded batches,
+  stale-claim recovery, idempotent IDs, exponential retry, and visible health.
+- Semantic mapping for execution work, measurements, decisions, evidence,
+  recommendations, exact human corrections, outcomes, and shift handovers.
+- Start/list/get/evidence-view/complete/review/redaction REST routes and a React
+  timeline showing actor, trust, provenance, corrections, payload, and retry
+  failures.
+- Deterministic ingress sanitization plus append-oriented redaction overlays;
+  governance requires scoped `ApprovalAuthority` separately from RBAC.
+- P-302, shift-handover, and capture-failure PostgreSQL fixtures; migrations
+  through version 8.
+- Platform-selectable backend packaging, including a Windows/macOS-only target
+  that produces x64/ARM64 archives and a complete SHA-256 manifest without
+  requiring Linux builds.
+
+#### Safety and boundaries
+
+- Capture processing failure cannot roll back authoritative maintenance work;
+  a gap remains visible and blocks demonstration completion.
+- Runtime role cannot update/delete semantic events or reviews. No
+  mouse-coordinate recorder, self-modification, CMMS expansion, or industrial
+  control was introduced in Phase 3.
+
+#### Verified
+
+- Empty-database migration to version 8 on PostgreSQL/pgvector.
+- Full Go vet and race-enabled PostgreSQL/S3 suite.
+- React TypeScript check, Vitest, Vite build, and valid OpenAPI Phase 3 lint.
+- Fedora Podman bind mounts now carry SELinux relabel options.
+- Windows and macOS backend archives for amd64/arm64 with all checksums
+  verified.
+
+### 2026-07-26 — SDK v0.2.0 integration gate closed
+
+#### Added
+
+- Exact `github.com/ZekromNguyen/skawld-sdk-go v0.2.0` dependency with normal
+  Go checksum verification and no committed `replace`.
+- Trusted maintenance-principal to SDK tenant/actor/role mapping, canonical
+  policy-safe SDK role identifiers, centralized product role permissions, and
+  explicit maintenance-to-SDK risk mapping.
+- Repository-wide import guard allowing SDK imports only in
+  `internal/skawld` and the isolated SDK contract suite.
+- Behavioral contracts for provider streaming, a strict maintenance-shaped
+  idempotent tool, role/risk policy, approval pause/resume, requester/approver
+  separation, deterministic workflow execution, audit emission, semantic
+  demonstration recording, multi-demonstration learning, exact candidate
+  review, evaluation gates, and publication.
+
+#### Changed
+
+- Closed ADR 0002 and Phase 0's SDK release gate.
+- Principal resolution now retains trusted roles and does not merge roles or
+  sites from another organization into the current single-organization
+  session.
+- Product role names containing spaces are translated only at the SDK boundary
+  (`maintenance_supervisor`, `senior_technician`, and so on); maintenance
+  vocabulary and stored role names remain unchanged.
+
+#### Verified
+
+- `go mod verify` and `go list -m` resolve the exact tag without replacement.
+- Full Go vet/build and PostgreSQL/S3 race suite, including the new SDK
+  contract package.
+- Reachable vulnerability scanning reports no findings; API/worker OCI images
+  and Windows/macOS amd64/arm64 backend packages still build after the SDK
+  integration, with all package checksums verified.
+
+### 2026-07-26 — Phase 2 evidence-first copilot implemented
+
+#### Added
+
+- Controlled industrial document metadata and revision lifecycle with
+  authority, effective/expiry dates, applicability, supersession, retirement,
+  attachment provenance, and approval-authority enforcement.
+- Bounded PDF/text ingestion using a fixed Poppler command, stable chunk
+  locators/checksums, versioned embeddings, transactional River enqueue,
+  re-ingestion identity, failure classification, and a worker container with
+  the required extractor.
+- Authorization-first PostgreSQL eligible-set search combining FTS, exact
+  pgvector cosine, explicit RRF, and same-site resolved incident history.
+- Provider-neutral capability router, deterministic structured and embedding
+  development providers, strict versioned output contracts, optional
+  configured HTTP speech adapter, transcription candidate/verification flow,
+  and a vision-candidate-only port.
+- Typed incident recommendation API with evidence snapshots, assumptions,
+  unknowns, confidence/risk, `INSUFFICIENT_EVIDENCE`, human feedback, and AI
+  call/retrieval instrumentation.
+- Structured maintenance report draft/edit/submit/approve lifecycle and shift
+  handover draft/edit/submit/accept/acknowledge lifecycle with exact
+  model/prompt/hash/evidence provenance and append-oriented audit/edit records.
+- React supervisor views for controlled knowledge ingestion/status, evidence
+  search, advisory recommendations, report drafts, and shift handover.
+- Online-only evidence-backed recommendation panel in the Flutter
+  Windows/macOS/field client; deterministic offline maintenance writes remain
+  independent and durable.
+- OpenAPI Phase 2 routes and migrations through version 5.
+
+#### Safety
+
+- Tenant, site, document approval/validity, and asset applicability are applied
+  in SQL before ranking or AI context construction.
+- Invalid JSON, unknown fields, invented evidence IDs, duplicated evidence,
+  and recommendation risk above advisory fail closed without domain mutation.
+- AI produces proposals/drafts/candidates only. Report, handover, document, and
+  transcript authority remain explicit human transitions.
+- No generic chat, machinery-control tool, PTW/LOTO authority, or autonomous
+  workflow mutation was added.
+
+#### Verified
+
+- Go vet/build and full tests, including real PostgreSQL vertical tests for
+  ingestion, filtered hybrid retrieval, report provenance/edit/approval, and
+  shift handover provenance.
+- S3 capability contract, React TypeScript/Vitest/production build, valid
+  OpenAPI lint, and an empty-database migration through version 5 using the
+  non-superuser schema owner after admin extension bootstrap.
+- Windows amd64/arm64 and macOS amd64/arm64 backend engineering archives,
+  archive contents, and SHA-256 manifests. Flutter Phase 2 source validation
+  remains a native/mobile CI gate because the current shell has no Flutter SDK.
+- Reachable Go vulnerability scan reported no findings; API and non-root
+  Poppler-equipped worker OCI images build successfully.
+
+#### Open gate
+
+- Deterministic development providers must be replaced by deployment-selected
+  adapters and evaluated before a pilot. Speech returns `503` unless a
+  configured endpoint is provided.
+- Native Windows/macOS CI artifacts still require a native CI run, signing, and
+  macOS notarization before external distribution. The same CI run must execute
+  Flutter analysis/tests for the new copilot panel.
+
+### 2026-07-26 — Phase 1 core maintenance implemented
+
+#### Added
+
+- Source-aware asset hierarchy/components, approved criticality, incident
+  lifecycle, and PostgreSQL repositories with tenant/site authorization,
+  optimistic concurrency, idempotency, audit, and domain events.
+- Pump inspection execution aggregate with assigned work, fixed inspectable
+  steps, exact vibration/temperature measurements, observations, actions,
+  semantic decisions, and external prerequisite evidence.
+- Hard blocking of intrusive bearing inspection until current energy-isolation
+  evidence is recorded by a separately privileged actor; Skawld does not own
+  the permit or isolation.
+- Narrow AWS SDK v2 S3 adapter and attachment lifecycle with server-generated
+  keys, constrained signed upload, independent retries, SHA-256/size/magic-byte
+  verification, and rejected/available states.
+- Phase 1 REST handlers and OpenAPI 3.1 contract.
+- React 19 + TypeScript + Vite + Tailwind supervisor workbench for native asset
+  and incident creation, incident queue, pump execution, steps, and exact
+  measurement entry.
+- Flutter/Drift offline client source with assigned-execution pull, checklist,
+  measurement/note capture, photo/audio manifest queue, atomic outbox,
+  client/device/time identity, retry/conflict state, secure OIDC PKCE
+  credentials, and connectivity-triggered synchronization.
+- Native Windows and macOS Flutter build jobs and packaging scripts producing a
+  portable Windows ZIP plus macOS DMG/ZIP with SHA-256 files. These are
+  technician/workstation apps and remain unsigned engineering artifacts.
+- Desktop runtime configuration loaded from a managed file or environment,
+  plus macOS network/loopback/Keychain entitlements required by OIDC PKCE and
+  secure credential storage.
+
+#### Verified
+
+- Goose migrations through version 3 on PostgreSQL/pgvector.
+- Race-enabled PostgreSQL vertical integration for P-302 execution and safety
+  prerequisite blocking.
+- Required S3 adapter capability subset against Adobe S3Mock 5 after updating
+  its v5 environment/health configuration.
+- Go test/vet/build, TypeScript check, Vitest, Vite production build, and valid
+  Redocly OpenAPI lint.
+- Flutter `3.44.8` dependency resolution and lock, Drift generation, clean
+  Flutter analysis, and Flutter contract tests.
+
+#### Open gate
+
+- Native Windows/macOS builds require their OS toolchains and remain CI gates;
+  signing/notarization are deliberately not configured without release
+  identities and protected secrets.
+
 ### 2026-07-26 — Windows and macOS engineering packages
 
 #### Added

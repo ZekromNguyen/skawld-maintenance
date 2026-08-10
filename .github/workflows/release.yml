@@ -1,0 +1,100 @@
+name: Release signing
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+          - platform: macos
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: "3.44.8"
+          cache: true
+      - name: Generate platform host project
+        run: flutter create --platforms=${{ matrix.platform }} --org com.skawld --project-name skawld_maintenance_mobile .
+      - name: Configure macOS entitlements
+        if: runner.os == 'macOS'
+        run: ../scripts/configure-flutter-macos.sh
+      - run: flutter pub get
+      - name: Quality gates
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          dart run build_runner build
+          flutter analyze
+          flutter test
+      - name: Build Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: flutter build windows --release
+      - name: Sign Windows application
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_BASE64 != '' && env.WINDOWS_CERT_PASSWORD != ''
+        env:
+          WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        uses: dlemstra/code-sign-action@4b50d5d17d7e1fcccdd983c7f88baf2c1e63f869
+        with:
+          certificate: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          password: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          files: mobile/build/windows/x64/runner/Release/*.exe
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ../scripts/package-desktop-windows.ps1 -Version "signed-ci"
+      - name: Build macOS application
+        if: runner.os == 'macOS'
+        run: flutter build macos --release
+      - name: Sign macOS application
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_IDENTITY != ''
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          codesign --deep --force --options runtime \
+            --sign "$MACOS_SIGNING_IDENTITY" \
+            build/macos/Build/Products/Release/skawld_maintenance_mobile.app
+      - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: ../scripts/package-desktop-macos.sh "signed-ci"
+      - name: Notarize macOS package
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_IDENTITY != '' && env.MACOS_NOTARY_KEY_ID != '' && env.MACOS_NOTARY_ISSUER_ID != '' && env.MACOS_NOTARY_PRIVATE_KEY != ''
+        shell: bash
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_PRIVATE_KEY: ${{ secrets.MACOS_NOTARY_PRIVATE_KEY }}
+        run: |
+          printf '%s' "$MACOS_NOTARY_PRIVATE_KEY" > "$RUNNER_TEMP/notary.p8"
+          DMG=$(ls dist/desktop/*.dmg | head -1)
+          xcrun notarytool submit "$DMG" \
+            --key-id "$MACOS_NOTARY_KEY_ID" \
+            --issuer "$MACOS_NOTARY_ISSUER_ID" \
+            --key "$RUNNER_TEMP/notary.p8" --wait
+          xcrun stapler staple "$DMG"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: signed-${{ matrix.platform }}-${{ github.run_number }}
+          path: mobile/dist/desktop/
+          if-no-files-found: ignore

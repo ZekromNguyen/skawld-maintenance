@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -64,11 +65,71 @@ func TestLiveness(t *testing.T) {
 	}
 }
 
-func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
+func TestOpenAPIDocumentServedWhenProvided(t *testing.T) {
+	t.Parallel()
+	handler := New(Dependencies{
+		Logger:  slog.New(slog.DiscardHandler),
+		Auth:    fakeAuth{},
+		OpenAPI: []byte("openapi: 3.1.0\n"),
+	})
+	request := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if contentType := response.Header().Get("Content-Type"); contentType != "application/yaml" {
+		t.Fatalf("content-type = %q, want application/yaml", contentType)
+	}
+	if body := response.Body.String(); body != "openapi: 3.1.0\n" {
+		t.Fatalf("body = %q, want openapi document", body)
+	}
+}
+
+func TestOpenAPIDocumentAbsentWhenNotProvided(t *testing.T) {
 	t.Parallel()
 	handler := New(Dependencies{
 		Logger: slog.New(slog.DiscardHandler),
 		Auth:   fakeAuth{},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/openapi.yaml", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
+func TestReadinessFailsClosedWhenDatabaseIsUnavailable(t *testing.T) {
+	t.Parallel()
+	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	response := httptest.NewRecorder()
+
+	readiness(nil).ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf(
+			"status = %d, want %d",
+			response.Code,
+			http.StatusServiceUnavailable,
+		)
+	}
+}
+
+func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
+	t.Parallel()
+	handler := New(Dependencies{
+		Logger: slog.New(slog.DiscardHandler),
+		Auth: fakeAuth{principal: domain.Principal{
+			ID:          "00000000-0000-0000-0000-000000000001",
+			DisplayName: "Test User",
+			Roles:       []domain.Role{domain.RoleTechnician},
+			Permissions: map[domain.Permission]struct{}{},
+		}},
 	})
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	response := httptest.NewRecorder()
@@ -77,6 +138,14 @@ func TestCurrentPrincipalIsProtectedAndMapped(t *testing.T) {
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	roles, ok := body["roles"].([]any)
+	if !ok || len(roles) != 1 || roles[0] != "Technician" {
+		t.Fatalf("roles = %v, want [Technician]", body["roles"])
 	}
 }
 

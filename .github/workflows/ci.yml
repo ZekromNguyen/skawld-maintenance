@@ -14,17 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.7"
+          go-version: "1.25.12"
           cache: true
       - name: Verify formatting
         run: test -z "$(gofmt -l .)"
       - name: Download dependencies
         run: go mod download
+      - name: Verify pinned SDK
+        shell: bash
+        run: |
+          go mod verify
+          test "$(go list -m -f '{{.Version}}' github.com/ZekromNguyen/skawld-sdk-go)" = "v0.2.0"
       - name: Start PostgreSQL
         run: docker compose up -d --wait postgres
+      - name: Start S3 contract target
+        run: docker compose --profile objectstore up -d --wait s3mock
       - name: Migrate from empty
         env:
           MIGRATION_DATABASE_URL: postgres://skawld_owner:skawld_owner_dev@localhost:5432/skawld?sslmode=disable
@@ -38,34 +45,228 @@ jobs:
       - name: Test
         env:
           TEST_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
+          TEST_S3_ENDPOINT: http://localhost:9090
         run: go test -race -count=1 ./...
+      - name: Import fixture snapshot through the CLI
+        env:
+          TEST_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
+        run: |
+          SITE_ID=$(docker compose exec -T postgres psql -U skawld_app -d skawld -Atqc "
+            WITH o AS (
+              INSERT INTO organizations (id, name, source_of_truth, version, created_at, updated_at)
+              VALUES (gen_random_uuid(), 'CI Import Organization', 'OWNED_BY_SKAWLD', 1, now(), now())
+              RETURNING id
+            ), s AS (
+              INSERT INTO sites (id, organization_id, code, name, timezone, status, version, created_at, updated_at)
+              SELECT gen_random_uuid(), id, 'CI', 'CI Import Site', 'UTC', 'ACTIVE', 1, now(), now() FROM o
+              RETURNING id, organization_id
+            ), p AS (
+              INSERT INTO principals (id, external_subject, display_name, status, created_at, updated_at)
+              VALUES (gen_random_uuid(), 'ci-import', 'CI Import Admin', 'ACTIVE', now(), now())
+              RETURNING id
+            )
+            INSERT INTO memberships (id, principal_id, organization_id, site_id, role, created_at)
+            SELECT gen_random_uuid(), p.id, s.organization_id, s.id, 'Administrator', now() FROM s, p
+            RETURNING site_id")
+          go run ./cmd/import -snapshot test/fixtures/import-p302.ndjson \
+            -site-id "$SITE_ID" -database-url "$TEST_DATABASE_URL" \
+            -external-subject ci-import
+      - name: Run frozen pilot safety evaluation
+        run: go run ./cmd/eval -dataset test/evaldata/pilot-v1.json -output dist/evaluation/pilot-v1.json
+      - name: Check API/worker PostgreSQL contention budget
+        env:
+          LOAD_DATABASE_URL: postgres://skawld_app:skawld_app_dev@localhost:5432/skawld?sslmode=disable
+        run: go run ./tools/loadcheck -operations 25 -max-p95 750ms
+      - name: Generate CycloneDX SBOM
+        run: go run ./tools/sbom -version "${GITHUB_REF_NAME}" -output dist/sbom/skawld-maintenance.cdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pilot-evaluation-and-sbom-${{ github.run_number }}
+          path: |
+            dist/evaluation/pilot-v1.json
+            dist/sbom/skawld-maintenance.cdx.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Build
-        run: go build ./cmd/api ./cmd/worker ./cmd/migrate
+        run: go build ./cmd/api ./cmd/worker ./cmd/migrate ./cmd/eval
       - name: Stop dependencies
         if: always()
         run: docker compose down --volumes
 
-  containers:
-    needs: checks
+  provider-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.25.12"
+          cache: true
+      - name: Download dependencies
+        run: go mod download
+      - name: Run AI provider contract tests
+        run: go test ./internal/skawld/ -run Contract -v
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Validate OpenAPI
+        run: npx redocly lint ../api/openapi.yaml
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: "3.44.8"
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart run build_runner build
+      - run: flutter analyze
+      - run: flutter test
+
+  desktop-app-packages:
+    if: github.event_name == 'push'
+    needs: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: windows
+          - runner: macos-latest
+            platform: macos
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: "3.44.8"
+          cache: true
+      - name: Generate platform host project
+        run: flutter create --platforms=${{ matrix.platform }} --org com.skawld --project-name skawld_maintenance_mobile .
+      - name: Configure macOS entitlements
+        if: runner.os == 'macOS'
+        run: ../scripts/configure-flutter-macos.sh
+      - run: flutter pub get
+      - name: Format, analyze, and test on the native runner
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          dart run build_runner build
+          flutter analyze
+          flutter test
+      - name: Build Windows application
+        if: runner.os == 'Windows'
+        run: flutter build windows --release
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ../scripts/package-desktop-windows.ps1 -Version "${{ github.ref_name }}"
+      - name: Build macOS application
+        if: runner.os == 'macOS'
+        run: flutter build macos --release
+      - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: ../scripts/package-desktop-macos.sh "${{ github.ref_name }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: skawld-maintenance-${{ matrix.platform }}-${{ github.run_number }}
+          path: mobile/dist/desktop/
+          if-no-files-found: error
+          retention-days: 14
+
+  containers:
+    needs: [checks, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build API image
         run: docker build -f deployments/containers/api.Dockerfile -t skawld-maintenance-api:ci .
       - name: Build worker image
         run: docker build -f deployments/containers/worker.Dockerfile -t skawld-maintenance-worker:ci .
+      - name: Build migrate image
+        run: docker build -f deployments/containers/migrate.Dockerfile -t skawld-maintenance-migrate:ci .
+      - name: Build web image
+        run: docker build -f deployments/containers/web.Dockerfile -t skawld-maintenance-web:ci .
+      - name: Scan API image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: skawld-maintenance-api:ci
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          # Block releases when a vendor remediation exists. Unfixed findings
+          # remain a security-review input; they cannot be remediated in CI.
+          only-fixed: true
+      - name: Scan worker image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: skawld-maintenance-worker:ci
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          only-fixed: true
+      - name: Scan migrate image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: skawld-maintenance-migrate:ci
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          only-fixed: true
+      - name: Scan web image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: skawld-maintenance-web:ci
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          only-fixed: true
+      - name: Validate pilot compose profile
+        run: docker compose --env-file deployments/pilot/.env.example -f deployments/pilot/compose.yaml config --quiet
 
   native-packages:
     if: github.event_name == 'push'
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: "1.25.7"
+          go-version: "1.25.12"
           cache: true
       - name: Build Windows, macOS, and Linux packages
         shell: bash
@@ -79,9 +280,14 @@ jobs:
             -version "${version}" \
             -commit "${GITHUB_SHA}" \
             -built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: skawld-maintenance-${{ env.PACKAGE_VERSION }}
           path: dist/packages/${{ env.PACKAGE_VERSION }}/
           if-no-files-found: error
           retention-days: 14
+      - name: Attest tagged package provenance
+        if: github.ref_type == 'tag'
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: dist/packages/${{ env.PACKAGE_VERSION }}/*

@@ -63,5 +63,81 @@ func validConfig(role Role) Config {
 			VisionConcurrency:        1,
 			TranscriptionConcurrency: 1,
 		},
+		ObjectStore: ObjectStore{
+			Region: "us-east-1",
+			Bucket: "test",
+		},
+		AI: AI{
+			StructuredProvider: "deterministic",
+			EmbeddingProvider:  "deterministic",
+		},
+	}
+}
+
+func TestValidateRejectsUnknownStructuredProvider(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "bogus"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected structured provider validation error")
+	}
+}
+
+func TestValidateRejectsUnknownEmbeddingProvider(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.EmbeddingProvider = "bogus"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected embedding provider validation error")
+	}
+}
+
+func TestValidateRequiresOpenAIModel(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "openai"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing AI_MODEL error")
+	}
+}
+
+func TestValidateRequiresAnthropicKeyAndModel(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "anthropic"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing ANTHROPIC_API_KEY error")
+	}
+}
+
+func TestLoadDefaultsStructuredProviderToDeterministic(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://test")
+	t.Setenv("S3_BUCKET", "test-bucket")
+	cfg, err := Load(RoleWorker)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.AI.StructuredProvider != "deterministic" {
+		t.Fatalf("StructuredProvider = %q, want deterministic", cfg.AI.StructuredProvider)
+	}
+	if cfg.AI.EmbeddingProvider != "deterministic" {
+		t.Fatalf("EmbeddingProvider = %q, want deterministic", cfg.AI.EmbeddingProvider)
+	}
+}
+
+func TestValidateRequiresOpenAIAPIKey(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig(RoleAPI)
+	cfg.AI.StructuredProvider = "openai"
+	cfg.AI.Model = "gpt-4o"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing AI_API_KEY error")
+	}
+}
+
+func TestValidConfigPassesValidation(t *testing.T) {
+	t.Parallel()
+	if err := validConfig(RoleAPI).Validate(); err != nil {
+		t.Fatalf("validConfig(RoleAPI) must validate clean: %v", err)
 	}
 }

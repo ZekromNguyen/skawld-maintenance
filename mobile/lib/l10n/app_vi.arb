@@ -1,0 +1,90 @@
+{
+  "@@locale": "vi",
+  "appTitle": "Skawld Maintenance",
+  "language": "Ngôn ngữ",
+  "locale_system": "Hệ thống",
+  "locale_english": "English",
+  "locale_vietnamese": "Tiếng Việt",
+  "login_subtitle": "Hãy đăng nhập khi có kết nối. Công việc được phân công đã lưu sẽ vẫn sẵn sàng trong các lần mất kết nối sau.",
+  "login_button": "Đăng nhập bằng OIDC",
+  "login_connecting": "Đang kết nối…",
+  "list_assignedMaintenance": "Công việc bảo trì được phân công",
+  "list_offlineBanner": "SẴN SÀNG NGOẠI TUYẾN · CHỈ ĐỂ THAM KHẢO",
+  "list_syncNow": "Đồng bộ ngay",
+  "list_empty": "Không có công việc nào được lưu.\nKết nối một lần để tải công việc được phân công của bạn.",
+  "list_footer": "Các thay đổi đang chờ được lưu trên thiết bị này và tự động đồng bộ.",
+  "signout_title": "Đăng xuất?",
+  "signout_message": "Phiên làm việc trên thiết bị này sẽ kết thúc. Công việc đã lưu vẫn ở trên thiết bị và đồng bộ sau khi bạn đăng nhập lại.",
+  "signout_cancel": "Hủy",
+  "signout_confirm": "Đăng xuất",
+  "signout_tooltip": "Đăng xuất",
+  "detail_disclaimer": "Skawld hướng dẫn và ghi lại công việc. PTW/LOTO bên ngoài vẫn giữ thẩm quyền.",
+  "detail_startOffline": "Bắt đầu kiểm tra ngoại tuyến",
+  "detail_requiresPrerequisite": "Yêu cầu {prerequisite}",
+  "@detail_requiresPrerequisite": {
+    "placeholders": {
+      "prerequisite": {
+        "type": "String"
+      }
+    }
+  },
+  "detail_complete": "Hoàn thành",
+  "measurement_record": "Ghi số đo",
+  "measurement_vibrationVelocity": "Vận tốc rung · mm/s",
+  "measurement_bearingTemperature": "Nhiệt độ ổ trục · °C",
+  "measurement_exactValue": "Giá trị chính xác",
+  "measurement_save": "Lưu số đo trên thiết bị",
+  "copilot_title": "Trợ lý có căn cứ bằng chứng",
+  "copilot_disclaimer": "Chỉ dùng khi trực tuyến. Các đề xuất tham khảo không thể hoàn tất bước quy trình hoặc cấp phép PTW/LOTO.",
+  "copilot_busy": "Đang truy xuất bằng chứng hợp lệ…",
+  "copilot_recommend": "Đề xuất bước kiểm tra tiếp theo",
+  "copilot_confidence": "Độ tin cậy {percent}%",
+  "@copilot_confidence": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "copilot_insufficient": "THIẾU BẰNG CHỨNG",
+  "copilot_unknowns": "Chưa rõ: {value}",
+  "@copilot_unknowns": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "copilot_humanConfirmation": "{provenance} · cần xác nhận của con người",
+  "@copilot_humanConfirmation": {
+    "placeholders": {
+      "provenance": {
+        "type": "String"
+      }
+    }
+  },
+  "observation_title": "Nhận xét của kỹ thuật viên",
+  "observation_hint": "Bạn đã quan sát thấy gì?",
+  "observation_save": "Lưu ghi chú trên thiết bị",
+  "attachment_title": "Bằng chứng ảnh hoặc ghi âm",
+  "attachment_subtitle": "Tệp được xếp hàng riêng. Tải lên thất bại không xóa bản ghi kiểm tra.",
+  "attachment_choose": "Chọn tệp từ thiết bị này",
+  "attachment_pickerLabel": "Ảnh và ghi chú thoại",
+  "savedPendingSync": "Đã lưu trên thiết bị · chờ đồng bộ",
+  "error_notAssigned": "Chỉ công việc được phân công mới có thể bắt đầu",
+  "error_notInProgress": "Công việc chưa trong trạng thái đang tiến hành",
+  "error_prerequisiteUnverified": "{prerequisite} phải được cơ quan có thẩm quyền bên ngoài xác minh khi trực tuyến",
+  "@error_prerequisiteUnverified": {
+    "placeholders": {
+      "prerequisite": {
+        "type": "String"
+      }
+    }
+  },
+  "error_copilotOffline": "Copilot yêu cầu kết nối trực tuyến đã xác thực. Hồ sơ hiện trường ngoại tuyến vẫn an toàn.",
+  "error_copilotEmpty": "Copilot trả về phản hồi rỗng",
+  "error_attachmentSize": "Tệp đính kèm phải có kích thước từ 1 byte đến 50 MiB",
+  "error_attachmentType": "Loại tệp đính kèm không được hỗ trợ",
+  "config_invalid": "Cấu hình máy tính để bàn không hợp lệ",
+  "config_hint": "Kiểm tra skawld-config.json hoặc các biến môi trường được quản lý."
+}

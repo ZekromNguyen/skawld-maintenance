@@ -1,0 +1,23 @@
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": { target: "http://localhost:8080", changeOrigin: false },
+      "/auth": { target: "http://localhost:8080", changeOrigin: false },
+      "/health": { target: "http://localhost:8080", changeOrigin: false }
+    }
+  },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Enable global afterEach so @testing-library/react auto-cleanup runs
+    // between tests (prevents DOM leakage across test files).
+    globals: true,
+    setupFiles: "./src/test/setup.ts"
+  }
+});

@@ -1,0 +1,121 @@
+name: skawld-maintenance-pilot
+
+x-app-environment: &app-environment
+  APP_ENV: pilot
+  DATABASE_URL: postgres://skawld_app:${SKAWLD_DB_APP_PASSWORD:?required}@postgres:5432/skawld?sslmode=disable
+  DATABASE_API_MAX_CONNS: ${DATABASE_API_MAX_CONNS:-8}
+  DATABASE_WORKER_MAX_CONNS: ${DATABASE_WORKER_MAX_CONNS:-8}
+  DATABASE_MAX_CONNECTION_BUDGET: ${DATABASE_MAX_CONNECTION_BUDGET:-20}
+  DATABASE_STATEMENT_TIMEOUT: ${DATABASE_STATEMENT_TIMEOUT:-15s}
+  DATABASE_LOCK_TIMEOUT: ${DATABASE_LOCK_TIMEOUT:-3s}
+  OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?required}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?required}
+  OIDC_AUDIENCE: ${OIDC_AUDIENCE:-skawld-api}
+  OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL:?required}
+  SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-skawld_session}
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_TTL: ${SESSION_TTL:-8h}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:?required}
+  S3_BUCKET: ${S3_BUCKET:?required}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+  S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-true}
+
+services:
+  postgres:
+    image: docker.io/pgvector/pgvector:0.8.2-pg17-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?required}
+      POSTGRES_DB: postgres
+      SKAWLD_DB_OWNER_PASSWORD: ${SKAWLD_DB_OWNER_PASSWORD:?required}
+      SKAWLD_DB_APP_PASSWORD: ${SKAWLD_DB_APP_PASSWORD:?required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: deployments/containers/migrate.Dockerfile
+    environment:
+      MIGRATION_DATABASE_URL: postgres://skawld_owner:${SKAWLD_DB_OWNER_PASSWORD:?required}@postgres:5432/skawld?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["up"]
+    restart: "no"
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deployments/containers/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      HTTP_ADDRESS: :8080
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1770"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: deployments/containers/worker.Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      JOB_CONCURRENCY_EMBEDDING: ${JOB_CONCURRENCY_EMBEDDING:-3}
+      JOB_CONCURRENCY_REPORT: ${JOB_CONCURRENCY_REPORT:-4}
+      JOB_CONCURRENCY_VISION: ${JOB_CONCURRENCY_VISION:-2}
+      JOB_CONCURRENCY_TRANSCRIPTION: ${JOB_CONCURRENCY_TRANSCRIPTION:-2}
+      PDFTOTEXT_BINARY: pdftotext
+      TRANSCRIPTION_ENDPOINT: ${TRANSCRIPTION_ENDPOINT:-}
+      TRANSCRIPTION_API_KEY: ${TRANSCRIPTION_API_KEY:-}
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-unavailable}
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-unavailable}
+      TRANSCRIPTION_MODEL_VERSION: ${TRANSCRIPTION_MODEL_VERSION:-none}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs: ["/tmp:size=256m,mode=1770"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deployments/containers/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1770
+      - /var/cache/nginx:size=16m,mode=1770
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+volumes:
+  postgres-data:

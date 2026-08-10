@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Role string
@@ -18,12 +20,16 @@ const (
 )
 
 type Config struct {
-	Environment string
-	Role        Role
-	HTTP        HTTP
-	Database    Database
-	Auth        Auth
-	Jobs        Jobs
+	Environment   string
+	Role          Role
+	HTTP          HTTP
+	Database      Database
+	Auth          Auth
+	Jobs          Jobs
+	ObjectStore   ObjectStore
+	Documents     Documents
+	Transcription Transcription
+	AI            AI
 }
 
 type HTTP struct {
@@ -49,6 +55,13 @@ type Auth struct {
 	CookieSecure      bool
 	SessionTTL        time.Duration
 	BootstrapSubjects []string
+	// EmailDomainAllowlist restricts federated (Google / Microsoft Entra)
+	// sign-in to company accounts whose email domain is listed. Empty means
+	// the gate is disabled. Bootstrap and seeded principals are exempt.
+	EmailDomainAllowlist []string
+	// FederatedOrgID is the organization federated users are provisioned
+	// into when they carry a valid skawld_role claim.
+	FederatedOrgID string
 }
 
 type Jobs struct {
@@ -56,6 +69,46 @@ type Jobs struct {
 	ReportConcurrency        int
 	VisionConcurrency        int
 	TranscriptionConcurrency int
+}
+
+type ObjectStore struct {
+	Endpoint        string
+	Region          string
+	Bucket          string
+	AccessKeyID     string
+	SecretAccessKey string
+	UsePathStyle    bool
+}
+
+type Documents struct {
+	PDFToTextBinary string
+}
+
+type Transcription struct {
+	Endpoint     string
+	APIKey       string
+	Provider     string
+	Model        string
+	ModelVersion string
+}
+
+// AI selects the structured-output and embedding providers. The deterministic
+// providers are the development default so tests and demos run without AI
+// credentials; deployment adapters are chosen with STRUCTURED_PROVIDER and
+// EMBEDDING_PROVIDER.
+type AI struct {
+	StructuredProvider    string
+	EmbeddingProvider     string
+	Endpoint              string
+	APIKey                string
+	Model                 string
+	ModelVersion          string
+	AnthropicAPIKey       string
+	AnthropicModel        string
+	AnthropicModelVersion string
+	EmbeddingEndpoint     string
+	EmbeddingModel        string
+	EmbeddingModelVersion string
 }
 
 func Load(role Role) (Config, error) {
@@ -74,21 +127,55 @@ func Load(role Role) (Config, error) {
 			LockTimeout:      envDuration("DATABASE_LOCK_TIMEOUT", 3*time.Second),
 		},
 		Auth: Auth{
-			IssuerURL:         env("OIDC_ISSUER_URL", ""),
-			ClientID:          env("OIDC_CLIENT_ID", ""),
-			ClientSecret:      env("OIDC_CLIENT_SECRET", ""),
-			Audience:          env("OIDC_AUDIENCE", "skawld-api"),
-			RedirectURL:       env("OIDC_REDIRECT_URL", "http://localhost:8080/auth/callback"),
-			CookieName:        env("SESSION_COOKIE_NAME", "skawld_session"),
-			CookieSecure:      envBool("SESSION_COOKIE_SECURE", true),
-			SessionTTL:        envDuration("SESSION_TTL", 8*time.Hour),
-			BootstrapSubjects: envCSV("BOOTSTRAP_OIDC_SUBJECTS"),
+			IssuerURL:            env("OIDC_ISSUER_URL", ""),
+			ClientID:             env("OIDC_CLIENT_ID", ""),
+			ClientSecret:         env("OIDC_CLIENT_SECRET", ""),
+			Audience:             env("OIDC_AUDIENCE", "skawld-api"),
+			RedirectURL:          env("OIDC_REDIRECT_URL", "http://localhost:8080/auth/callback"),
+			CookieName:           env("SESSION_COOKIE_NAME", "skawld_session"),
+			CookieSecure:         envBool("SESSION_COOKIE_SECURE", true),
+			SessionTTL:           envDuration("SESSION_TTL", 8*time.Hour),
+			BootstrapSubjects:    envCSV("BOOTSTRAP_OIDC_SUBJECTS"),
+			EmailDomainAllowlist: envCSV("EMAIL_DOMAIN_ALLOWLIST"),
+			FederatedOrgID:       env("FEDERATED_ORG_ID", ""),
 		},
 		Jobs: Jobs{
 			EmbeddingConcurrency:     envInt("JOB_CONCURRENCY_EMBEDDING", 5),
 			ReportConcurrency:        envInt("JOB_CONCURRENCY_REPORT", 10),
 			VisionConcurrency:        envInt("JOB_CONCURRENCY_VISION", 3),
 			TranscriptionConcurrency: envInt("JOB_CONCURRENCY_TRANSCRIPTION", 3),
+		},
+		ObjectStore: ObjectStore{
+			Endpoint:        env("S3_ENDPOINT", ""),
+			Region:          env("S3_REGION", "us-east-1"),
+			Bucket:          env("S3_BUCKET", ""),
+			AccessKeyID:     env("S3_ACCESS_KEY_ID", ""),
+			SecretAccessKey: env("S3_SECRET_ACCESS_KEY", ""),
+			UsePathStyle:    envBool("S3_USE_PATH_STYLE", true),
+		},
+		Documents: Documents{
+			PDFToTextBinary: env("PDFTOTEXT_BINARY", "pdftotext"),
+		},
+		Transcription: Transcription{
+			Endpoint:     env("TRANSCRIPTION_ENDPOINT", ""),
+			APIKey:       env("TRANSCRIPTION_API_KEY", ""),
+			Provider:     env("TRANSCRIPTION_PROVIDER", "unavailable"),
+			Model:        env("TRANSCRIPTION_MODEL", "unavailable"),
+			ModelVersion: env("TRANSCRIPTION_MODEL_VERSION", "none"),
+		},
+		AI: AI{
+			StructuredProvider:    strings.ToLower(strings.TrimSpace(env("STRUCTURED_PROVIDER", "deterministic"))),
+			EmbeddingProvider:     strings.ToLower(strings.TrimSpace(env("EMBEDDING_PROVIDER", "deterministic"))),
+			Endpoint:              env("AI_ENDPOINT", ""),
+			APIKey:                env("AI_API_KEY", ""),
+			Model:                 env("AI_MODEL", ""),
+			ModelVersion:          env("AI_MODEL_VERSION", ""),
+			AnthropicAPIKey:       env("ANTHROPIC_API_KEY", ""),
+			AnthropicModel:        env("ANTHROPIC_MODEL", ""),
+			AnthropicModelVersion: env("ANTHROPIC_MODEL_VERSION", ""),
+			EmbeddingEndpoint:     env("EMBEDDING_ENDPOINT", ""),
+			EmbeddingModel:        env("EMBEDDING_MODEL", ""),
+			EmbeddingModelVersion: env("EMBEDDING_MODEL_VERSION", ""),
 		},
 	}
 	return cfg, errors.Join(cfg.Validate(), validateEnvironmentValues())
@@ -141,9 +228,87 @@ func (c Config) Validate() error {
 		if c.Environment != "development" && c.Environment != "test" && !c.Auth.CookieSecure {
 			errs = append(errs, errors.New("SESSION_COOKIE_SECURE must be true outside development/test"))
 		}
+		if len(c.Auth.EmailDomainAllowlist) > 0 {
+			if strings.TrimSpace(c.Auth.FederatedOrgID) == "" {
+				errs = append(errs, errors.New("FEDERATED_ORG_ID is required when EMAIL_DOMAIN_ALLOWLIST is set"))
+			} else if _, err := uuid.Parse(c.Auth.FederatedOrgID); err != nil {
+				errs = append(errs, errors.New("FEDERATED_ORG_ID must be a valid UUID"))
+			}
+		}
 	}
 	if c.Auth.SessionTTL <= 0 {
 		errs = append(errs, errors.New("SESSION_TTL must be positive"))
+	}
+	if c.Role == RoleAPI || c.Role == RoleWorker {
+		if strings.TrimSpace(c.ObjectStore.Region) == "" ||
+			strings.TrimSpace(c.ObjectStore.Bucket) == "" {
+			errs = append(errs, errors.New("S3_REGION and S3_BUCKET are required"))
+		}
+		if (c.ObjectStore.AccessKeyID == "") != (c.ObjectStore.SecretAccessKey == "") {
+			errs = append(errs, errors.New("S3 access key ID and secret must be configured together"))
+		}
+	}
+	if c.Role == RoleWorker && strings.TrimSpace(c.Documents.PDFToTextBinary) == "" {
+		errs = append(errs, errors.New("PDFTOTEXT_BINARY is required for worker role"))
+	}
+	if c.Transcription.Endpoint != "" {
+		endpoint, err := url.Parse(c.Transcription.Endpoint)
+		if err != nil || !endpoint.IsAbs() ||
+			(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+			errs = append(errs, errors.New("TRANSCRIPTION_ENDPOINT must be an absolute HTTP(S) URL"))
+		}
+		if strings.TrimSpace(c.Transcription.Provider) == "" ||
+			strings.TrimSpace(c.Transcription.Model) == "" ||
+			strings.TrimSpace(c.Transcription.ModelVersion) == "" {
+			errs = append(errs, errors.New("transcription model metadata is required"))
+		}
+	}
+	if c.AI.StructuredProvider != "deterministic" &&
+		c.AI.StructuredProvider != "openai" &&
+		c.AI.StructuredProvider != "anthropic" {
+		errs = append(errs, errors.New("STRUCTURED_PROVIDER must be deterministic, openai, or anthropic"))
+	}
+	if c.AI.EmbeddingProvider != "deterministic" &&
+		c.AI.EmbeddingProvider != "openai" {
+		errs = append(errs, errors.New("EMBEDDING_PROVIDER must be deterministic or openai"))
+	}
+	if c.AI.StructuredProvider == "openai" {
+		if strings.TrimSpace(c.AI.Model) == "" {
+			errs = append(errs, errors.New("AI_MODEL is required when STRUCTURED_PROVIDER is openai"))
+		}
+		if strings.TrimSpace(c.AI.APIKey) == "" {
+			errs = append(errs, errors.New("AI_API_KEY is required when STRUCTURED_PROVIDER is openai"))
+		}
+		if c.AI.Endpoint != "" {
+			endpoint, err := url.Parse(c.AI.Endpoint)
+			if err != nil || !endpoint.IsAbs() ||
+				(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+				errs = append(errs, errors.New("AI_ENDPOINT must be an absolute HTTP(S) URL"))
+			}
+		}
+	}
+	if c.AI.StructuredProvider == "anthropic" {
+		if strings.TrimSpace(c.AI.AnthropicAPIKey) == "" {
+			errs = append(errs, errors.New("ANTHROPIC_API_KEY is required when STRUCTURED_PROVIDER is anthropic"))
+		}
+		if strings.TrimSpace(c.AI.AnthropicModel) == "" {
+			errs = append(errs, errors.New("ANTHROPIC_MODEL is required when STRUCTURED_PROVIDER is anthropic"))
+		}
+	}
+	if c.AI.EmbeddingProvider == "openai" {
+		if strings.TrimSpace(c.AI.EmbeddingModel) == "" {
+			errs = append(errs, errors.New("EMBEDDING_MODEL is required when EMBEDDING_PROVIDER is openai"))
+		}
+		if strings.TrimSpace(c.AI.APIKey) == "" {
+			errs = append(errs, errors.New("AI_API_KEY is required when EMBEDDING_PROVIDER is openai"))
+		}
+		if c.AI.EmbeddingEndpoint != "" {
+			endpoint, err := url.Parse(c.AI.EmbeddingEndpoint)
+			if err != nil || !endpoint.IsAbs() ||
+				(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+				errs = append(errs, errors.New("EMBEDDING_ENDPOINT must be an absolute HTTP(S) URL"))
+			}
+		}
 	}
 	for name, value := range map[string]int{
 		"embedding":     c.Jobs.EmbeddingConcurrency,
@@ -186,9 +351,11 @@ func validateEnvironmentValues() error {
 			}
 		}
 	}
-	if raw, ok := os.LookupEnv("SESSION_COOKIE_SECURE"); ok {
-		if _, err := strconv.ParseBool(raw); err != nil {
-			errs = append(errs, fmt.Errorf("SESSION_COOKIE_SECURE must be a boolean: %w", err))
+	for _, name := range []string{"SESSION_COOKIE_SECURE", "S3_USE_PATH_STYLE"} {
+		if raw, ok := os.LookupEnv(name); ok {
+			if _, err := strconv.ParseBool(raw); err != nil {
+				errs = append(errs, fmt.Errorf("%s must be a boolean: %w", name, err))
+			}
 		}
 	}
 	return errors.Join(errs...)

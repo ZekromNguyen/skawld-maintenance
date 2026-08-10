@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"slices"
+	"sort"
 	"testing"
 	"time"
 )
@@ -96,4 +98,137 @@ func TestCanAccessSite(t *testing.T) {
 	if !organizationScoped.CanAccessSite("org-a", "site-b") {
 		t.Fatal("organization-scoped membership should access its organization sites")
 	}
+}
+
+func TestPermissionsForUnknownRoleFailsClosed(t *testing.T) {
+	t.Parallel()
+	if permissions := PermissionsForRole("Unknown"); len(permissions) != 0 {
+		t.Fatalf("unknown role permissions = %v", permissions)
+	}
+	technician := PermissionsForRole(RoleTechnician)
+	foundWrite := false
+	foundWorkflowRead := false
+	foundPublish := false
+	for _, permission := range technician {
+		foundWrite = foundWrite || permission == PermissionExecutionWrite
+		foundWorkflowRead = foundWorkflowRead || permission == PermissionWorkflowRead
+		foundPublish = foundPublish || permission == PermissionWorkflowPublish
+	}
+	if !foundWrite || !foundWorkflowRead || foundPublish {
+		t.Fatalf("technician permissions = %v", technician)
+	}
+}
+
+func TestExternalImportPermissionIsRestrictedToImportAuthorities(t *testing.T) {
+	t.Parallel()
+	for _, role := range []Role{RoleAdministrator, RoleMaintenanceSupervisor} {
+		if !containsPermission(PermissionsForRole(role), PermissionExternalImport) {
+			t.Fatalf("%s should have external import permission", role)
+		}
+	}
+	for _, role := range []Role{
+		RoleSeniorTechnician, RoleTechnician, RoleManager,
+	} {
+		if containsPermission(PermissionsForRole(role), PermissionExternalImport) {
+			t.Fatalf("%s must not have external import permission", role)
+		}
+	}
+}
+
+func containsPermission(permissions []Permission, expected Permission) bool {
+	for _, permission := range permissions {
+		if permission == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func TestFieldManageIsAdministratorOnly(t *testing.T) {
+	t.Parallel()
+	for _, role := range []Role{RoleAdministrator} {
+		if !containsPermission(PermissionsForRole(role), PermissionFieldManage) {
+			t.Fatalf("%s should have field:manage permission", role)
+		}
+	}
+	for _, role := range []Role{
+		RoleMaintenanceSupervisor, RoleSeniorTechnician, RoleTechnician, RoleManager,
+	} {
+		if containsPermission(PermissionsForRole(role), PermissionFieldManage) {
+			t.Fatalf("%s must not have field:manage permission", role)
+		}
+	}
+}
+
+func TestPermissionsForRoleMatrix(t *testing.T) {
+	t.Parallel()
+	read := []string{
+		"asset:read", "demonstration:read", "execution:read",
+		"incident:read", "knowledge:read", "workflow:read",
+	}
+	expected := map[Role][]string{
+		RoleAdministrator: matrixSet(read,
+			"asset:create", "asset:criticality:approve", "attachment:write",
+			"demonstration:capture", "demonstration:review", "execution:read:all",
+			"execution:write", "handover:accept", "handover:write",
+			"incident:create", "incident:resolve", "integration:external:import",
+			"knowledge:approve", "knowledge:write", "organization:create",
+			"execution:prerequisite:verify",
+			"recommendation:review", "recommendation:run", "report:approve",
+			"report:write", "workflow:publish", "workflow:review",
+			"field:manage",
+		),
+		RoleMaintenanceSupervisor: matrixSet(read,
+			"asset:create", "asset:criticality:approve", "attachment:write",
+			"demonstration:capture", "demonstration:review", "execution:read:all",
+			"execution:write", "handover:accept", "handover:write",
+			"incident:create", "incident:resolve", "integration:external:import",
+			"knowledge:approve", "knowledge:write", "execution:prerequisite:verify",
+			"recommendation:review", "recommendation:run", "report:approve",
+			"report:write", "workflow:review",
+		),
+		RoleSeniorTechnician: matrixSet(read,
+			"attachment:write", "demonstration:capture", "demonstration:review",
+			"execution:write", "handover:write", "incident:create",
+			"execution:prerequisite:verify", "recommendation:run", "report:write",
+			"workflow:review",
+		),
+		RoleTechnician: matrixSet(read,
+			"attachment:write", "demonstration:capture", "execution:write",
+			"handover:write", "recommendation:run", "report:write",
+		),
+		RoleManager: matrixSet(read,
+			"demonstration:review", "handover:accept", "handover:write",
+			"recommendation:review", "recommendation:run",
+		),
+	}
+	for role, want := range expected {
+		got := permissionSet(PermissionsForRole(role))
+		if !slices.Equal(got, want) {
+			t.Errorf("PermissionsForRole(%s) = %v, want %v", role, got, want)
+		}
+	}
+}
+
+// matrixSet builds a sorted, deduplicated permission set from the universal
+// read set plus role-specific extras, matching permissionSet's output shape.
+func matrixSet(read []string, extra ...string) []string {
+	set := append(slices.Clone(read), extra...)
+	sort.Strings(set)
+	return set
+}
+
+// permissionSet returns the role's permissions as a sorted, deduplicated
+// list of strings, so expected sets can be written literally.
+func permissionSet(permissions []Permission) []string {
+	unique := make(map[Permission]struct{}, len(permissions))
+	for _, p := range permissions {
+		unique[p] = struct{}{}
+	}
+	set := make([]string, 0, len(unique))
+	for p := range unique {
+		set = append(set, string(p))
+	}
+	sort.Strings(set)
+	return set
 }

@@ -27,7 +27,7 @@ func (r SiteReader) Get(
 		WHERE id = $1::uuid
 		  AND organization_id = $2::uuid
 		  AND (
-		      cardinality($3::uuid[]) = 0
+		      COALESCE(cardinality($3::uuid[]), 0) = 0
 		      OR id = ANY($3::uuid[])
 		  )
 	`, siteID, principal.OrganizationID, principal.SiteIDs).Scan(

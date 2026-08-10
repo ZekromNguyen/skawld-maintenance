@@ -25,18 +25,29 @@ func TestRuntimeRolePrivilegesAndTransactionRollback(t *testing.T) {
 	defer pool.Close()
 
 	var auditUpdate, auditDelete, schemaCreate bool
+	var demonstrationEventUpdate, demonstrationEventDelete, reviewUpdate bool
 	err = pool.QueryRow(ctx, `
 		SELECT
 			has_table_privilege(current_user, 'public.audit_events', 'UPDATE'),
 			has_table_privilege(current_user, 'public.audit_events', 'DELETE'),
-			has_schema_privilege(current_user, 'public', 'CREATE')
-	`).Scan(&auditUpdate, &auditDelete, &schemaCreate)
+			has_schema_privilege(current_user, 'public', 'CREATE'),
+			has_table_privilege(current_user, 'public.demonstration_events', 'UPDATE'),
+			has_table_privilege(current_user, 'public.demonstration_events', 'DELETE'),
+			has_table_privilege(current_user, 'public.demonstration_reviews', 'UPDATE')
+	`).Scan(
+		&auditUpdate, &auditDelete, &schemaCreate,
+		&demonstrationEventUpdate, &demonstrationEventDelete, &reviewUpdate,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if auditUpdate || auditDelete || schemaCreate {
-		t.Fatalf("unsafe runtime privileges: audit update=%t delete=%t schema create=%t",
-			auditUpdate, auditDelete, schemaCreate)
+	if auditUpdate || auditDelete || schemaCreate || demonstrationEventUpdate ||
+		demonstrationEventDelete || reviewUpdate {
+		t.Fatalf(
+			"unsafe runtime privileges: audit update=%t delete=%t schema create=%t demonstration update=%t delete=%t review update=%t",
+			auditUpdate, auditDelete, schemaCreate, demonstrationEventUpdate,
+			demonstrationEventDelete, reviewUpdate,
+		)
 	}
 
 	sentinel := errors.New("rollback requested")
